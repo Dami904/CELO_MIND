@@ -1,5 +1,15 @@
 # CeloMind MCP: Full Team Plan
 
+## Current Repository Structure
+CeloMind is now organized as two top-level applications:
+
+- `frontend/` - the self-contained Next.js dashboard and chat UI.
+- `backend/` - the canonical mainnet-only API, MCP server, shared packages, docs knowledge, dashboard metrics module, tests, and build scripts.
+
+Run the backend locally with `cd backend && npm run dev` on port `3001`, then run the frontend with `cd frontend && npm run dev` on port `3000`. The frontend reads `NEXT_PUBLIC_API_BASE_URL` and defaults to `http://localhost:3001`.
+
+The project now targets Celo mainnet (`celo`, chain ID `42220`) only. Write actions are prepared by the backend and must be signed by the connected wallet in the frontend.
+
 ## 1. Product Summary
 CeloMind MCP is an **investor-pitch-ready full dashboard + open-source TypeScript MCP server** for Celo.
 
@@ -27,7 +37,7 @@ Core references/data sources:
 - Bot must connect to Celo wallets and support wallet-aware actions.
 - Bot must explain Celo docs in simple language.
 - Use free/open-source tools as much as possible.
-- Demo should use **Celo testnet first**.
+- Demo should use **Celo mainnet** with wallet confirmation for every write action.
 - Every write action must require confirmation.
 - Copy-wallet features must analyze/prepare first, never auto-trade.
 - Final output must support investor pitch, demo video, and team presentation.
@@ -51,7 +61,7 @@ Core references/data sources:
 - **Wallet:** wagmi, viem, WalletConnect/Web3Modal.
 - **Backend API:** Node.js, TypeScript, Fastify or Express.
 - **MCP Server:** official MCP TypeScript SDK.
-- **Blockchain:** viem, Celo RPC, Alfajores/testnet first.
+- **Blockchain:** viem, Celo RPC, Celo mainnet only.
 - **Validation:** zod.
 - **Docs Assistant:** curated Celo Markdown docs + simple RAG/context search.
 - **Data/logs:** SQLite locally or Supabase free tier.

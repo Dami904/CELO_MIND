@@ -211,6 +211,53 @@ export async function getTokenHoldersV2(tokenAddress: string, network: Network, 
   });
 }
 
+export type TxV2 = {
+  hash: string;
+  status: string | null; // "ok" | "error" | null (pending)
+  method: string | null;
+  decodedCall: string | null;
+  from: string | null;
+  to: string | null;
+  toIsContract: boolean;
+  value: string;
+  rawInput: string;
+  timestamp: string | null;
+  exists: boolean;
+};
+
+/** Fetch + decode a transaction by hash (powers transaction_explain / malicious_tx_check). */
+export async function getTransactionV2(hash: string, network: Network): Promise<TxV2> {
+  try {
+    const raw = await fetchJson<{
+      hash?: string;
+      status?: string | null;
+      result?: string | null;
+      method?: string | null;
+      decoded_input?: { method_call?: string } | null;
+      from?: { hash?: string } | null;
+      to?: { hash?: string; is_contract?: boolean } | null;
+      value?: string | null;
+      raw_input?: string | null;
+      timestamp?: string | null;
+    }>(`${v2Base(network)}/transactions/${hash}`);
+    return {
+      hash: raw.hash ?? hash,
+      status: raw.status ?? raw.result ?? null,
+      method: raw.method ?? null,
+      decodedCall: raw.decoded_input?.method_call ?? null,
+      from: raw.from?.hash ?? null,
+      to: raw.to?.hash ?? null,
+      toIsContract: Boolean(raw.to?.is_contract),
+      value: raw.value ?? "0",
+      rawInput: raw.raw_input ?? "0x",
+      timestamp: raw.timestamp ?? null,
+      exists: true,
+    };
+  } catch {
+    return { hash, status: null, method: null, decodedCall: null, from: null, to: null, toIsContract: false, value: "0", rawInput: "0x", timestamp: null, exists: false };
+  }
+}
+
 /** Whether a contract is verified on Blockscout (used by risk checks). */
 export async function isContractVerifiedV2(address: string, network: Network): Promise<boolean | null> {
   try {

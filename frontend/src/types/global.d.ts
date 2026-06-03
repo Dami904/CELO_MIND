@@ -10,5 +10,4 @@ declare module 'react' {
 
 declare module 'viem/chains' {
   export const celo: any;
-  export const celoAlfajores: any;
 }

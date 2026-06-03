@@ -13,6 +13,8 @@ import { encodeFunctionData, parseUnits, formatUnits, type Address } from "viem"
 import { findTokenAsync, type Network } from "@celomind/shared";
 import { getPublicClient, getWalletClient } from "./celo-client.js";
 import { getMentoQuote, encodeMentoSwap, MENTO_BROKER, type MentoQuote } from "./mento.js";
+import { getCeloTokenPrice } from "./market.js";
+import { checkTokenRisk } from "./risk.js";
 
 export const UNISWAP_V3 = {
   quoterV2: "0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8" as Address,
@@ -114,6 +116,7 @@ export type PreparedSwap = {
   transactions: PreparedTx[];
   status: "prepared_for_review";
   warning: string;
+  outputTokenRisk?: { level: string; score: number; flags: string[] };
   source: string;
 };
 
@@ -217,6 +220,24 @@ export async function getSwapQuote(fromSym: string, toSym: string, amount: strin
   }
 
   const amountOutStr = formatUnits(amountOut, toTok.decimals);
+  const execRate = Number(amountOutStr) / Number(amount);
+
+  // Reference-price cross-check (CoinGecko) — catches a venue that's uniformly mispriced, which the
+  // within-venue impact check can't see. Only possible when both tokens have a known price feed.
+  let refWarning: string | undefined;
+  if (fromTok.coingeckoId && toTok.coingeckoId) {
+    const [fp, tp] = await Promise.all([getCeloTokenPrice(fromTok.coingeckoId), getCeloTokenPrice(toTok.coingeckoId)]);
+    if (fp?.usd && tp?.usd && tp.usd > 0) {
+      const marketRate = fp.usd / tp.usd; // toToken per 1 fromToken at market
+      const dev = marketRate > 0 ? (marketRate - execRate) / marketRate : 0;
+      if (dev > HARD_IMPACT) {
+        return {
+          error: `Refusing ${fromTok.symbol} → ${toTok.symbol}: on-chain quote is ~${(dev * 100).toFixed(1)}% below the CoinGecko market rate. Likely thin/manipulated liquidity — you'd swap at a loss.`,
+        };
+      }
+      if (dev > WARN_IMPACT) refWarning = `Quote is ~${(dev * 100).toFixed(1)}% below CoinGecko market price — proceed with caution.`;
+    }
+  }
   return {
     route,
     fromToken: fromTok.symbol,
@@ -229,13 +250,16 @@ export async function getSwapQuote(fromSym: string, toSym: string, amount: strin
     amountInRaw: amountIn.toString(),
     amountOut: amountOutStr,
     amountOutRaw: amountOut.toString(),
-    rate: Number(amountOutStr) / Number(amount),
+    rate: execRate,
     priceImpact: impact,
     priceImpactPct: `${(impact * 100).toFixed(2)}%`,
     feeTier: uniFee,
     mentoProvider: mentoQ?.provider,
     mentoExchangeId: mentoQ?.exchangeId,
-    warning: impact > WARN_IMPACT ? `High price impact (~${(impact * 100).toFixed(1)}%). You may receive notably less than market value — consider a smaller amount.` : undefined,
+    warning:
+      [impact > WARN_IMPACT ? `High price impact (~${(impact * 100).toFixed(1)}%) — consider a smaller amount.` : undefined, refWarning]
+        .filter(Boolean)
+        .join(" ") || undefined,
     dex: route,
     source: `${route} (Celo)`,
   };
@@ -252,6 +276,13 @@ export async function prepareSwap(
 ): Promise<PreparedSwap | SwapError> {
   const quote = await getSwapQuote(fromSym, toSym, amount, network);
   if ("error" in quote) return quote;
+
+  // Output-token risk screen — don't let a user unknowingly swap INTO a scam/honeypot token.
+  const risk = await checkTokenRisk(quote.toAddress, network).catch(() => null);
+  const outputTokenRisk = risk ? { level: risk.riskLevel, score: risk.riskScore, flags: risk.flags } : undefined;
+  const riskWarning = risk && (risk.riskLevel === "high" || risk.riskLevel === "critical")
+    ? `⚠ Destination token ${quote.toToken} looks ${risk.riskLevel} risk: ${risk.flags.slice(0, 2).join("; ")}.`
+    : undefined;
 
   const amountInRaw = BigInt(quote.amountInRaw);
   const minOut = (BigInt(quote.amountOutRaw) * BigInt(10000 - slippageBps)) / 10000n;
@@ -326,7 +357,8 @@ export async function prepareSwap(
     minAmountOut: formatUnits(minOut, quote.toDecimals),
     transactions,
     status: "prepared_for_review",
-    warning: quote.warning ?? "Review and sign these in your wallet. The backend never signs or executes — your wallet does.",
+    warning: [riskWarning, quote.warning].filter(Boolean).join(" ") || "Review and sign these in your wallet. The backend never signs or executes — your wallet does.",
+    outputTokenRisk,
     source: `${quote.route} (Celo)`,
   };
 }

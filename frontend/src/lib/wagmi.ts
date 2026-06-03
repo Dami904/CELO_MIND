@@ -1,8 +1,9 @@
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config'
 import { cookieStorage, createStorage } from 'wagmi'
 // @ts-ignore
-import { celo, celoAlfajores } from 'viem/chains'
+import { celo } from 'viem/chains'
 
+// CeloMind is mainnet-only (chainId 42220). No testnet chains are configured.
 export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || 'a30d5b51a0293049b49bcf5c36dfc2e5'
 
 const metadata = {
@@ -13,7 +14,7 @@ const metadata = {
 }
 
 export const config = defaultWagmiConfig({
-  chains: [celo, celoAlfajores] as const,
+  chains: [celo] as const,
   projectId,
   metadata,
   ssr: true,

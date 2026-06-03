@@ -1,11 +1,14 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from "react";
-import { useAccount } from "wagmi";
-import { apiClient } from "@/lib/api";
+import { useAccount, useSendTransaction, useSwitchChain, usePublicClient } from "wagmi";
+import { celo } from "viem/chains";
+import { apiClient, type PendingTxData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import ResultCard from "@/components/ui/ResultCard";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+
+const CELO_CHAIN_ID = 42220; // Celo mainnet
 
 interface Message {
   id: string;
@@ -16,14 +19,18 @@ interface Message {
     title: string;
     data: { label: string; value: string; color?: "green" | "yellow" | "red" | "default" }[];
   };
-  pendingTx?: {
-    title: string;
-    data: { label: string; value: string }[];
-  };
+  pendingTx?: PendingTxData;
 }
 
 export default function ChatPage() {
-  const { address } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { switchChainAsync } = useSwitchChain();
+  const publicClient = usePublicClient({ chainId: celo.id });
+  const conversationId = useRef<string>(
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
+  ).current;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -37,8 +44,14 @@ export default function ChatPage() {
 
   // Transaction signing states
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [pendingTxData, setPendingTxData] = useState<{ title: string; data: { label: string; value: string }[] } | null>(null);
+  const [pendingTxData, setPendingTxData] = useState<PendingTxData | null>(null);
   const [isSigning, setIsSigning] = useState(false);
+
+  const addBotMessage = (text: string, resultCard?: Message["resultCard"]) =>
+    setMessages((prev) => [
+      ...prev,
+      { id: Math.random().toString(), sender: "bot", text, timestamp: new Date().toLocaleTimeString(), resultCard },
+    ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,8 +93,8 @@ export default function ChatPage() {
     setIsTyping(true);
 
     try {
-      const response = await apiClient.sendMessage(text, address);
-      
+      const response = await apiClient.sendMessage(text, address, "full", conversationId);
+
       const botMsg: Message = {
         id: Math.random().toString(),
         sender: "bot",
@@ -93,52 +106,68 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, botMsg]);
     } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "bot",
-          text: "RPC Exception: Failed to connect to local MCP gateway.",
-          timestamp: new Date().toLocaleTimeString(),
-        }
-      ]);
+      addBotMessage(
+        e instanceof Error ? `Request failed: ${e.message}` : "Failed to reach the CeloMind backend."
+      );
     } finally {
       setIsTyping(false);
     }
   };
 
-  const triggerPendingTx = (tx: { title: string; data: { label: string; value: string }[] }) => {
+  const triggerPendingTx = (tx: PendingTxData) => {
     setPendingTxData(tx);
     setIsConfirmOpen(true);
   };
 
-  const handleConfirmSign = () => {
-    setIsSigning(true);
-    setTimeout(() => {
-      setIsSigning(false);
-      setIsConfirmOpen(false);
+  // Real signer: the backend only prepares unsigned txs — the user's wallet signs/broadcasts them here.
+  const handleConfirmSign = async () => {
+    if (!pendingTxData) return;
 
-      // Append success transaction receipt to chat
-      const time = new Date().toLocaleTimeString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "bot",
-          text: "Transaction successfully signed and broadcast to Celo Mainnet.",
-          timestamp: time,
-          resultCard: {
-            title: "Transaction Receipt",
-            data: [
-              { label: "Status", value: "SUCCESS (CONFIRMED)", color: "green" },
-              { label: "Transaction Hash", value: "0x789c0a...f34b82" },
-              { label: "Gas Used", value: "84,231" },
-              { label: "Block Number", value: "18,482,901" }
-            ]
-          }
+    if (!isConnected || !address) {
+      setIsConfirmOpen(false);
+      addBotMessage("Connect your wallet first — I prepare transactions, your wallet signs them.");
+      return;
+    }
+
+    setIsSigning(true);
+    try {
+      if (chainId !== CELO_CHAIN_ID) {
+        await switchChainAsync({ chainId: CELO_CHAIN_ID });
+      }
+
+      const hashes: string[] = [];
+      for (const tx of pendingTxData.transactions) {
+        const hash = await sendTransactionAsync({
+          to: tx.to as `0x${string}`,
+          data: (tx.data || "0x") as `0x${string}`,
+          value: BigInt(tx.value || "0"),
+        });
+        hashes.push(hash);
+        // Wait for each step to be mined before sending the next (e.g. approve before swap/supply).
+        if (publicClient && pendingTxData.transactions.length > 1) {
+          await publicClient.waitForTransactionReceipt({ hash: hash as `0x${string}` });
         }
-      ]);
-    }, 2000);
+      }
+
+      setIsConfirmOpen(false);
+      addBotMessage("Transaction signed and broadcast to Celo Mainnet.", {
+        title: "Transaction Receipt",
+        data: [
+          { label: "Status", value: "BROADCAST", color: "green" },
+          ...hashes.map((h, i) => ({
+            label: hashes.length > 1 ? `Tx ${i + 1} hash` : "Transaction hash",
+            value: h,
+          })),
+          { label: "Network", value: "Celo Mainnet (42220)" },
+        ],
+      });
+    } catch (e) {
+      setIsConfirmOpen(false);
+      const msg = e instanceof Error ? e.message : "Transaction rejected or failed.";
+      addBotMessage(`Transaction not completed: ${msg.split("\n")[0]}`);
+    } finally {
+      setIsSigning(false);
+    }
   };
 
   return (

@@ -25,7 +25,8 @@ import {
   getCeloRecentTransactions,
   getCeloTVL,
 } from "./market.js";
-import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "./risk.js";
+import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction, explainTransaction } from "./risk.js";
+import { getAavePosition, prepareAaveSupply } from "./aave.js";
 import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "./whale.js";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
@@ -338,22 +339,21 @@ async function handleTool(name: string, args: Record<string, unknown>) {
 
     case "celo_aave_position": {
       const { walletAddress } = args as { walletAddress: string };
-      return ok({
-        walletAddress,
-        network: NETWORK,
-        note: "Aave V3 on Celo mainnet. Pool: 0x3E59A31363E6b6d5E4BF2b15D01Fc8a52f1De78",
-        message: "To get live Aave positions, query the Pool contract getUserAccountData(address).",
-        aavePoolAddress: "0x3E59A31363E6b6d5E4BF2b15D01Fc8a52f1De78",
-        supportedAssets: ["CELO", "cUSD", "cEUR", "USDC", "WETH"],
-      });
+      if (!walletAddress) return err("walletAddress is required");
+      const position = await getAavePosition(walletAddress, NETWORK);
+      return ok({ network: NETWORK, ...position });
     }
 
     case "celo_aave_supply": {
-      return ok({
-        status: "requires_signer",
-        message: "Aave supply requires CELO_PRIVATE_KEY and user confirmation. Set env var and re-invoke.",
-        network: NETWORK,
-      });
+      const { asset, amount, walletAddress } = args as { asset: string; amount: string; walletAddress?: string };
+      let owner = walletAddress;
+      if (!owner && process.env.CELO_PRIVATE_KEY) {
+        try { owner = getWalletClient(NETWORK).account!.address; } catch { /* ignore */ }
+      }
+      if (!owner) return err("Provide walletAddress (or set CELO_PRIVATE_KEY) to prepare an Aave supply.");
+      const prepared = await prepareAaveSupply(asset, amount, owner, NETWORK);
+      if ("error" in prepared) return err(prepared.error);
+      return ok({ network: NETWORK, ...prepared });
     }
 
     case "self_verify": {
@@ -444,7 +444,7 @@ async function handleTool(name: string, args: Record<string, unknown>) {
     case "check_malicious_transaction":
     case "explain_transaction_risk": {
       const { txData } = args as { txData: string };
-      const report = await checkMaliciousTransaction(txData, NETWORK);
+      const report = await explainTransaction(txData, NETWORK);
       return ok({ network: NETWORK, ...report });
     }
 

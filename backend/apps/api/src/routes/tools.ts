@@ -10,8 +10,10 @@ import {
   getRecentlyLaunchedCeloTokens,
   getTrendingCeloTokens,
 } from "@celomind/mcp-server/market";
-import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "@celomind/mcp-server/risk";
+import { checkContractRisk, checkTokenRisk, explainTransaction } from "@celomind/mcp-server/risk";
 import { getSwapQuote, prepareSwap } from "@celomind/mcp-server/swap";
+import { prepareTransfer } from "@celomind/mcp-server/transfer";
+import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
 import { analyzeCopyWallet, getWhaleWalletActivity } from "@celomind/mcp-server/whale";
 import { logToolCall } from "../db/sqlite.js";
 import { recordToolCall } from "../../../../dashboard/src/index.js";
@@ -141,14 +143,29 @@ export async function toolRoutes(app: FastifyInstance) {
         case "prepare_celo_swap":
           data = await prepareSwapTx(params, walletAddress);
           break;
+        case "celo_send": {
+          const to = (params.to as string) ?? "";
+          const prepared = await prepareTransfer(to, String(params.amount ?? ""), String(params.tokenSymbolOrAddress ?? params.token ?? "CELO"), net);
+          data = "error" in prepared ? { status: "no_quote", message: prepared.error } : prepared;
+          break;
+        }
+        case "celo_aave_supply": {
+          const owner = (params.walletAddress as string) ?? walletAddress;
+          if (!owner) { data = { status: "needs_wallet", message: "Provide walletAddress to prepare an Aave supply." }; break; }
+          const prepared = await prepareAaveSupply(String(params.asset ?? ""), String(params.amount ?? ""), owner, net);
+          data = "error" in prepared ? { status: "no_quote", message: prepared.error } : prepared;
+          break;
+        }
         case "celo_swap_execute":
-        case "celo_send":
-        case "celo_aave_supply":
           data = confirmationData(tool, params);
           break;
-        case "celo_aave_position":
-          data = aavePositionData((params.walletAddress as string) ?? walletAddress);
+        case "celo_aave_position": {
+          const addr = (params.walletAddress as string) ?? walletAddress;
+          if (!addr) { data = aavePositionData(undefined); break; }
+          try { data = await getAavePosition(addr, net); }
+          catch { data = aavePositionData(addr); }
           break;
+        }
         case "self_verify":
           data = {
             ...selfData((params.address as string) ?? walletAddress),
@@ -180,10 +197,10 @@ export async function toolRoutes(app: FastifyInstance) {
           data = await checkTokenRisk(params.tokenAddress as string, net);
           break;
         case "check_malicious_transaction":
-          data = await checkMaliciousTransaction(params.txData as string, net);
+          data = await explainTransaction(String(params.txData ?? params.txHash ?? ""), net);
           break;
         case "explain_transaction_risk":
-          data = await checkMaliciousTransaction(String(params.txData ?? params.txHash ?? ""), net);
+          data = await explainTransaction(String(params.txData ?? params.txHash ?? ""), net);
           break;
         case "watch_whale_wallet":
         case "get_whale_wallet_activity":

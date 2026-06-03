@@ -1,5 +1,7 @@
 import { getNetwork, marketNetwork, type Network } from "@celomind/shared";
-import { isContractVerifiedV2, getTokenInfoV2 } from "./blockscout.js";
+import { isContractVerifiedV2, getTokenInfoV2, getTransactionV2 } from "./blockscout.js";
+
+const HASH_RE = /0x[0-9a-fA-F]{64}/;
 
 /** Etherscan-V1-compatible API on the Blockscout host (replaces deprecated Celoscan V1). */
 function v1Base(network: Network) {
@@ -120,7 +122,64 @@ export async function checkTokenRisk(tokenAddress: string, network: Network = ma
   };
 }
 
-export async function checkMaliciousTransaction(txData: string, network: Network): Promise<RiskReport> {
+/**
+ * Explain/score a transaction. If the input contains a real tx hash, fetch + decode it from
+ * Blockscout and analyze the actual on-chain transaction; otherwise fall back to heuristic
+ * calldata-string analysis. Powers both `transaction_explain` and `malicious_tx_check`.
+ */
+export async function explainTransaction(input: string, network: Network = marketNetwork()): Promise<RiskReport & { summary?: string; txHash?: string }> {
+  const hash = input.match(HASH_RE)?.[0];
+  if (!hash) return checkMaliciousTransaction(input, network);
+
+  const tx = await getTransactionV2(hash, network);
+  if (!tx.exists) {
+    return {
+      target: hash, type: "transaction", riskLevel: "medium", riskScore: 20, flags: ["Transaction not found on Blockscout (wrong hash or not yet indexed)"],
+      explanation: "Could not load that transaction.", recommendation: "Double-check the hash on the explorer.",
+      uncertainty: "Transaction lookup failed.", source: "Blockscout", txHash: hash,
+    };
+  }
+
+  const flags: string[] = [];
+  let score = 0;
+  const call = (tx.decodedCall ?? tx.method ?? "").toLowerCase();
+
+  if (tx.status === "error") { flags.push("Transaction reverted/failed on-chain"); score += 10; }
+  if (call.includes("approve")) {
+    const unlimited = /ffffffffffffffff/.test(tx.rawInput.toLowerCase());
+    if (unlimited) { flags.push("Unlimited token approval — spender can move all of this token"); score += 55; }
+    else flags.push("Token approval — grants a spender allowance");
+    score += 10;
+  }
+  if (call.includes("setapprovalforall")) { flags.push("setApprovalForAll — grants control over ALL your NFTs in a collection"); score += 60; }
+  if (call.includes("permit")) { flags.push("Gasless permit signature — verify the spender and amount"); score += 20; }
+  if (call.includes("transferfrom")) { flags.push("transferFrom — pulls tokens from an owner"); score += 15; }
+  if (tx.to && !tx.toIsContract && tx.value !== "0") flags.push("Plain value transfer to an externally-owned account");
+
+  const riskLevel = score >= 60 ? "critical" : score >= 40 ? "high" : score >= 20 ? "medium" : "low";
+  const summary = `${tx.decodedCall ?? tx.method ?? "Transfer"} — from ${tx.from ?? "?"} to ${tx.to ?? "?"}${tx.value !== "0" ? `, value ${tx.value} wei` : ""} (${tx.status ?? "pending"}).`;
+
+  return {
+    target: hash,
+    type: "transaction",
+    riskLevel,
+    riskScore: Math.min(score, 100),
+    flags: flags.length ? flags : ["No high-risk patterns detected in this transaction"],
+    explanation: summary,
+    recommendation: riskLevel === "low" ? "Looks routine — still verify the counterparty." : `${riskLevel.toUpperCase()} risk — review carefully before trusting/repeating this action.`,
+    uncertainty: "Based on Blockscout's decoded transaction; not a formal audit.",
+    source: "Blockscout",
+    summary,
+    txHash: hash,
+  };
+}
+
+export async function checkMaliciousTransaction(txData: string, network: Network = marketNetwork()): Promise<RiskReport> {
+  // If a real tx hash is present, analyze the actual on-chain tx instead of the raw string.
+  if (HASH_RE.test(txData)) {
+    const { summary: _s, txHash: _h, ...report } = await explainTransaction(txData, network);
+    return report;
+  }
   const flags: string[] = [];
   let score = 0;
 

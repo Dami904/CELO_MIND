@@ -11,7 +11,9 @@
     "./blockscout": "./src/blockscout.ts",
     "./dune": "./src/dune.ts",
     "./swap": "./src/swap.ts",
-    "./mento": "./src/mento.ts"
+    "./mento": "./src/mento.ts",
+    "./transfer": "./src/transfer.ts",
+    "./aave": "./src/aave.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

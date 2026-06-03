@@ -15,9 +15,11 @@ import {
   getCeloWalletPortfolio,
   getCeloRecentTransactions,
 } from "@celomind/mcp-server/market";
-import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "@celomind/mcp-server/risk";
+import { checkContractRisk, checkTokenRisk, explainTransaction } from "@celomind/mcp-server/risk";
 import { getWhaleWalletActivity, analyzeCopyWallet } from "@celomind/mcp-server/whale";
 import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-server/swap";
+import { prepareTransfer, parseSendRequest } from "@celomind/mcp-server/transfer";
+import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
 
 import { resolveNetwork } from "@celomind/shared";
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
@@ -31,6 +33,14 @@ function extractAddress(message: string, fallback?: string): string | undefined 
 function extractTwoAddresses(message: string, fallback?: string): [string | undefined, string | undefined] {
   const matches = message.match(new RegExp(ADDRESS_RE.source, "g")) ?? [];
   return [matches[0] ?? fallback, matches[1] ?? fallback];
+}
+
+/** Loosely extract a payment "{amount} {TOKEN} ... 0x{recipient}" from free text (used by x402). */
+function parsePayment(message: string): { amount: string; token: string; to: string } | null {
+  const to = message.match(ADDRESS_RE)?.[0];
+  const amt = message.match(/([\d.]+)\s*([a-zA-Z$]{2,10})\b/);
+  if (to && amt) return { amount: amt[1], token: amt[2], to };
+  return null;
 }
 
 async function swapQuoteData(message: string) {
@@ -151,8 +161,13 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
     case "token_risk":
     case "malicious_tx_check":
     case "transaction_explain": {
-      const risk = data as { riskLevel?: string; riskScore?: number; explanation?: string; recommendation?: string; uncertainty?: string };
-      return `Risk result: ${risk.riskLevel ?? "unknown"}${typeof risk.riskScore === "number" ? ` (${risk.riskScore}/100)` : ""}.\n${risk.explanation ?? ""}\nRecommendation: ${risk.recommendation ?? "Review carefully before signing."}${risk.uncertainty ? `\nUncertainty: ${risk.uncertainty}` : ""}`;
+      const risk = payload as { riskLevel?: string; riskScore?: number; explanation?: string; recommendation?: string; uncertainty?: string };
+      return `Risk result: ${risk.riskLevel ?? "unknown"}${typeof risk.riskScore === "number" ? ` (${risk.riskScore}/100)` : ""}.\n${risk.explanation ?? ""}\nRecommendation: ${risk.recommendation ?? "Review carefully before signing."}${risk.uncertainty ? `\nUncertainty: ${risk.uncertainty}` : ""}\n${srcLine("Blockscout")}`;
+    }
+    case "aave_position": {
+      const p = payload as { totalCollateralUsd?: string; totalDebtUsd?: string; availableBorrowsUsd?: string; healthFactor?: string; hasPosition?: boolean };
+      if (!p || p.hasPosition === false) return "No active Aave V3 position for that wallet (no collateral or debt).\nSource: Aave V3 Pool.";
+      return `Aave V3 position:\nCollateral: $${p.totalCollateralUsd} · Debt: $${p.totalDebtUsd} · Available to borrow: $${p.availableBorrowsUsd}\nHealth factor: ${p.healthFactor}.\nSource: Aave V3 Pool.`;
     }
     case "whale_watch":
     case "whale_activity": {
@@ -182,9 +197,16 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       return `Prepared swap (Uniswap V3): ${s.quote.amountIn} ${s.quote.fromToken} → ~${s.quote.amountOut} ${s.quote.toToken} (min ${s.minAmountOut}).\nSteps to sign in your wallet: ${steps}.\nNothing was executed — review and confirm in your wallet.`;
     }
     case "send":
-    case "aave_supply":
-    case "x402_pay":
-      return "This is a write/payment operation. I prepared the request, but nothing was executed. Please review and confirm in your wallet before proceeding.";
+    case "x402_pay": {
+      const t = data as { token?: string; amount?: string; to?: string; transaction?: unknown };
+      if (t?.transaction && t.to) return `Prepared transfer: ${t.amount} ${t.token} → ${t.to}.\nReview and sign in your wallet — the backend does not move funds.`;
+      return "This is a write/payment operation. I prepared the request, but nothing was executed. Please confirm in your wallet.";
+    }
+    case "aave_supply": {
+      const s = data as { asset?: string; amount?: string; transactions?: { type: string }[] };
+      if (!s?.transactions) return "Tell me the amount and asset, e.g. \"supply 10 cUSD to Aave\".";
+      return `Prepared Aave V3 supply: ${s.amount} ${s.asset}.\nSteps to sign: ${(s.transactions ?? []).map((x) => x.type).join(" → ")}.\nNothing executed — confirm in your wallet.`;
+    }
     default:
       return typeof data === "string" ? data : `Here is the clean result I found:\n${JSON.stringify(data, null, 2)}`;
   }
@@ -273,8 +295,15 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       case "swap_quote":
         return await swapQuoteData(req.message);
 
-      case "aave_position":
-        return getAaveInfo(wa);
+      case "aave_position": {
+        const addr = extractAddress(req.message, wa);
+        if (!addr) return { note: "Connect or provide a wallet address to read its Aave V3 position." };
+        try {
+          return { result: await getAavePosition(addr, marketNetwork()), source: "Aave V3 Pool" };
+        } catch {
+          return { ...getAaveInfo(addr), note: "Could not read the live Aave position right now." };
+        }
+      }
 
       case "self_verify":
         return { ...getSelfInfo(extractAddress(req.message, wa)), context: await buildDocsContextAsync("Self Protocol Celo identity verification") };
@@ -282,8 +311,16 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       case "agent_id_check":
         return getSelfInfo(extractAddress(req.message, wa));
 
-      case "x402_pay":
+      case "x402_pay": {
+        // The real, signable leg of an x402 flow is the payment transfer. If the message names an
+        // amount + token + recipient, prepare it; otherwise explain the flow.
+        const pay = parsePayment(req.message);
+        if (pay) {
+          const prepared = await prepareTransfer(pay.to, pay.amount, pay.token, marketNetwork());
+          if (!("error" in prepared)) return { ...prepared, protocol: "x402", requires_confirmation: true };
+        }
         return getX402Info(req.message);
+      }
 
       case "whale_watch":
       case "whale_activity": {
@@ -306,7 +343,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "malicious_tx_check":
-        return await checkMaliciousTransaction(req.message, net);
+        return { result: await explainTransaction(req.message, marketNetwork()), source: "Blockscout + heuristics" };
 
       case "copy_wallet_analyze": {
         const [source, mine] = extractTwoAddresses(req.message, wa);
@@ -322,14 +359,23 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
           return { note: "Provide source wallet and your wallet address. I will prepare actions only; nothing executes automatically." };
         }
         const analysis = await analyzeCopyWallet(source, mine, marketNetwork());
-        return { ...analysis, requires_confirmation: true, status: "prepared_for_review" };
+        // Real, live quotes for acquiring each missing token (illustrative 1 cUSD each).
+        const suggestedSwaps: { token: string; route?: string; quote: string }[] = [];
+        for (const sym of analysis.tokensToAdd.slice(0, 3)) {
+          const q = await getSwapQuote("cUSD", sym, "1", marketNetwork());
+          if (!("error" in q)) suggestedSwaps.push({ token: sym, route: q.route, quote: `1 cUSD ≈ ${q.amountOut} ${sym}` });
+        }
+        return {
+          ...analysis,
+          suggestedSwaps,
+          requires_confirmation: true,
+          status: "prepared_for_review",
+          note: "Quotes are illustrative (1 cUSD each). To get a signable swap, say e.g. \"swap 10 cUSD to <TOKEN>\".",
+        };
       }
 
-      case "transaction_explain": {
-        const hash = req.message.match(HASH_RE)?.[0];
-        const risk = await checkMaliciousTransaction(req.message, net);
-        return { txHash: hash, ...risk, source: hash ? "Blockscout (tx lookup) + heuristic" : "heuristic message analysis" };
-      }
+      case "transaction_explain":
+        return { result: await explainTransaction(req.message, marketNetwork()), source: "Blockscout" };
 
       case "swap_execute": {
         const parsed = parseSwapRequest(req.message);
@@ -340,9 +386,22 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return { ...prepared, requires_confirmation: true };
       }
 
-      case "send":
-      case "aave_supply":
-        return { requires_confirmation: true, message: "This is a write operation. Please confirm in your wallet before proceeding." };
+      case "send": {
+        const parsed = parseSendRequest(req.message);
+        if (!parsed) return { note: "Tell me the amount, token, and recipient, e.g. \"send 5 cUSD to 0x…\"." };
+        const prepared = await prepareTransfer(parsed.to, parsed.amount, parsed.token, marketNetwork());
+        if ("error" in prepared) return { note: prepared.error };
+        return { ...prepared, requires_confirmation: true };
+      }
+
+      case "aave_supply": {
+        const m = req.message.match(/supply\s+([\d.]+)\s+([a-zA-Z$]+)/i);
+        if (!m) return { note: "Tell me the amount and asset, e.g. \"supply 10 cUSD to Aave\"." };
+        if (!wa) return { note: "Connect your wallet first — I prepare the supply, your wallet signs it." };
+        const prepared = await prepareAaveSupply(m[2], m[1], wa, marketNetwork());
+        if ("error" in prepared) return { note: prepared.error };
+        return { ...prepared, requires_confirmation: true };
+      }
 
       case "unsupported":
         return null;

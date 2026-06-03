@@ -17,7 +17,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: CELO_NETWORK
-        value: alfajores
+        value: celo
       - key: UPSTASH_REDIS_URL
         sync: false
       - key: UPSTASH_REDIS_TOKEN
@@ -35,15 +35,11 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+        value: gemini-2.5-flash
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: DEEPSEEK_MODEL
         value: deepseek-chat
-      - key: OLLAMA_BASE_URL
-        sync: false
-      - key: OLLAMA_MODEL
-        value: llama3
       - key: DATABASE_URL
         sync: false
       - key: BLOCKSCOUT_API_KEY

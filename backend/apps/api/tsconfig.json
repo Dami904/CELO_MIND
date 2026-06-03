@@ -14,7 +14,9 @@
       "@celomind/mcp-server/dune": ["../../packages/mcp-server/src/dune.ts"],
       "@celomind/dashboard": ["../../dashboard/src/index.ts"],
       "@celomind/mcp-server/swap": ["../../packages/mcp-server/src/swap.ts"],
-      "@celomind/mcp-server/mento": ["../../packages/mcp-server/src/mento.ts"]
+      "@celomind/mcp-server/mento": ["../../packages/mcp-server/src/mento.ts"],
+      "@celomind/mcp-server/transfer": ["../../packages/mcp-server/src/transfer.ts"],
+      "@celomind/mcp-server/aave": ["../../packages/mcp-server/src/aave.ts"]
     }
   },
   "include": ["src", "../../dashboard/src"]
