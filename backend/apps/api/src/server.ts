@@ -1,3 +1,4 @@
+import "./env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { initDb } from "./db/sqlite.js";
@@ -8,6 +9,7 @@ import { chatRoutes } from "./routes/chat.js";
 import { riskRoutes } from "./routes/risk.js";
 import { whaleRoutes } from "./routes/whales.js";
 import { toolRoutes } from "./routes/tools.js";
+import { metricsRoutes } from "../../../dashboard/src/index.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -43,6 +45,7 @@ async function main() {
   await app.register(riskRoutes);
   await app.register(whaleRoutes);
   await app.register(toolRoutes);
+  await app.register(metricsRoutes);
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`[CeloMind API] Listening on http://${HOST}:${PORT}`);
