@@ -26,7 +26,6 @@ export default function Web3ModalProvider({
   initialState?: State
 }) {
   return (
-    // @ts-expect-error type conflict in React 18/19 typings
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         {children}

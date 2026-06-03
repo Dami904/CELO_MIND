@@ -18,6 +18,7 @@ export const config = defaultWagmiConfig({
   projectId,
   metadata,
   ssr: true,
+  // @ts-ignore - Storage type compatibility
   storage: createStorage({
     storage: cookieStorage,
   }),
