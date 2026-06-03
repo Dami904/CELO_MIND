@@ -1,0 +1,27 @@
+{
+  "name": "@celomind/api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@celomind/shared": "*",
+    "@celomind/docs-knowledge": "*",
+    "@celomind/mcp-server": "*",
+    "fastify": "^4.28.0",
+    "@fastify/cors": "^9.0.1",
+    "@libsql/client": "^0.14.0",
+    "viem": "^2.17.0",
+    "zod": "^3.23.8",
+    "@anthropic-ai/sdk": "^0.32.0",
+    "openai": "^4.57.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "tsx": "^4.15.0",
+    "@types/node": "^20.14.0"
+  }
+}

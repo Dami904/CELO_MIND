@@ -1,0 +1,30 @@
+{
+  "name": "@celomind/mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./celo-client": "./src/celo-client.ts",
+    "./market": "./src/market.ts",
+    "./risk": "./src/risk.ts",
+    "./whale": "./src/whale.ts",
+    "./blockscout": "./src/blockscout.ts",
+    "./dune": "./src/dune.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@celomind/shared": "*",
+    "@celomind/docs-knowledge": "*",
+    "viem": "^2.17.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "tsx": "^4.15.0"
+  }
+}
