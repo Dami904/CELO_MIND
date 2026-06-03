@@ -11,8 +11,9 @@
       "@celomind/mcp-server/risk": ["../../packages/mcp-server/src/risk.ts"],
       "@celomind/mcp-server/whale": ["../../packages/mcp-server/src/whale.ts"],
       "@celomind/mcp-server/blockscout": ["../../packages/mcp-server/src/blockscout.ts"],
-      "@celomind/mcp-server/dune": ["../../packages/mcp-server/src/dune.ts"]
+      "@celomind/mcp-server/dune": ["../../packages/mcp-server/src/dune.ts"],
+      "@celomind/dashboard": ["../../dashboard/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../../dashboard/src"]
 }

@@ -13,6 +13,7 @@ import {
 import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "@celomind/mcp-server/risk";
 import { analyzeCopyWallet, getWhaleWalletActivity } from "@celomind/mcp-server/whale";
 import { logToolCall } from "../db/sqlite.js";
+import { recordToolCall } from "../../../../dashboard/src/index.js";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 
@@ -80,6 +81,7 @@ export async function toolRoutes(app: FastifyInstance) {
     const { tool } = req.params;
     const parsed = ToolRunRequestSchema.safeParse(req.body);
     if (!parsed.success) {
+      void recordToolCall({ tool, success: false });
       return reply.code(400).send(makeErr(`tool_${tool}`, NETWORK, "VALIDATION_ERROR", parsed.error.message));
     }
     const { params, walletAddress, network } = parsed.data;
@@ -204,11 +206,14 @@ export async function toolRoutes(app: FastifyInstance) {
           break;
         }
         default:
+          void recordToolCall({ tool, success: false });
           return reply.code(404).send(makeErr(`tool_${tool}`, net, "UNKNOWN_TOOL", `Tool '${tool}' not found`));
       }
 
+      void recordToolCall({ tool, success: true });
       return makeOk(`tool_${tool}`, net, data, uiHintForTool(tool));
     } catch (e: unknown) {
+      void recordToolCall({ tool, success: false });
       return reply.code(500).send(makeErr(`tool_${tool}`, net, "TOOL_ERROR", String(e)));
     }
   });

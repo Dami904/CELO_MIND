@@ -4,6 +4,7 @@ import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledg
 import { detectIntent } from "../ai/intent-router.js";
 import { aiComplete } from "../ai/providers.js";
 import { logChatMessage } from "../db/sqlite.js";
+import { recordChatRequest, type MetricsProvider } from "../../../../dashboard/src/index.js";
 import { findToken, getTokenList, marketNetwork } from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
 import {
@@ -375,6 +376,9 @@ export async function chatRoutes(app: FastifyInstance) {
 
     let aiResponse: string;
     let aiProvider: string;
+    let aiModel = "fallback";
+    let fallback = false;
+    const aiStartedAt = Date.now();
 
     try {
       const result = await aiComplete({
@@ -387,10 +391,23 @@ export async function chatRoutes(app: FastifyInstance) {
       });
       aiResponse = result.text;
       aiProvider = result.provider;
+      aiModel = result.model;
     } catch (e: unknown) {
       aiResponse = formatFallbackAnswer(intent, intentData);
       aiProvider = "fallback";
+      fallback = true;
     }
+
+    void recordChatRequest({
+      chatbotType: chatReq.chatbotType,
+      intent,
+      provider: aiProvider as MetricsProvider,
+      model: aiModel,
+      fallback,
+      latencyMs: Date.now() - aiStartedAt,
+      walletAddress: chatReq.walletAddress,
+      conversationId: chatReq.conversationId,
+    });
 
     // Log assistant response (fire-and-forget)
     void logChatMessage({
