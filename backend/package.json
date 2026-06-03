@@ -2,6 +2,9 @@
   "name": "celomind",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
