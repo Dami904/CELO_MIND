@@ -6,14 +6,16 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { findToken, getTokenList, resolveNetwork, marketNetwork } from "@celomind/shared";
+import { findTokenAsync, getTokenList, resolveNetwork, marketNetwork } from "@celomind/shared";
 import { buildDocsContext } from "@celomind/docs-knowledge";
 import {
   getNativeBalance,
   getTokenBalance,
   sendNative,
   sendToken,
+  getWalletClient,
 } from "./celo-client.js";
+import { getSwapQuote, prepareSwap, executeSwap } from "./swap.js";
 import {
   getCeloTokenPrice,
   getTrendingCeloTokens,
@@ -173,13 +175,15 @@ const TOOLS = [
   },
   {
     name: "prepare_celo_swap",
-    description: "Prepare (but do not execute) a swap transaction for review",
+    description: "Prepare (but do not execute) a Uniswap V3 swap on Celo — returns unsigned approve + swap txs for the wallet to sign",
     inputSchema: {
       type: "object",
       properties: {
         fromToken: { type: "string" },
         toToken: { type: "string" },
         amount: { type: "string" },
+        walletAddress: { type: "string", description: "Wallet that will sign; omit to use the configured signer" },
+        slippageBps: { type: "number", description: "Slippage tolerance in basis points (default 50 = 0.5%)" },
       },
       required: ["fromToken", "toToken", "amount"],
     },
@@ -281,7 +285,7 @@ async function handleTool(name: string, args: Record<string, unknown>) {
 
     case "celo_get_token_balance": {
       const { walletAddress, tokenSymbolOrAddress } = args as { walletAddress: string; tokenSymbolOrAddress: string };
-      const token = findToken(tokenSymbolOrAddress, NETWORK);
+      const token = await findTokenAsync(tokenSymbolOrAddress, NETWORK);
       const tokenAddr = token?.address ?? tokenSymbolOrAddress;
       const result = await getTokenBalance(walletAddress, tokenAddr, NETWORK);
       return ok({ walletAddress, network: NETWORK, tokenAddress: tokenAddr, ...result });
@@ -294,35 +298,42 @@ async function handleTool(name: string, args: Record<string, unknown>) {
         const result = await sendNative(to, amount, NETWORK);
         return ok({ network: NETWORK, ...result });
       }
-      const token = findToken(tokenSymbolOrAddress, NETWORK);
+      const token = await findTokenAsync(tokenSymbolOrAddress, NETWORK);
       if (!token) return err(`Unknown token: ${tokenSymbolOrAddress}`);
       const result = await sendToken(token.address, to, amount, NETWORK);
       return ok({ network: NETWORK, token: token.symbol, ...result });
     }
 
-    case "celo_swap_quote":
-    case "prepare_celo_swap": {
+    case "celo_swap_quote": {
       const { fromToken, toToken, amount } = args as { fromToken: string; toToken: string; amount: string };
-      return ok({
-        network: NETWORK,
-        fromToken,
-        toToken,
-        amount,
-        status: "quote_only",
-        message: "Live swap quotes require a DEX router integration. Use Mento app (app.mento.finance) or Uniswap V3 on Celo for live quotes.",
-        uniswapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-        mentoRouter: "0x6a0eEF2bed4C30Dc2CB42fe6c5f01F80f7EF16d",
-        estimatedSlippage: "0.5%",
-        warning: "Always verify quotes on-chain before executing.",
-      });
+      const quote = await getSwapQuote(fromToken, toToken, amount, NETWORK);
+      if ("error" in quote) return err(quote.error);
+      return ok({ network: NETWORK, ...quote });
+    }
+
+    case "prepare_celo_swap": {
+      const { fromToken, toToken, amount, walletAddress, slippageBps } = args as {
+        fromToken: string; toToken: string; amount: string; walletAddress?: string; slippageBps?: number;
+      };
+      // Use the provided wallet, or the configured signer's address (agent mode), to prepare txs.
+      let owner = walletAddress;
+      if (!owner && process.env.CELO_PRIVATE_KEY) {
+        try { owner = getWalletClient(NETWORK).account!.address; } catch { /* ignore */ }
+      }
+      if (!owner) return err("Provide walletAddress (or set CELO_PRIVATE_KEY) to prepare a swap.");
+      const prepared = await prepareSwap(fromToken, toToken, amount, owner, slippageBps ?? 50, NETWORK);
+      if ("error" in prepared) return err(prepared.error);
+      return ok({ network: NETWORK, ...prepared });
     }
 
     case "celo_swap_execute": {
-      return ok({
-        status: "requires_confirmation",
-        message: "Swap execution requires explicit user confirmation. Call celo_swap_quote first, review the quote, then confirm to proceed.",
-        network: NETWORK,
-      });
+      // Agent mode: actually send the swap using CELO_PRIVATE_KEY (no human wallet in the loop).
+      const { fromToken, toToken, amount, slippageBps } = args as {
+        fromToken: string; toToken: string; amount: string; slippageBps?: number;
+      };
+      const result = await executeSwap(fromToken, toToken, amount, slippageBps ?? 50, NETWORK);
+      if ("error" in result) return err(result.error);
+      return ok({ network: NETWORK, status: "executed", ...result });
     }
 
     case "celo_aave_position": {

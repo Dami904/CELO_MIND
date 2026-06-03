@@ -9,7 +9,9 @@
     "./risk": "./src/risk.ts",
     "./whale": "./src/whale.ts",
     "./blockscout": "./src/blockscout.ts",
-    "./dune": "./src/dune.ts"
+    "./dune": "./src/dune.ts",
+    "./swap": "./src/swap.ts",
+    "./mento": "./src/mento.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

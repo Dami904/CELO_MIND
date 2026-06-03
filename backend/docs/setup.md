@@ -35,7 +35,7 @@ npm run dev
 | `OPENAI_API_KEY` | For ChatGPT | OpenAI / ChatGPT responses |
 | `GEMINI_API_KEY` | For Gemini | Google Gemini responses |
 | `DEEPSEEK_API_KEY` | For DeepSeek | DeepSeek responses |
-| `AI_PROVIDER` | No | Force a provider: `claude`, `openai`, `gemini`, `deepseek`, `ollama` |
+| `AI_PROVIDER` | No | Force a provider: `claude`, `openai`, `gemini`, `deepseek` |
 | `CELO_PRIVATE_KEY` | Write tools only | Wallet private key — never commit this |
 | `BLOCKSCOUT_API_KEY` | No | Increases Celoscan rate limits |
 | `PORT` | No | API port (default: 3001) |
@@ -50,11 +50,10 @@ Override with `AI_PROVIDER=<name>` in your `.env`.
 |---|---|---|
 | Claude (Anthropic) | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` |
 | ChatGPT (OpenAI) | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| Google Gemini | `GEMINI_API_KEY` | `gemini-1.5-flash` |
+| Google Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
-| Ollama (local) | none needed | `llama3` |
 
-Override model with `CLAUDE_MODEL`, `OPENAI_MODEL`, `GEMINI_MODEL`, `DEEPSEEK_MODEL`, or `OLLAMA_MODEL`.
+Override model with `CLAUDE_MODEL`, `OPENAI_MODEL`, `GEMINI_MODEL`, or `DEEPSEEK_MODEL`.
 
 ## API Routes
 

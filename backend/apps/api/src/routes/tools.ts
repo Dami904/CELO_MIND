@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { buildDocsContextAsync } from "@celomind/docs-knowledge";
-import { makeOk, makeErr, ToolRunRequestSchema, findToken, resolveNetwork } from "@celomind/shared";
+import { makeOk, makeErr, ToolRunRequestSchema, findTokenAsync, resolveNetwork } from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
 import {
   getCeloRecentTransactions,
@@ -11,6 +11,7 @@ import {
   getTrendingCeloTokens,
 } from "@celomind/mcp-server/market";
 import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "@celomind/mcp-server/risk";
+import { getSwapQuote, prepareSwap } from "@celomind/mcp-server/swap";
 import { analyzeCopyWallet, getWhaleWalletActivity } from "@celomind/mcp-server/whale";
 import { logToolCall } from "../db/sqlite.js";
 
@@ -25,16 +26,25 @@ function confirmationData(tool: string, params: Record<string, unknown>) {
   };
 }
 
-function swapQuoteData(params: Record<string, unknown>) {
-  return {
-    status: "quote_only",
-    fromToken: params.fromToken,
-    toToken: params.toToken,
-    amount: params.amount,
-    source: "CeloMind swap preparation",
-    message: "Live swap execution is disabled in this API route. Use this result to render a review/confirmation step.",
-    warning: "No swap was executed.",
-  };
+async function swapQuoteData(params: Record<string, unknown>) {
+  const quote = await getSwapQuote(String(params.fromToken ?? ""), String(params.toToken ?? ""), String(params.amount ?? ""), NETWORK);
+  if ("error" in quote) return { status: "no_quote", message: quote.error };
+  return quote;
+}
+
+async function prepareSwapTx(params: Record<string, unknown>, walletAddress?: string) {
+  const owner = (params.walletAddress as string) ?? walletAddress;
+  if (!owner) return { status: "needs_wallet", message: "Provide walletAddress to prepare a signable swap." };
+  const prepared = await prepareSwap(
+    String(params.fromToken ?? ""),
+    String(params.toToken ?? ""),
+    String(params.amount ?? ""),
+    owner,
+    Number(params.slippageBps ?? 50),
+    NETWORK
+  );
+  if ("error" in prepared) return { status: "no_quote", message: prepared.error };
+  return prepared;
 }
 
 function aavePositionData(walletAddress?: string) {
@@ -101,7 +111,7 @@ export async function toolRoutes(app: FastifyInstance) {
           const wa = (params.walletAddress as string) ?? walletAddress;
           const tok = params.tokenSymbolOrAddress as string;
           if (!wa || !tok) throw new Error("walletAddress and tokenSymbolOrAddress required");
-          const token = findToken(tok, net);
+          const token = await findTokenAsync(tok, net);
           data = await getTokenBalance(wa, token?.address ?? tok, net);
           break;
         }
@@ -124,8 +134,10 @@ export async function toolRoutes(app: FastifyInstance) {
           data = await getCeloRecentTransactions((params.address as string) ?? walletAddress ?? "", net);
           break;
         case "celo_swap_quote":
+          data = await swapQuoteData(params);
+          break;
         case "prepare_celo_swap":
-          data = swapQuoteData(params);
+          data = await prepareSwapTx(params, walletAddress);
           break;
         case "celo_swap_execute":
         case "celo_send":

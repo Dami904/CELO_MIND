@@ -129,10 +129,17 @@ function queryId(envVar: string): number {
   return Number.isFinite(id) ? id : 0;
 }
 
+/**
+ * The Dune queries are scheduled to refresh DAILY on dune.com, so there's no value re-reading the
+ * latest results more often than a few times a day. Cache them for 6h (env-overridable). This only
+ * reads Dune's cheap `/results` endpoint — it never triggers a (credit-costing) execution.
+ */
+const DAILY_QUERY_TTL = Number(process.env.DUNE_CACHE_TTL_SECONDS) || 6 * 60 * 60; // 6 hours
+
 export async function getDuneTrendingTokens(): Promise<DuneResult | null> {
-  return runDuneQueryLatest(queryId("DUNE_QUERY_TRENDING_TOKENS"));
+  return runDuneQueryLatest(queryId("DUNE_QUERY_TRENDING_TOKENS"), DAILY_QUERY_TTL);
 }
 
 export async function getDuneTopWhales(): Promise<DuneResult | null> {
-  return runDuneQueryLatest(queryId("DUNE_QUERY_TOP_WHALES"));
+  return runDuneQueryLatest(queryId("DUNE_QUERY_TOP_WHALES"), DAILY_QUERY_TTL);
 }

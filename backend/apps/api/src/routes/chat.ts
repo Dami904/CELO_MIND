@@ -16,6 +16,7 @@ import {
 } from "@celomind/mcp-server/market";
 import { checkContractRisk, checkTokenRisk, checkMaliciousTransaction } from "@celomind/mcp-server/risk";
 import { getWhaleWalletActivity, analyzeCopyWallet } from "@celomind/mcp-server/whale";
+import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-server/swap";
 
 import { resolveNetwork } from "@celomind/shared";
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
@@ -31,15 +32,12 @@ function extractTwoAddresses(message: string, fallback?: string): [string | unde
   return [matches[0] ?? fallback, matches[1] ?? fallback];
 }
 
-function prepareSwapData(req: { message: string }) {
-  return {
-    status: "quote_only",
-    source: "CeloMind swap preparation",
-    message: "I can prepare a swap quote for review. Live execution stays disabled until the wallet confirmation step.",
-    detectedRequest: req.message,
-    routeNotes: ["Use Mento/Uniswap-compatible Celo liquidity where available.", "Always compare the final quote before signing."],
-    warning: "No swap was executed.",
-  };
+async function swapQuoteData(message: string) {
+  const parsed = parseSwapRequest(message);
+  if (!parsed) return { note: "Tell me the amount and tokens, e.g. \"swap 3 USDT to CELO\"." };
+  const quote = await getSwapQuote(parsed.fromToken, parsed.toToken, parsed.amount);
+  if ("error" in quote) return { note: quote.error };
+  return { result: quote, source: quote.source };
 }
 
 function getAaveInfo(walletAddress?: string) {
@@ -171,8 +169,18 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       const context = (data as { context?: string }).context;
       return context ? `Based on live/curated documentation:\n\n${context}` : "I could not fetch documentation context for that question.";
     }
+    case "swap_quote": {
+      const q = payload as { fromToken?: string; toToken?: string; amountIn?: string; amountOut?: string; rate?: number; feeTier?: number };
+      if (!q?.amountOut) return "I couldn't get a swap quote for that pair right now.";
+      return `Swap quote (${source ?? "Uniswap V3"}): ${q.amountIn} ${q.fromToken} → ~${q.amountOut} ${q.toToken}\nRate: 1 ${q.fromToken} ≈ ${q.rate?.toFixed(6)} ${q.toToken} · fee tier ${q.feeTier}.\nThis is a quote only — nothing was executed.`;
+    }
+    case "swap_execute": {
+      const s = data as { quote?: { fromToken?: string; toToken?: string; amountIn?: string; amountOut?: string }; minAmountOut?: string; transactions?: { type: string }[] };
+      if (!s?.quote) return "Connect your wallet and tell me the amount + tokens, e.g. \"swap 3 USDT to CELO\".";
+      const steps = (s.transactions ?? []).map((t) => t.type).join(" → ");
+      return `Prepared swap (Uniswap V3): ${s.quote.amountIn} ${s.quote.fromToken} → ~${s.quote.amountOut} ${s.quote.toToken} (min ${s.minAmountOut}).\nSteps to sign in your wallet: ${steps}.\nNothing was executed — review and confirm in your wallet.`;
+    }
     case "send":
-    case "swap_execute":
     case "aave_supply":
     case "x402_pay":
       return "This is a write/payment operation. I prepared the request, but nothing was executed. Please review and confirm in your wallet before proceeding.";
@@ -262,7 +270,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return { context: await buildDocsContextAsync("Claude Desktop MCP server setup") };
 
       case "swap_quote":
-        return prepareSwapData(req);
+        return await swapQuoteData(req.message);
 
       case "aave_position":
         return getAaveInfo(wa);
@@ -322,8 +330,16 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return { txHash: hash, ...risk, source: hash ? "Blockscout (tx lookup) + heuristic" : "heuristic message analysis" };
       }
 
+      case "swap_execute": {
+        const parsed = parseSwapRequest(req.message);
+        if (!parsed) return { note: "Tell me the amount and tokens, e.g. \"swap 3 USDT to CELO\"." };
+        if (!wa) return { note: "Connect your wallet first — I prepare the swap, your wallet signs it." };
+        const prepared = await prepareSwap(parsed.fromToken, parsed.toToken, parsed.amount, wa);
+        if ("error" in prepared) return { note: prepared.error };
+        return { ...prepared, requires_confirmation: true };
+      }
+
       case "send":
-      case "swap_execute":
       case "aave_supply":
         return { requires_confirmation: true, message: "This is a write operation. Please confirm in your wallet before proceeding." };
 

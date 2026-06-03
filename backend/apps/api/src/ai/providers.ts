@@ -1,10 +1,10 @@
 /**
  * Multi-provider AI abstraction.
- * Supports: Claude (Anthropic), OpenAI/ChatGPT, Google Gemini, DeepSeek, Ollama (local).
- * Set AI_PROVIDER in .env to switch. Falls back to Claude if ANTHROPIC_API_KEY is set.
+ * Supports: Claude (Anthropic), OpenAI/ChatGPT, Google Gemini, DeepSeek.
+ * Set AI_PROVIDER in .env to force one, or it auto-detects by which key is present.
  */
 
-export type AIProvider = "claude" | "openai" | "gemini" | "deepseek" | "ollama";
+export type AIProvider = "claude" | "openai" | "gemini" | "deepseek";
 
 export type AIMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -56,7 +56,7 @@ async function callOpenAI(opts: AICompletionOptions): Promise<AICompletionResult
 async function callGemini(opts: AICompletionOptions): Promise<AICompletionResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
   const systemMsg = opts.messages.find((m) => m.role === "system")?.content ?? "";
   const userMsg = opts.messages
     .filter((m) => m.role !== "system")
@@ -102,26 +102,6 @@ async function callDeepSeek(opts: AICompletionOptions): Promise<AICompletionResu
   return { text, provider: "deepseek", model };
 }
 
-// ─── Ollama (local) ───────────────────────────────────────────────────────────
-async function callOllama(opts: AICompletionOptions): Promise<AICompletionResult> {
-  const base = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-  const model = process.env.OLLAMA_MODEL ?? "llama3";
-  const systemMsg = opts.messages.find((m) => m.role === "system")?.content ?? "";
-  const prompt = opts.messages
-    .filter((m) => m.role !== "system")
-    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-    .join("\n");
-
-  const res = await fetch(`${base}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, system: systemMsg, prompt, stream: false }),
-  });
-  if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
-  const data = (await res.json()) as { response: string };
-  return { text: data.response ?? "", provider: "ollama", model };
-}
-
 // ─── Provider selection ───────────────────────────────────────────────────────
 function detectProvider(): AIProvider {
   const explicit = process.env.AI_PROVIDER as AIProvider | undefined;
@@ -130,7 +110,9 @@ function detectProvider(): AIProvider {
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.DEEPSEEK_API_KEY) return "deepseek";
-  return "ollama";
+  throw new Error(
+    "No AI provider configured — set AI_PROVIDER or one of ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / DEEPSEEK_API_KEY."
+  );
 }
 
 export async function aiComplete(opts: AICompletionOptions): Promise<AICompletionResult> {
@@ -140,7 +122,6 @@ export async function aiComplete(opts: AICompletionOptions): Promise<AICompletio
     case "openai": return callOpenAI(opts);
     case "gemini": return callGemini(opts);
     case "deepseek": return callDeepSeek(opts);
-    case "ollama": return callOllama(opts);
     default: throw new Error(`Unknown AI provider: ${provider}`);
   }
 }

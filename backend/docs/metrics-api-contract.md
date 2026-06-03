@@ -180,5 +180,5 @@ export interface MetricsTimeseries {
 - **Empty state:** a brand-new system returns zeros / empty arrays — design a graceful "no data yet" state.
 - **Build now with mocks:** the JSON blocks above are valid fixtures — drop them into your mock layer and
   build the cards today; swap to live `fetch` when the endpoints are up.
-- **Provider values** you'll see: `claude`, `openai`, `gemini`, `deepseek`, `ollama`, `fallback`.
+- **Provider values** you'll see: `claude`, `openai`, `gemini`, `deepseek`, `fallback`.
 - **Numbers are cumulative** (all-time) except `/timeseries` (per-day). There's no per-user filtering in v1.
