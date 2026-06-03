@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cy: #FBCC5C;
+  --cg: #35D07F;
+  --dark: #0D0F0E;
+  --surface: #1A1D1B;
+  --forest: #5EA33B;
+  --text: #F5F5F0;
+  --muted: #6B7280;
+  --error: #EF4444;
+  --border: rgba(251, 204, 92, 0.15);
+  --border2: rgba(255, 255, 255, 0.08);
+
+  --font-syne: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --font-sans: 'DM Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--dark);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Webkit Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+/* Typography Utilities */
+.font-syne {
+  font-family: var(--font-syne);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* Animations */
+@keyframes blink {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.animate-blink {
+  animation: blink 1.4s infinite both;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.pulse-green {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--cg);
+  border-radius: 9999px;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Brutalist Custom Scrollbar for Chat panel and lists */
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: var(--border2);
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
