@@ -1,0 +1,10 @@
+﻿version: "3.8"
+services:
+  mcp-server:
+    build: ./packages/server
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./packages/server:/app
+      - /app/node_modules
