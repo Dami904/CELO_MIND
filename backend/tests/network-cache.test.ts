@@ -13,15 +13,8 @@ describe("resolveRpcUrl", () => {
     expect(resolveRpcUrl("celo")).toBe("https://mainnet.example");
   });
 
-  it("uses CELO_TESTNET_RPC_URL for testnets", () => {
-    process.env.CELO_TESTNET_RPC_URL = "https://testnet.example";
-    expect(resolveRpcUrl("sepolia")).toBe("https://testnet.example");
-    expect(resolveRpcUrl("alfajores")).toBe("https://testnet.example");
-  });
-
   it("falls back to legacy CELO_RPC_URL then the built-in default", () => {
     delete process.env.CELO_MAINNET_RPC_URL;
-    delete process.env.CELO_TESTNET_RPC_URL;
     process.env.CELO_RPC_URL = "https://legacy.example";
     expect(resolveRpcUrl("celo")).toBe("https://legacy.example");
     delete process.env.CELO_RPC_URL;
@@ -29,33 +22,22 @@ describe("resolveRpcUrl", () => {
   });
 });
 
-describe("marketNetwork (hybrid)", () => {
-  const saved = { ...process.env };
-  afterEach(() => {
-    process.env = { ...saved };
-  });
-
-  it("defaults to mainnet", () => {
-    delete process.env.MARKET_NETWORK;
+describe("marketNetwork (mainnet-only)", () => {
+  it("always resolves to mainnet", () => {
     expect(marketNetwork()).toBe("celo");
-  });
-
-  it("honors MARKET_NETWORK override", () => {
-    process.env.MARKET_NETWORK = "alfajores";
-    expect(marketNetwork()).toBe("alfajores");
   });
 });
 
-describe("network config uses Blockscout (no Celoscan V1)", () => {
-  it("mainnet/alfajores/sepolia all point at blockscout hosts", () => {
-    for (const n of ["celo", "alfajores", "sepolia"] as const) {
-      expect(getNetwork(n).blockscoutUrl).toContain("blockscout.com");
-      expect(getNetwork(n).blockscoutUrl).not.toContain("celoscan.io");
-    }
+describe("network config (mainnet-only, Blockscout — no Celoscan V1)", () => {
+  it("celo points at the Blockscout host", () => {
+    expect(getNetwork("celo").blockscoutUrl).toContain("blockscout.com");
+    expect(getNetwork("celo").blockscoutUrl).not.toContain("celoscan.io");
   });
 
-  it("resolveNetwork parses the Sepolia label", () => {
-    expect(resolveNetwork("Celo Sepolia Testnet")).toBe("sepolia");
+  it("resolveNetwork always returns celo (testnets unsupported)", () => {
+    expect(resolveNetwork("Celo Sepolia Testnet")).toBe("celo");
+    expect(resolveNetwork("alfajores")).toBe("celo");
+    expect(resolveNetwork(undefined)).toBe("celo");
   });
 });
 

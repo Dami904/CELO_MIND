@@ -111,9 +111,9 @@ Setup:
   "mcpServers": {
     "celomind": {
       "command": "node",
-      "args": ["/path/to/celomind/packages/mcp-server/dist/index.js"],
+      "args": ["/path/to/celomind/backend/packages/mcp-server/dist/index.js"],
       "env": {
-        "CELO_NETWORK": "alfajores",
+        "CELO_NETWORK": "celo",
         "ANTHROPIC_API_KEY": "your-key"
       }
     }

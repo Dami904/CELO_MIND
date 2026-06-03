@@ -4,7 +4,7 @@ import { z } from "zod";
 export const ApiResponseSchema = z.object({
   success: z.boolean(),
   action: z.string(),
-  network: z.enum(["alfajores", "celo", "sepolia"]),
+  network: z.literal("celo"),
   data: z.unknown().nullable(),
   error: z
     .object({
@@ -34,7 +34,7 @@ export const ApiResponseSchema = z.object({
 export type ApiResponse<T = unknown> = {
   success: boolean;
   action: string;
-  network: "alfajores" | "celo" | "sepolia";
+  network: "celo";
   data: T | null;
   error: { code: string; message: string; details?: unknown } | null;
   timestamp: string;
@@ -52,11 +52,11 @@ export type ApiResponse<T = unknown> = {
   };
 };
 
-export function makeOk<T>(action: string, network: "alfajores" | "celo" | "sepolia", data: T, uiHints?: ApiResponse["uiHints"]): ApiResponse<T> {
+export function makeOk<T>(action: string, network: "celo", data: T, uiHints?: ApiResponse["uiHints"]): ApiResponse<T> {
   return { success: true, action, network, data, error: null, timestamp: new Date().toISOString(), uiHints };
 }
 
-export function makeErr(action: string, network: "alfajores" | "celo" | "sepolia", code: string, message: string, details?: unknown): ApiResponse<null> {
+export function makeErr(action: string, network: "celo", code: string, message: string, details?: unknown): ApiResponse<null> {
   return {
     success: false,
     action,
@@ -97,14 +97,14 @@ export const RiskCheckRequestSchema = z.object({
   type: z.enum(["transaction", "contract", "token"]),
   target: z.string(),
   walletAddress: z.string().optional(),
-  network: z.enum(["alfajores", "celo", "sepolia"]).default("alfajores"),
+  network: z.literal("celo").default("celo"),
 });
 export type RiskCheckRequest = z.infer<typeof RiskCheckRequestSchema>;
 
 // ─── Whale watch ──────────────────────────────────────────────────────────────
 export const WhaleWatchRequestSchema = z.object({
   walletAddress: z.string(),
-  network: z.enum(["alfajores", "celo", "sepolia"]).default("alfajores"),
+  network: z.literal("celo").default("celo"),
   label: z.string().optional(),
 });
 export type WhaleWatchRequest = z.infer<typeof WhaleWatchRequestSchema>;
@@ -113,7 +113,7 @@ export type WhaleWatchRequest = z.infer<typeof WhaleWatchRequestSchema>;
 export const ToolRunRequestSchema = z.object({
   params: z.record(z.unknown()),
   walletAddress: z.string().optional(),
-  network: z.enum(["alfajores", "celo", "sepolia"]).default("alfajores"),
+  network: z.literal("celo").default("celo"),
 });
 export type ToolRunRequest = z.infer<typeof ToolRunRequestSchema>;
 

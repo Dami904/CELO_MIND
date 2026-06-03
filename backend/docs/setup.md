@@ -29,7 +29,7 @@ npm run dev
 
 | Variable | Required | Description |
 |---|---|---|
-| `CELO_NETWORK` | No | `alfajores` (default) or `celo` |
+| `CELO_NETWORK` | No | `celo` (mainnet-only) |
 | `CELO_RPC_URL` | No | Override the default RPC endpoint |
 | `ANTHROPIC_API_KEY` | For Claude | Claude AI responses |
 | `OPENAI_API_KEY` | For ChatGPT | OpenAI / ChatGPT responses |
@@ -92,7 +92,7 @@ POST /api/tools/:tool/run            Run a specific tool directly
 {
   "success": true,
   "action": "chat",
-  "network": "alfajores",
+  "network": "celo",
   "data": { ... },
   "error": null,
   "timestamp": "2026-06-02T12:00:00.000Z",
@@ -168,7 +168,7 @@ curl -X POST http://localhost:3001/api/chat \
 # Risk check
 curl -X POST http://localhost:3001/api/risk/check \
   -H "Content-Type: application/json" \
-  -d '{"type":"contract","target":"0xCONTRACT_ADDRESS","network":"alfajores"}'
+  -d '{"type":"contract","target":"0xCONTRACT_ADDRESS","network":"celo"}'
 
 # Docs assistant
 curl -X POST http://localhost:3001/api/docs/ask \
@@ -178,7 +178,7 @@ curl -X POST http://localhost:3001/api/docs/ask \
 
 ## Security Rules
 
-- Alfajores testnet is the default — always safe for testing.
+- Mainnet-only: all reads and writes are on Celo mainnet. Use small amounts for write actions.
 - Read tools work without a private key.
 - Write tools (`celo_send`, `celo_swap_execute`, `celo_aave_supply`) require `CELO_PRIVATE_KEY`.
 - The landing chatbot never executes write operations.
