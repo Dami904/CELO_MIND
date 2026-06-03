@@ -4,8 +4,8 @@
       "command": "node",
       "args": ["/ABSOLUTE/PATH/TO/celomind/backend/packages/mcp-server/dist/index.js"],
       "env": {
-        "CELO_NETWORK": "alfajores",
-        "CELO_RPC_URL": "https://alfajores-forno.celo-testnet.org",
+        "CELO_NETWORK": "celo",
+        "CELO_RPC_URL": "https://forno.celo.org",
         "ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY",
         "BLOCKSCOUT_API_KEY": ""
       }

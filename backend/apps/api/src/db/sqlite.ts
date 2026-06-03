@@ -124,7 +124,7 @@ export async function addWatchedWallet(address: string, label?: string, network?
     const db = getClient();
     await db.execute({
       sql: `INSERT OR REPLACE INTO watched_wallets (address, label, network) VALUES (?, ?, ?)`,
-      args: [address.toLowerCase(), label ?? null, network ?? "alfajores"],
+      args: [address.toLowerCase(), label ?? null, network ?? "celo"],
     });
   } catch { /* non-fatal */ }
 }

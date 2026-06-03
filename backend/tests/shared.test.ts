@@ -50,7 +50,7 @@ describe("RiskCheckRequestSchema", () => {
     const result = RiskCheckRequestSchema.safeParse({
       type: "contract",
       target: "0x1234567890123456789012345678901234567890",
-      network: "alfajores",
+      network: "celo",
     });
     expect(result.success).toBe(true);
   });
@@ -60,19 +60,19 @@ describe("RiskCheckRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("defaults network to alfajores", () => {
+  it("defaults network to celo", () => {
     const result = RiskCheckRequestSchema.safeParse({ type: "token", target: "0x123" });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.network).toBe("alfajores");
+    if (result.success) expect(result.data.network).toBe("celo");
   });
 });
 
 describe("makeOk / makeErr", () => {
   it("makeOk returns correct shape", () => {
-    const res = makeOk("test_action", "alfajores", { value: 42 });
+    const res = makeOk("test_action", "celo", { value: 42 });
     expect(res.success).toBe(true);
     expect(res.action).toBe("test_action");
-    expect(res.network).toBe("alfajores");
+    expect(res.network).toBe("celo");
     expect(res.data).toEqual({ value: 42 });
     expect(res.error).toBeNull();
     expect(res.timestamp).toBeDefined();
@@ -87,50 +87,50 @@ describe("makeOk / makeErr", () => {
   });
 });
 
-describe("findToken", () => {
-  it("finds cUSD by symbol on alfajores", () => {
-    const token = findToken("cUSD", "alfajores");
+describe("findToken (mainnet-only)", () => {
+  it("finds cUSD by symbol", () => {
+    const token = findToken("cUSD", "celo");
     expect(token).toBeDefined();
     expect(token?.symbol).toBe("cUSD");
     expect(token?.decimals).toBe(18);
   });
 
-  it("finds CELO by symbol on mainnet", () => {
+  it("finds CELO by symbol", () => {
     const token = findToken("CELO", "celo");
     expect(token).toBeDefined();
     expect(token?.address).toBe("0x471EcE3750Da237f93B8E339c536989b8978a438");
   });
 
-  it("finds token by lowercase address", () => {
-    const token = findToken("0x874069fa1eb16d44d622f2e0ca25eea172369bc1", "alfajores");
+  it("finds token by lowercase mainnet address", () => {
+    const token = findToken("0x765de816845861e75a25fca122bb6898b8b1282a", "celo");
     expect(token?.symbol).toBe("cUSD");
   });
 
   it("returns undefined for unknown token", () => {
-    const token = findToken("UNKNOWN", "alfajores");
+    const token = findToken("UNKNOWN", "celo");
     expect(token).toBeUndefined();
+  });
+
+  it("works with no network arg (defaults to celo)", () => {
+    expect(findToken("CELO")?.symbol).toBe("CELO");
   });
 });
 
-describe("getTokenList", () => {
-  it("returns alfajores tokens", () => {
-    const list = getTokenList("alfajores");
+describe("getTokenList (mainnet-only)", () => {
+  it("returns Celo mainnet tokens", () => {
+    const list = getTokenList("celo");
     expect(list).toHaveProperty("CELO");
     expect(list).toHaveProperty("cUSD");
-  });
-
-  it("returns mainnet tokens", () => {
-    const list = getTokenList("celo");
     expect(list).toHaveProperty("USDC");
   });
 });
 
-describe("NETWORKS config", () => {
-  it("alfajores has correct chain id", () => {
-    expect(NETWORKS.alfajores.chainId).toBe(44787);
-  });
-
+describe("NETWORKS config (mainnet-only)", () => {
   it("celo mainnet has correct chain id", () => {
     expect(NETWORKS.celo.chainId).toBe(42220);
+  });
+
+  it("has no testnet entries", () => {
+    expect(Object.keys(NETWORKS)).toEqual(["celo"]);
   });
 });

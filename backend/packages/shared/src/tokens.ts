@@ -1,3 +1,5 @@
+import type { Network } from "./network.js";
+
 export type TokenInfo = {
   symbol: string;
   name: string;
@@ -6,37 +8,8 @@ export type TokenInfo = {
   coingeckoId?: string;
 };
 
-export const ALFAJORES_TOKENS: Record<string, TokenInfo> = {
-  CELO: {
-    symbol: "CELO",
-    name: "Celo",
-    address: "0xF194afDf50B03e69Bd7D057c1Aa9e10c9954E4C9",
-    decimals: 18,
-    coingeckoId: "celo",
-  },
-  cUSD: {
-    symbol: "cUSD",
-    name: "Celo Dollar",
-    address: "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1",
-    decimals: 18,
-    coingeckoId: "celo-dollar",
-  },
-  cEUR: {
-    symbol: "cEUR",
-    name: "Celo Euro",
-    address: "0x10c892A6EC43a53E45D0B916B4b7D383B1b78d0F",
-    decimals: 18,
-    coingeckoId: "celo-euro",
-  },
-  cREAL: {
-    symbol: "cREAL",
-    name: "Celo Brazilian Real",
-    address: "0xE4D517785D091D3c54818832dB6094bcc2744545",
-    decimals: 18,
-  },
-};
-
-export const MAINNET_TOKENS: Record<string, TokenInfo> = {
+// CeloMind is MAINNET-ONLY — only Celo mainnet token addresses.
+export const CELO_TOKENS: Record<string, TokenInfo> = {
   CELO: {
     symbol: "CELO",
     name: "Celo",
@@ -73,13 +46,12 @@ export const MAINNET_TOKENS: Record<string, TokenInfo> = {
   },
 };
 
-export function getTokenList(network: "alfajores" | "celo" | "sepolia") {
-  return network === "celo" ? MAINNET_TOKENS : ALFAJORES_TOKENS;
+export function getTokenList(_network: Network = "celo") {
+  return CELO_TOKENS;
 }
 
-export function findToken(symbolOrAddress: string, network: "alfajores" | "celo" | "sepolia"): TokenInfo | undefined {
-  const net = network === "sepolia" ? "alfajores" : network;
-  const list = getTokenList(net);
+export function findToken(symbolOrAddress: string, _network: Network = "celo"): TokenInfo | undefined {
+  const list = CELO_TOKENS;
   const lower = symbolOrAddress.toLowerCase();
   // Try exact key match first
   const exactKey = Object.keys(list).find((k) => k.toLowerCase() === lower);

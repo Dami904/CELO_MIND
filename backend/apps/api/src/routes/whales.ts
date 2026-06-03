@@ -27,8 +27,8 @@ export async function whaleRoutes(app: FastifyInstance) {
     "/api/whales/:address/analyze",
     async (req, reply) => {
       const { address } = req.params;
-      const { compare, network } = req.query;
-      const net = (network ?? NETWORK) as "alfajores" | "celo";
+      const { compare } = req.query;
+      const net = NETWORK; // mainnet-only
 
       if (!compare) {
         return reply.code(400).send(makeErr("copy_wallet", net, "MISSING_PARAM", "Provide ?compare=<your_wallet_address>"));

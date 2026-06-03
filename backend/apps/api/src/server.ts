@@ -29,7 +29,7 @@ async function main() {
     reply.code(error.statusCode ?? 500).send({
       success: false,
       action: "error",
-      network: process.env.CELO_NETWORK ?? "alfajores",
+      network: "celo",
       data: null,
       error: { code: "INTERNAL_ERROR", message: error.message },
       timestamp: new Date().toISOString(),
@@ -49,7 +49,7 @@ async function main() {
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`[CeloMind API] Listening on http://${HOST}:${PORT}`);
-  console.log(`[CeloMind API] Network: ${process.env.CELO_NETWORK ?? "alfajores"}`);
+  console.log(`[CeloMind API] Network: celo (mainnet-only)`);
 }
 
 main().catch((e) => {
