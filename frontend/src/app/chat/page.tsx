@@ -62,15 +62,59 @@ function formatHistoryTitle(thread: HistoryThread): string {
   return "Session";
 }
 
+function formatHistoryStamp(value: string): string {
+  const time = Date.parse(value);
+  if (Number.isFinite(time)) return new Date(time).toLocaleString();
+  return value;
+}
+
+function messageMatchesQuery(message: ChatHistoryMessage, query: string): boolean {
+  const haystack = [
+    message.content,
+    message.intent ?? "",
+    message.role,
+    message.chatbotType,
+    message.conversationId ?? "",
+    message.walletAddress ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+function threadMatchesQuery(thread: HistoryThread, query: string): boolean {
+  if (!query) return true;
+  const header = [
+    thread.key,
+    thread.conversationId ?? "",
+    thread.walletAddress ?? "",
+    thread.firstAt,
+    thread.lastAt,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return header.includes(query) || thread.messages.some((message) => messageMatchesQuery(message, query));
+}
+
+function toLiveMessage(message: ChatHistoryMessage): Message {
+  return {
+    id: `history-${message.id}`,
+    sender: message.role === "assistant" ? "bot" : "user",
+    text: message.content,
+    timestamp: formatHistoryStamp(message.timestamp),
+  };
+}
+
 export default function ChatPage() {
   const { address, isConnected, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: CELO_CHAIN_ID });
   const reduce = useReducedMotion();
-  const conversationId = useRef<string>(
+  const initialConversationId = useRef<string>(
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
   ).current;
+  const [activeConversationId, setActiveConversationId] = useState(initialConversationId);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -88,6 +132,7 @@ export default function ChatPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [selectedThreadKey, setSelectedThreadKey] = useState<string | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
 
   // Transaction signing states
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -131,7 +176,7 @@ export default function ChatPage() {
   useEffect(() => {
     let active = true;
     const walletHistory = isConnected && address ? address : undefined;
-    const sessionHistory = !walletHistory ? conversationId : undefined;
+    const sessionHistory = !walletHistory ? activeConversationId : undefined;
 
     if (!walletHistory && !sessionHistory) {
       setHistory([]);
@@ -165,11 +210,16 @@ export default function ChatPage() {
     return () => {
       active = false;
     };
-  }, [address, conversationId, historyRefreshToken, isConnected]);
+  }, [address, activeConversationId, historyRefreshToken, isConnected]);
 
   const historyThreads = useMemo(() => groupHistory(history), [history]);
+  const normalizedHistorySearch = historySearch.trim().toLowerCase();
+  const visibleHistoryThreads = useMemo(
+    () => historyThreads.filter((thread) => threadMatchesQuery(thread, normalizedHistorySearch)),
+    [historyThreads, normalizedHistorySearch]
+  );
   const activeThread =
-    historyThreads.find((thread) => thread.key === selectedThreadKey) ?? historyThreads[0] ?? null;
+    visibleHistoryThreads.find((thread) => thread.key === selectedThreadKey) ?? visibleHistoryThreads[0] ?? null;
 
   useEffect(() => {
     if (activeThread && activeThread.key !== selectedThreadKey) {
@@ -177,9 +227,30 @@ export default function ChatPage() {
     }
   }, [activeThread, selectedThreadKey]);
 
+  useEffect(() => {
+    if (!historySearch && !selectedThreadKey && visibleHistoryThreads.length > 0) {
+      setSelectedThreadKey(visibleHistoryThreads[0].key);
+    }
+  }, [historySearch, selectedThreadKey, visibleHistoryThreads]);
+
   const historyScopeLabel = isConnected && address
     ? `All-time wallet history for ${address.slice(0, 6)}...${address.slice(-4)}`
     : "Current session history";
+  const activeConversationLabel =
+    activeConversationId === initialConversationId
+      ? "New Session"
+      : `Restored ${activeConversationId.slice(0, 8)}`;
+
+  const restoreThread = (thread: HistoryThread) => {
+    setSelectedThreadKey(thread.key);
+    setActiveConversationId(thread.conversationId ?? initialConversationId);
+    setMessages(thread.messages.map(toLiveMessage));
+    setInputText("");
+    setIsTyping(false);
+    setIsConfirmOpen(false);
+    setPendingTxData(null);
+    setHistoryOpen(true);
+  };
 
   const historyPanel = (
     <div className="flex h-full min-h-0 flex-col bg-surface">
@@ -198,6 +269,27 @@ export default function ChatPage() {
           </button>
         </div>
         <p className="mt-2 text-[10px] font-mono text-muted leading-relaxed">{historyScopeLabel}</p>
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            placeholder="Search history"
+            className="h-9 min-w-0 flex-1 border border-border2 bg-dark/40 px-2.5 text-[10px] font-mono text-text placeholder:text-muted outline-none focus:border-cy"
+          />
+          <button
+            type="button"
+            onClick={() => setHistorySearch("")}
+            disabled={!historySearch}
+            className="px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-wider text-muted">
+          <span>{visibleHistoryThreads.length} visible</span>
+          <span>{historyThreads.length} total</span>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-3 space-y-3">
@@ -227,16 +319,22 @@ export default function ChatPage() {
           </div>
         )}
 
-        {historyThreads.length > 0 && (
+        {!historyLoading && historyThreads.length > 0 && visibleHistoryThreads.length === 0 && (
+          <div className="border border-border2 bg-dark/40 p-3 text-[10px] font-mono text-muted leading-relaxed">
+            No conversations match your search.
+          </div>
+        )}
+
+        {visibleHistoryThreads.length > 0 && (
           <div className="space-y-2">
-            {historyThreads.slice(0, 12).map((thread) => {
+            {visibleHistoryThreads.slice(0, 12).map((thread) => {
               const isActive = activeThread?.key === thread.key;
               const lastMessage = thread.messages[thread.messages.length - 1];
               return (
                 <button
                   key={thread.key}
                   type="button"
-                  onClick={() => setSelectedThreadKey(thread.key)}
+                  onClick={() => restoreThread(thread)}
                   className={cn(
                     "w-full border p-3 text-left transition-colors press",
                     isActive ? "border-cy bg-cy/5" : "border-border2 bg-dark/40 hover:border-cy/50"
@@ -253,6 +351,10 @@ export default function ChatPage() {
                   <p className="mt-1 max-h-10 overflow-hidden text-[10px] font-mono text-muted leading-relaxed">
                     {lastMessage?.content ?? "No preview available"}
                   </p>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-wider text-cy">
+                    <span>{isActive ? "Restored" : "Click to restore"}</span>
+                    <span>{thread.conversationId ? "Conversation" : "Session"}</span>
+                  </div>
                 </button>
               );
             })}
@@ -271,7 +373,10 @@ export default function ChatPage() {
             </div>
 
             <div className="mt-2 space-y-2">
-              {activeThread.messages.slice(-10).map((msg) => {
+              {(normalizedHistorySearch
+                ? activeThread.messages.filter((msg) => messageMatchesQuery(msg, normalizedHistorySearch))
+                : activeThread.messages
+              ).slice(-10).map((msg) => {
                 const isUser = msg.role === "user";
                 return (
                   <div
@@ -283,12 +388,17 @@ export default function ChatPage() {
                   >
                     <div className="mb-1 flex items-center justify-between gap-2 text-[9px] uppercase tracking-wider">
                       <span>{isUser ? "User" : "Assistant"}</span>
-                      <span className="text-muted">{msg.timestamp}</span>
+                      <span className="text-muted">{formatHistoryStamp(msg.timestamp)}</span>
                     </div>
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   </div>
                 );
               })}
+              {normalizedHistorySearch && activeThread.messages.filter((msg) => messageMatchesQuery(msg, normalizedHistorySearch)).length === 0 && (
+                <div className="border border-border2 bg-dark/40 p-3 text-[10px] font-mono text-muted leading-relaxed">
+                  No messages in this conversation match your search.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -312,7 +422,7 @@ export default function ChatPage() {
     setIsTyping(true);
 
     try {
-      const response = await apiClient.sendMessage(text, address, "full", conversationId);
+      const response = await apiClient.sendMessage(text, address, "full", activeConversationId);
 
       const botMsg: Message = {
         id: Math.random().toString(),
@@ -480,6 +590,9 @@ export default function ChatPage() {
             <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
               <span className="pulse-green"></span>
               Agent Ready
+            </div>
+            <div className="hidden sm:flex items-center border border-border2 bg-dark/40 px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-cy">
+              {activeConversationLabel}
             </div>
           </div>
         </div>
