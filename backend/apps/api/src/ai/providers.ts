@@ -56,7 +56,7 @@ async function callOpenAI(opts: AICompletionOptions): Promise<AICompletionResult
 async function callGemini(opts: AICompletionOptions): Promise<AICompletionResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3-flash-preview";
   const systemMsg = opts.messages.find((m) => m.role === "system")?.content ?? "";
   const userMsg = opts.messages
     .filter((m) => m.role !== "system")
