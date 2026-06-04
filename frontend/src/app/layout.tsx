@@ -22,7 +22,7 @@ export default function RootLayout({
             className="w-full md:max-w-6xl bg-dark text-text border-0 md:border border-border rounded-none md:rounded-2xl overflow-hidden flex flex-col min-h-screen md:min-h-[680px] shadow-none md:shadow-[0_0_50px_rgba(0,0,0,0.85)]"
           >
             <Navbar />
-            <div className="flex-1 flex flex-col overflow-hidden relative">
+            <div className="flex-1 flex flex-col overflow-hidden relative pb-20 md:pb-0">
               {children}
             </div>
           </div>

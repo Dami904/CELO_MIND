@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ChatRequest, Intent } from "../../packages/shared/src/index.js";
 import { sqlHincrbyBatch, sqlPfaddBatch, sqlHgetall, sqlPfcount, type CounterOp, type UniqueOp } from "./store.js";
 
-export type MetricsProvider = "claude" | "openai" | "gemini" | "deepseek" | "ollama" | "fallback";
+export type MetricsProvider = "groq" | "cohere" | "openrouter" | "gemini" | "claude" | "openai" | "deepseek" | "ollama" | "fallback";
 
 export type RecordChatRequestInput = {
   chatbotType: ChatRequest["chatbotType"];

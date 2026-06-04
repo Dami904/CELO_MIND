@@ -7,7 +7,7 @@ const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "token_balance", patterns: [/\btoken balance\b/i, /\bcusd balance\b/i, /\bceur balance\b/i, /\bbalance of\b/i] },
   { intent: "send", patterns: [/\bsend\b.*\bcelo\b/i, /\btransfer\b/i, /\bpay\b.*\bwallet\b/i] },
   { intent: "swap_quote", patterns: [/\bswap quote\b/i, /\bexchange rate\b/i, /\bhow much.*swap\b/i, /\bquote\b/i] },
-  { intent: "swap_execute", patterns: [/\bswap\b.*\bcelo\b/i, /\bexchange\b.*\btoken\b/i, /\btrade\b.*\bfor\b/i] },
+  { intent: "swap_execute", patterns: [/\bswap\s+[\d.]+/i, /\bexchange\s+[\d.]+/i, /\btrade\s+[\d.]+/i] },
   { intent: "aave_position", patterns: [/\baave\b/i, /\blending position\b/i, /\bborrowings?\b/i, /\bsupplied\b/i] },
   { intent: "aave_supply", patterns: [/\bsupply to aave\b/i, /\baave supply\b/i, /\blend\b.*\baave\b/i] },
   { intent: "self_verify", patterns: [/\bself\b.*\bverif/i, /\bverif.*\bidentity/i, /\bidentity verif/i, /\bpassport\b/i, /\bkyc\b/i, /with self\b/i] },
@@ -22,14 +22,23 @@ const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "malicious_tx_check", patterns: [/\bmalicious\b/i, /\bscam tx\b/i, /\bdangerous transaction\b/i, /\bcheck this tx\b/i] },
   { intent: "contract_risk", patterns: [/\bcontract risk\b/i, /\bcheck contract\b/i, /\bsafe contract\b/i, /\baudit\b/i] },
   { intent: "token_risk", patterns: [/\btoken risk\b/i, /\brug pull\b/i, /\bhoneypot\b/i, /\bsafe token\b/i] },
-  { intent: "whale_watch", patterns: [/\bwhale\b/i, /\bwatch wallet\b/i, /\btrack wallet\b/i, /\blarge holder\b/i] },
+  { intent: "whale_watch", patterns: [/\bwhales?\b/i, /\bwatch wallet\b/i, /\btrack wallet\b/i, /\blarge holders?\b/i, /\btop holders?\b/i, /\bbiggest holders?\b/i] },
   { intent: "whale_activity", patterns: [/\bwhale activity\b/i, /\bwhale moves\b/i, /\bwhale transactions\b/i] },
   { intent: "copy_wallet_analyze", patterns: [/\bcopy wallet\b/i, /\bmimic wallet\b/i, /\bfollow wallet\b/i, /\bcopy trader\b/i] },
   { intent: "copy_wallet_prepare", patterns: [/\bprepare copy\b/i, /\bcopy trade\b/i, /\bcopy.*portfolio\b/i] },
   { intent: "transaction_explain", patterns: [/\bexplain.*tx\b/i, /\bwhat is this transaction\b/i, /\bdecode tx\b/i] },
-  { intent: "docs_explain", patterns: [/\bwhat is celo\b/i, /\bhow does\b/i, /\bdocumentation\b/i, /\bexplain\b/i, /\blearn\b/i] },
   { intent: "mcp_setup", patterns: [/\bmcp\b/i, /\bmodel context protocol\b/i, /\bclaude desktop\b/i, /\bsetup.*server\b/i] },
   { intent: "claude_setup", patterns: [/\bclaude setup\b/i, /\banthropics?\b/i, /\bapikey\b/i] },
+  // Celo educational catch-all — runs LAST so specific data/action intents win first.
+  // Any Celo/blockchain concept question lands here and gets answered from live docs context.
+  {
+    intent: "docs_explain",
+    patterns: [
+      /\bwhat is celo\b/i, /\babout celo\b/i, /\bdocumentation\b/i, /\bdocs\b/i, /\bexplain\b/i, /\bhow does\b/i, /\blearn\b/i, /\btell me about\b/i,
+      /\bmento\b/i, /\bstablecoins?\b/i, /\bc(usd|eur|real)\b/i, /\bcelo\b/i, /\bdefi\b/i, /\bweb3\b/i, /\bblockchain\b/i,
+      /\bubeswap\b/i, /\buniswap\b/i, /\bvalidator\b/i, /\bgovernance\b/i, /\bstaking\b/i, /\bgas fees?\b/i,
+    ],
+  },
 ];
 
 export function detectIntent(message: string, chatbotType: ChatRequest["chatbotType"]): Intent {

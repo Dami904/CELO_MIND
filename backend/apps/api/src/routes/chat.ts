@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { makeOk, makeErr, ChatRequestSchema, type Intent } from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
 import { detectIntent } from "../ai/intent-router.js";
-import { aiComplete } from "../ai/providers.js";
+import { aiComplete, routeForIntent } from "../ai/providers.js";
 import { getChatMessages, logChatMessage } from "../db/sqlite.js";
 import { recordChatRequest, type MetricsProvider } from "../../../../dashboard/src/index.js";
 import { findToken, getTokenList, marketNetwork } from "@celomind/shared";
@@ -16,7 +16,7 @@ import {
   getCeloRecentTransactions,
 } from "@celomind/mcp-server/market";
 import { checkContractRisk, checkTokenRisk, explainTransaction } from "@celomind/mcp-server/risk";
-import { getWhaleWalletActivity, analyzeCopyWallet } from "@celomind/mcp-server/whale";
+import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "@celomind/mcp-server/whale";
 import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-server/swap";
 import { prepareTransfer, parseSendRequest } from "@celomind/mcp-server/transfer";
 import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
@@ -99,6 +99,9 @@ function unwrapEnvelope(data: unknown): { payload: unknown; source?: string } {
 }
 
 function formatFallbackAnswer(intent: Intent, data: unknown): string {
+  if (intent === "unsupported") {
+    return "I focus on the Celo ecosystem — ask me about Celo tokens, prices, wallets, swaps, DeFi, whales, or security and I'll help.";
+  }
   if (!data) return "I could not find enough live data for that request yet. Try adding a wallet address, token address, or transaction hash.";
   if (typeof data === "object" && data !== null && "note" in data) return String((data as { note: unknown }).note);
 
@@ -171,8 +174,25 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
     }
     case "whale_watch":
     case "whale_activity": {
-      const whale = data as { address?: string; nativeBalance?: string; txCount?: number; label?: string };
-      return `Whale wallet activity from Blockscout/Celoscan:\nWallet: ${whale.address ?? "unknown"}${whale.label ? ` (${whale.label})` : ""}\nNative balance: ${whale.nativeBalance ?? "0"} CELO\nRecent transaction count fetched: ${whale.txCount ?? 0}`;
+      const { payload, source } = unwrapEnvelope(data);
+      if (Array.isArray(payload)) {
+        const items = payload.slice(0, 10);
+        if (!items.length) return "I couldn't fetch the Celo whale leaderboard right now.";
+        return [
+          "Top Celo whales:",
+          ...items.map((it, i) => {
+            const w = it as Record<string, unknown>;
+            const addr =
+              (w.address && typeof w.address === "object" ? (w.address as { hash?: string }).hash : w.address) ??
+              w.wallet ?? w.holder ?? w.name ?? "unknown";
+            const val = w.value ?? w.balance ?? w.usdValue ?? w.amount ?? w.total;
+            return `${i + 1}. ${addr}${val ? ` — ${val}` : ""}`;
+          }),
+          `Source: ${source ?? "Dune"}.`,
+        ].join("\n");
+      }
+      const whale = payload as { address?: string; nativeBalance?: string; txCount?: number; label?: string };
+      return `Whale wallet activity from Blockscout:\nWallet: ${whale.address ?? "unknown"}${whale.label ? ` (${whale.label})` : ""}\nNative balance: ${whale.nativeBalance ?? "0"} CELO\nRecent transaction count fetched: ${whale.txCount ?? 0}`;
     }
     case "copy_wallet_analyze":
     case "copy_wallet_prepare": {
@@ -214,7 +234,11 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
 
 // ─── System prompts by chatbot type ──────────────────────────────────────────
 function getSystemPrompt(chatbotType: string, network: string): string {
-  const base = `You are CeloMind, an AI assistant specializing in the Celo blockchain ecosystem. You help users understand Celo, manage their wallets, explore DeFi, and stay safe. Always be clear, concise, and honest about uncertainty. Current network: ${network}.`;
+  const base = `You are CeloMind, an AI assistant specializing exclusively in the Celo blockchain ecosystem — Celo itself, its tokens and stablecoins (CELO, cUSD, cEUR, cREAL), wallets, DeFi (swaps, Mento, Aave), security/risk, market data, and the CeloMind app/MCP server.
+
+SCOPE (important): Only answer questions within this Celo / blockchain / crypto / DeFi / wallet scope. If the user asks about anything unrelated — general trivia, recipes, geography, entertainment, math, coding help, etc. — do NOT answer it. Politely decline in one short sentence and invite a Celo-related question instead.
+
+When "Live Celo data for this request" is provided below, treat it as current and authoritative and base your answer on it (do not contradict it or rely on stale memory). Be clear, concise, and honest about uncertainty. Current network: ${network}.`;
 
   const extras: Record<string, string> = {
     landing: `${base} You are the landing page assistant — be welcoming and informative. Do NOT execute any write operations.`,
@@ -325,8 +349,11 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       case "whale_watch":
       case "whale_activity": {
         const address = extractAddress(req.message, wa);
-        if (!address) return { note: "Provide a wallet address to watch." };
-        return await getWhaleWalletActivity(address, marketNetwork());
+        // A specific address → that wallet's activity. No address (e.g. "top whales on Celo")
+        // → the network-wide whale leaderboard (Dune, falling back to top cUSD holders on Blockscout).
+        if (address) return await getWhaleWalletActivity(address, marketNetwork());
+        const top = await getTopCeloWhales();
+        return { items: top.data, source: top.source };
       }
 
       case "contract_risk": {
@@ -456,6 +483,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const aiStartedAt = Date.now();
 
     try {
+      const route = routeForIntent(intent);
       const result = await aiComplete({
         messages: [
           { role: "system", content: systemPrompt + contextBlock + pageContext },
@@ -463,6 +491,8 @@ export async function chatRoutes(app: FastifyInstance) {
         ],
         maxTokens: 1024,
         temperature: 0.7,
+        provider: route.provider,
+        model: route.model,
       });
       aiResponse = result.text;
       aiProvider = result.provider;
@@ -575,6 +605,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const context = await buildDocsContextAsync(body.question);
     let answer: string;
     try {
+      const route = routeForIntent("docs_explain");
       const result = await aiComplete({
         messages: [
           {
@@ -584,6 +615,8 @@ export async function chatRoutes(app: FastifyInstance) {
           { role: "user", content: body.question },
         ],
         maxTokens: 1024,
+        provider: route.provider,
+        model: route.model,
       });
       answer = result.text;
     } catch {

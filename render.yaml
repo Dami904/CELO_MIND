@@ -24,22 +24,24 @@ services:
         sync: false
       - key: AI_PROVIDER
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: GROQ_API_KEY
         sync: false
-      - key: CLAUDE_MODEL
-        value: claude-sonnet-4-6
-      - key: OPENAI_API_KEY
+      - key: GROQ_MODEL_FAST
+        value: llama-3.1-8b-instant
+      - key: GROQ_MODEL_SMART
+        value: llama-3.3-70b-versatile
+      - key: COHERE_API_KEY
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
+      - key: COHERE_MODEL
+        value: command-a-03-2025
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: meta-llama/llama-3.3-70b-instruct
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3-flash-preview
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: DEEPSEEK_MODEL
-        value: deepseek-chat
+        value: gemini-3.1-flash-lite
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_AUTH_TOKEN

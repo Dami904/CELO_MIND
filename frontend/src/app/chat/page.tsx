@@ -10,6 +10,43 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const CELO_CHAIN_ID = 42220; // Celo mainnet
 
+// Slash-command palette. Typing "/" in the chat input surfaces this toolbox;
+// each entry maps to a backend intent and inserts an editable prompt template.
+type SlashCommand = {
+  cmd: string;
+  label: string;
+  desc: string;
+  template: string;
+  group: "Wallet" | "Market" | "DeFi" | "Security" | "Learn";
+};
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  // Wallet
+  { cmd: "/balance", label: "CELO balance", desc: "Native CELO balance for your wallet", template: "Check my CELO balance", group: "Wallet" },
+  { cmd: "/portfolio", label: "Portfolio", desc: "All token holdings in your wallet", template: "Show my wallet portfolio", group: "Wallet" },
+  { cmd: "/transactions", label: "Recent transactions", desc: "Your latest on-chain activity", template: "Show my recent transactions", group: "Wallet" },
+  { cmd: "/token-balance", label: "Token balance", desc: "Balance of a specific token", template: "What is my cUSD balance?", group: "Wallet" },
+  // Market
+  { cmd: "/price", label: "Token price", desc: "Live price of a Celo token", template: "What is the price of CELO?", group: "Market" },
+  { cmd: "/trending", label: "Trending tokens", desc: "Hottest tokens on Celo right now", template: "Show trending tokens on Celo", group: "Market" },
+  { cmd: "/launches", label: "New launches", desc: "Recently launched Celo tokens", template: "Show recently launched tokens on Celo", group: "Market" },
+  { cmd: "/whales", label: "Top whales", desc: "Largest holders / whale moves", template: "List the top 10 whales on Celo in the last 24 hours", group: "Market" },
+  // DeFi
+  { cmd: "/swap", label: "Swap tokens", desc: "Build a swap transaction", template: "Swap 10 CELO for cUSD", group: "DeFi" },
+  { cmd: "/quote", label: "Swap quote", desc: "Price quote without executing", template: "Swap quote for 10 CELO to cUSD", group: "DeFi" },
+  { cmd: "/send", label: "Send CELO", desc: "Transfer CELO to an address", template: "Send 1 CELO to 0x", group: "DeFi" },
+  { cmd: "/aave", label: "Aave position", desc: "Your lending / borrowing position", template: "Check my Aave position", group: "DeFi" },
+  // Security
+  { cmd: "/contract-risk", label: "Audit contract", desc: "Risk check on a contract address", template: "Check contract risk for 0x", group: "Security" },
+  { cmd: "/token-risk", label: "Token safety", desc: "Rug-pull / honeypot screen", template: "Is this token safe? 0x", group: "Security" },
+  { cmd: "/tx-check", label: "Inspect transaction", desc: "Screen a tx for malicious activity", template: "Check this transaction for malicious activity: 0x", group: "Security" },
+  { cmd: "/copy-wallet", label: "Analyze wallet", desc: "Copy-trade analysis of a wallet", template: "Analyze copy-trading strategy for wallet 0x", group: "Security" },
+  // Learn
+  { cmd: "/explain", label: "Explain a concept", desc: "Learn any Celo / DeFi topic", template: "Explain how Mento stablecoins work", group: "Learn" },
+  { cmd: "/verify", label: "Self verification", desc: "Verify identity with Self", template: "How do I verify my identity with Self?", group: "Learn" },
+  { cmd: "/mcp", label: "MCP setup", desc: "Connect the CeloMind MCP server", template: "How do I set up the CeloMind MCP server?", group: "Learn" },
+];
+
 interface Message {
   id: string;
   sender: "user" | "bot";
@@ -138,8 +175,22 @@ export default function ChatPage() {
   const { switchChainAsync } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: CELO_CHAIN_ID });
   const reduce = useReducedMotion();
+  // Persist the conversation id so an anonymous (no-wallet) thread survives reloads —
+  // "view history for all times" even before a wallet is connected. (Wallet history is
+  // keyed by address server-side and already persists across reloads/devices.)
   const initialConversationId = useRef<string>(
-    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
+    (() => {
+      const fresh = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      if (typeof window === "undefined") return fresh;
+      try {
+        const stored = window.localStorage.getItem("celomind:conversationId");
+        if (stored) return stored;
+        window.localStorage.setItem("celomind:conversationId", fresh);
+      } catch {
+        /* localStorage unavailable (private mode) — fall back to the fresh id */
+      }
+      return fresh;
+    })()
   ).current;
   const [activeConversationId, setActiveConversationId] = useState(initialConversationId);
 
@@ -153,6 +204,9 @@ export default function ChatPage() {
   ]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [history, setHistory] = useState<ChatHistoryMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -190,6 +244,39 @@ export default function ChatPage() {
       { label: "Audit Target Contract", cmd: "Audit contract address 0x471EcE3750Da237f93B8E33BCEF3C9e9790a400f" },
       { label: "Inspect Gas History", cmd: "Inspect Celo gas price history" }
     ]
+  };
+
+  // Slash-command palette: open when the input starts with "/" and isn't dismissed.
+  const slashQuery = inputText.startsWith("/") ? inputText.slice(1).toLowerCase().trimStart() : null;
+  const filteredCommands = useMemo(() => {
+    if (slashQuery === null) return [];
+    const q = slashQuery;
+    if (!q) return SLASH_COMMANDS;
+    return SLASH_COMMANDS.filter(
+      (c) =>
+        c.cmd.slice(1).includes(q) ||
+        c.label.toLowerCase().includes(q) ||
+        c.desc.toLowerCase().includes(q) ||
+        c.group.toLowerCase().includes(q)
+    );
+  }, [slashQuery]);
+  const slashOpen = slashQuery !== null && !slashDismissed && filteredCommands.length > 0;
+
+  useEffect(() => {
+    setSlashIndex(0);
+  }, [slashQuery]);
+
+  const applySlashCommand = (c: SlashCommand) => {
+    setInputText(c.template);
+    setSlashDismissed(true);
+    // Refocus and drop the caret at the end so users can edit addresses/amounts.
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(c.template.length, c.template.length);
+      }
+    });
   };
 
   useEffect(() => {
@@ -549,7 +636,7 @@ export default function ChatPage() {
       <main className="flex-1 min-h-0 flex flex-col bg-dark overflow-hidden">
         
         {/* Chat Header */}
-        <div className="h-12 border-b border-border px-4 md:px-5 flex items-center justify-between gap-2 shrink-0 bg-surface/30">
+        <div className="h-12 border-b border-border px-3 sm:px-4 md:px-5 flex items-center justify-between gap-2 shrink-0 bg-surface/30">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-syne font-bold text-xs uppercase text-text whitespace-nowrap">CeloMind Agent</span>
             <span className="hidden sm:inline px-1.5 py-0.5 bg-border2 border border-border text-[9px] font-mono text-muted uppercase">
@@ -562,9 +649,10 @@ export default function ChatPage() {
               onClick={() => setHistoryOpen((open) => !open)}
               className="px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
             >
-              {historyOpen ? "Close History" : "Open History"}
+              <span className="sm:hidden">{historyOpen ? "Close" : "History"}</span>
+              <span className="hidden sm:inline">{historyOpen ? "Close History" : "Open History"}</span>
             </button>
-            <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
+            <div className="hidden sm:flex text-[10px] font-mono text-muted items-center gap-1.5 shrink-0">
               <span className="pulse-green"></span>
               Agent Ready
             </div>
@@ -588,7 +676,7 @@ export default function ChatPage() {
         </div>
 
         {/* Message Feed */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 md:p-5 space-y-4 custom-scroll">
           {messages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
@@ -598,7 +686,7 @@ export default function ChatPage() {
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 transition={{ duration: 0.28, ease: "easeOut" }}
                 className={cn(
-                  "flex flex-col gap-1.5 max-w-[85%] text-xs",
+                  "flex flex-col gap-1.5 max-w-[92%] sm:max-w-[85%] text-xs",
                   isUser ? "ml-auto items-end" : "mr-auto items-start"
                 )}
               >
@@ -641,7 +729,7 @@ export default function ChatPage() {
 
           {/* Typing Indicator */}
           {isTyping && (
-            <div className="flex flex-col gap-1.5 max-w-[85%] text-xs mr-auto items-start">
+            <div className="flex flex-col gap-1.5 max-w-[92%] sm:max-w-[85%] text-xs mr-auto items-start">
               <span className="text-[9px] text-muted font-mono">{new Date().toLocaleTimeString()}</span>
               <div className="flex items-center gap-1 p-3 bg-surface border border-border2 rounded w-14 justify-center">
                 <span className="typing-dot"></span>
@@ -654,20 +742,74 @@ export default function ChatPage() {
         </div>
 
         {/* Input box */}
-        <div className="p-4 border-t border-border bg-surface/30 shrink-0">
+        <div className="relative p-3 sm:p-4 border-t border-border bg-surface/30 shrink-0">
+          {/* Slash-command palette */}
+          {slashOpen && (
+            <div className="absolute bottom-full left-3 right-3 sm:left-4 sm:right-4 mb-2 z-50 max-h-[280px] overflow-y-auto border border-border bg-surface shadow-xl custom-scroll">
+              <div className="sticky top-0 flex items-center justify-between bg-surface/95 px-3 py-1.5 border-b border-border2 text-[9px] font-mono uppercase tracking-wider text-muted">
+                <span>Tools — ↑↓ to navigate, ↵ to pick, esc to dismiss</span>
+                <span className="text-cy">{filteredCommands.length}</span>
+              </div>
+              {filteredCommands.map((c, i) => (
+                <button
+                  key={c.cmd}
+                  type="button"
+                  onMouseEnter={() => setSlashIndex(i)}
+                  onClick={() => applySlashCommand(c)}
+                  className={cn(
+                    "w-full text-left flex items-start gap-2.5 px-3 py-2 border-b border-border2/60 last:border-b-0 transition-colors",
+                    i === slashIndex ? "bg-cy/10" : "hover:bg-dark/40"
+                  )}
+                >
+                  <span className={cn("font-mono text-[11px] font-bold shrink-0 w-28", i === slashIndex ? "text-cy" : "text-text")}>{c.cmd}</span>
+                  <span className="flex flex-col min-w-0">
+                    <span className="font-mono text-[11px] text-text truncate">{c.label}</span>
+                    <span className="font-mono text-[10px] text-muted truncate">{c.desc}</span>
+                  </span>
+                  <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted">{c.group}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage(inputText);
             }}
-            className="flex gap-2.5 items-end"
+            className="flex gap-2 items-end sm:gap-2.5"
           >
             <textarea
+              ref={inputRef}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Query wallet balance, execute a swap, or trigger contract audits..."
+              onChange={(e) => {
+                setInputText(e.target.value);
+                setSlashDismissed(false);
+              }}
+              placeholder="Type / for tools, or query wallet balance, execute a swap, audit a contract..."
               className="flex-1 min-h-[44px] max-h-[80px] bg-dark border border-border2 hover:border-border text-xs text-text placeholder:text-muted p-2.5 outline-none font-mono resize-none focus:border-cy transition-colors"
               onKeyDown={(e) => {
+                if (slashOpen) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSlashIndex((i) => (i + 1) % filteredCommands.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSlashIndex((i) => (i - 1 + filteredCommands.length) % filteredCommands.length);
+                    return;
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    applySlashCommand(filteredCommands[slashIndex]);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setSlashDismissed(true);
+                    return;
+                  }
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage(inputText);
@@ -677,7 +819,7 @@ export default function ChatPage() {
             <button
               type="submit"
               disabled={!inputText.trim() || isTyping}
-              className="h-11 px-5 bg-cy border border-cy text-dark hover:bg-transparent hover:text-cy font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer press"
+              className="h-11 px-3 sm:px-5 bg-cy border border-cy text-dark hover:bg-transparent hover:text-cy font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer press"
             >
               Send
             </button>
@@ -686,7 +828,7 @@ export default function ChatPage() {
 
       </main>
       {historyOpen && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Close history drawer"
@@ -697,7 +839,7 @@ export default function ChatPage() {
             initial={reduce ? false : { x: 24, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute right-0 top-0 h-full w-full max-w-[420px] border-l border-border bg-dark shadow-[0_0_40px_rgba(0,0,0,0.4)]"
+            className="absolute right-0 top-0 h-full w-full max-w-[380px] sm:max-w-[420px] border-l border-border bg-dark shadow-[0_0_40px_rgba(0,0,0,0.4)]"
           >
             <div className="flex items-center justify-between border-b border-border2 px-4 py-3">
               <div>

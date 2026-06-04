@@ -277,6 +277,22 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
     }
     case "whale_watch":
     case "whale_activity": {
+      const { payload } = unwrap(intentData);
+      if (Array.isArray(payload)) {
+        const items = payload.slice(0, 10);
+        if (!items.length) return undefined;
+        return {
+          title: "Top Celo Whales",
+          data: items.map((it, i) => {
+            const w = it as Record<string, unknown>;
+            const addrRaw =
+              (w.address && typeof w.address === "object" ? (w.address as Record<string, unknown>).hash : w.address) ??
+              w.wallet ?? w.holder ?? w.name;
+            const val = w.value ?? w.balance ?? w.usdValue ?? w.amount ?? w.total;
+            return { label: `${i + 1}. ${short(String(addrRaw ?? "unknown"))}`, value: val ? String(val) : "—" };
+          }),
+        };
+      }
       const w = intentData as Record<string, unknown>;
       return {
         title: "Whale Activity",

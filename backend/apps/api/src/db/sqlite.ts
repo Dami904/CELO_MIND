@@ -151,7 +151,7 @@ export async function getChatMessages(filters: {
   try {
     const db = getClient();
     const where: string[] = [];
-    const args: unknown[] = [];
+    const args: (string | number)[] = [];
 
     if (filters.walletAddress) {
       where.push("lower(wallet_address) = lower(?)");

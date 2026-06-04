@@ -67,6 +67,7 @@ describe("detectIntent", () => {
   });
 
   it("landing chatbot blocks swap_execute", () => {
-    expect(detectIntent("Swap CELO for cUSD", "landing")).toBe("unsupported");
+    // swap_execute now requires an amount (an actual command, not an explanation)
+    expect(detectIntent("Swap 10 CELO for cUSD", "landing")).toBe("unsupported");
   });
 });

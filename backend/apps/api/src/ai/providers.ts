@@ -1,10 +1,22 @@
 /**
  * Multi-provider AI abstraction.
- * Supports: Claude (Anthropic), OpenAI/ChatGPT, Google Gemini, DeepSeek.
- * Set AI_PROVIDER in .env to force one, or it auto-detects by which key is present.
+ * Active providers: Groq, Cohere, OpenRouter, Google Gemini.
+ *
+ * Selection is TASK-BASED: each intent is routed to the provider/model best
+ * suited to it (see INTENT_ROUTES below). If the chosen provider fails
+ * (quota, outage, bad response), aiComplete() automatically fails over to the
+ * other configured providers so a single rate limit never breaks chat.
+ *
+ * Override knobs (all optional, via .env):
+ *   AI_PROVIDER            force a single provider for every request
+ *   GROQ_MODEL_FAST        default: llama-3.1-8b-instant
+ *   GROQ_MODEL_SMART       default: llama-3.3-70b-versatile
+ *   COHERE_MODEL           default: command-a-03-2025
+ *   OPENROUTER_MODEL       default: meta-llama/llama-3.3-70b-instruct
+ *   GEMINI_MODEL           default: gemini-3.1-flash-lite
  */
 
-export type AIProvider = "claude" | "openai" | "gemini" | "deepseek";
+export type AIProvider = "groq" | "cohere" | "openrouter" | "gemini";
 
 export type AIMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -12,6 +24,10 @@ export type AICompletionOptions = {
   messages: AIMessage[];
   maxTokens?: number;
   temperature?: number;
+  /** Force a specific provider (overrides task routing). */
+  provider?: AIProvider;
+  /** Force a specific model on the primary provider. */
+  model?: string;
 };
 
 export type AICompletionResult = {
@@ -20,43 +36,75 @@ export type AICompletionResult = {
   model: string;
 };
 
-// ─── Claude (Anthropic) ───────────────────────────────────────────────────────
-async function callClaude(opts: AICompletionOptions): Promise<AICompletionResult> {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const system = opts.messages.find((m) => m.role === "system")?.content ?? "";
-  const userMessages = opts.messages.filter((m) => m.role !== "system");
-  const model = process.env.CLAUDE_MODEL ?? "claude-sonnet-4-6";
-  const res = await client.messages.create({
-    model,
-    max_tokens: opts.maxTokens ?? 1024,
-    system,
-    messages: userMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+// ─── Groq (OpenAI-compatible) ─────────────────────────────────────────────────
+async function callGroq(opts: AICompletionOptions, model: string): Promise<AICompletionResult> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY not set");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: opts.maxTokens ?? 1024,
+      temperature: opts.temperature ?? 0.7,
+      messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+    }),
   });
-  const text = res.content[0].type === "text" ? res.content[0].text : "";
-  return { text, provider: "claude", model };
+  if (!res.ok) throw new Error(`Groq error: ${res.status}`);
+  const data = (await res.json()) as { choices: { message: { content: string } }[] };
+  const text = data.choices?.[0]?.message?.content ?? "";
+  return { text, provider: "groq", model };
 }
 
-// ─── OpenAI / ChatGPT ─────────────────────────────────────────────────────────
-async function callOpenAI(opts: AICompletionOptions): Promise<AICompletionResult> {
-  const OpenAI = (await import("openai")).default;
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
-  const res = await client.chat.completions.create({
-    model,
-    max_tokens: opts.maxTokens ?? 1024,
-    temperature: opts.temperature ?? 0.7,
-    messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+// ─── Cohere (v2 chat) ─────────────────────────────────────────────────────────
+async function callCohere(opts: AICompletionOptions, model: string): Promise<AICompletionResult> {
+  const apiKey = process.env.COHERE_API_KEY;
+  if (!apiKey) throw new Error("COHERE_API_KEY not set");
+  const res = await fetch("https://api.cohere.com/v2/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: opts.maxTokens ?? 1024,
+      temperature: opts.temperature ?? 0.7,
+      messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+    }),
   });
-  const text = res.choices[0]?.message?.content ?? "";
-  return { text, provider: "openai", model };
+  if (!res.ok) throw new Error(`Cohere error: ${res.status}`);
+  const data = (await res.json()) as { message: { content: { type: string; text: string }[] } };
+  const text = data.message?.content?.find((c) => c.type === "text")?.text ?? "";
+  return { text, provider: "cohere", model };
+}
+
+// ─── OpenRouter (OpenAI-compatible meta-router) ───────────────────────────────
+async function callOpenRouter(opts: AICompletionOptions, model: string): Promise<AICompletionResult> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": process.env.OPENROUTER_SITE ?? "https://celomind.app",
+      "X-Title": "CeloMind",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: opts.maxTokens ?? 1024,
+      temperature: opts.temperature ?? 0.7,
+      messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenRouter error: ${res.status}`);
+  const data = (await res.json()) as { choices: { message: { content: string } }[] };
+  const text = data.choices?.[0]?.message?.content ?? "";
+  return { text, provider: "openrouter", model };
 }
 
 // ─── Google Gemini ────────────────────────────────────────────────────────────
-async function callGemini(opts: AICompletionOptions): Promise<AICompletionResult> {
+async function callGemini(opts: AICompletionOptions, model: string): Promise<AICompletionResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-3-flash-preview";
   const systemMsg = opts.messages.find((m) => m.role === "system")?.content ?? "";
   const userMsg = opts.messages
     .filter((m) => m.role !== "system")
@@ -81,47 +129,98 @@ async function callGemini(opts: AICompletionOptions): Promise<AICompletionResult
   return { text, provider: "gemini", model };
 }
 
-// ─── DeepSeek ─────────────────────────────────────────────────────────────────
-async function callDeepSeek(opts: AICompletionOptions): Promise<AICompletionResult> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set");
-  const model = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
-  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      max_tokens: opts.maxTokens ?? 1024,
-      temperature: opts.temperature ?? 0.7,
-      messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
-    }),
-  });
-  if (!res.ok) throw new Error(`DeepSeek error: ${res.status}`);
-  const data = (await res.json()) as { choices: { message: { content: string } }[] };
-  const text = data.choices?.[0]?.message?.content ?? "";
-  return { text, provider: "deepseek", model };
-}
-
-// ─── Provider selection ───────────────────────────────────────────────────────
-function detectProvider(): AIProvider {
-  const explicit = process.env.AI_PROVIDER as AIProvider | undefined;
-  if (explicit) return explicit;
-  if (process.env.ANTHROPIC_API_KEY) return "claude";
-  if (process.env.OPENAI_API_KEY) return "openai";
-  if (process.env.GEMINI_API_KEY) return "gemini";
-  if (process.env.DEEPSEEK_API_KEY) return "deepseek";
-  throw new Error(
-    "No AI provider configured — set AI_PROVIDER or one of ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / DEEPSEEK_API_KEY."
-  );
-}
-
-export async function aiComplete(opts: AICompletionOptions): Promise<AICompletionResult> {
-  const provider = detectProvider();
+// ─── Default model per provider ───────────────────────────────────────────────
+function defaultModel(provider: AIProvider): string {
   switch (provider) {
-    case "claude": return callClaude(opts);
-    case "openai": return callOpenAI(opts);
-    case "gemini": return callGemini(opts);
-    case "deepseek": return callDeepSeek(opts);
-    default: throw new Error(`Unknown AI provider: ${provider}`);
+    case "groq": return process.env.GROQ_MODEL_FAST ?? "llama-3.1-8b-instant";
+    case "cohere": return process.env.COHERE_MODEL ?? "command-a-03-2025";
+    case "openrouter": return process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct";
+    case "gemini": return process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
   }
+}
+
+async function callProvider(provider: AIProvider, opts: AICompletionOptions, model: string): Promise<AICompletionResult> {
+  switch (provider) {
+    case "groq": return callGroq(opts, model);
+    case "cohere": return callCohere(opts, model);
+    case "openrouter": return callOpenRouter(opts, model);
+    case "gemini": return callGemini(opts, model);
+  }
+}
+
+// ─── Task-based routing ───────────────────────────────────────────────────────
+// Each route names the provider whose strengths fit the work, plus the model.
+type Route = { provider: AIProvider; model: string };
+
+// Fast structured data → Groq's instant 8B (low latency, generous free tier).
+const FAST = (): Route => ({ provider: "groq", model: process.env.GROQ_MODEL_FAST ?? "llama-3.1-8b-instant" });
+// Security / risk / analysis → Groq's 70B (stronger reasoning, tool-capable).
+const REASON = (): Route => ({ provider: "groq", model: process.env.GROQ_MODEL_SMART ?? "llama-3.3-70b-versatile" });
+// Educational / docs grounding → Cohere Command-A (RAG-optimized).
+const GROUNDED = (): Route => ({ provider: "cohere", model: process.env.COHERE_MODEL ?? "command-a-03-2025" });
+// Catch-all default → Gemini flash-lite (high daily quota, reliable).
+const DEFAULT_ROUTE = (): Route => ({ provider: "gemini", model: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite" });
+
+const INTENT_ROUTES: Record<string, () => Route> = {
+  // Security / risk reasoning — accuracy first
+  contract_risk: REASON, token_risk: REASON, malicious_tx_check: REASON,
+  transaction_explain: REASON, copy_wallet_analyze: REASON, copy_wallet_prepare: REASON,
+  whale_activity: REASON, whale_watch: REASON,
+  // Educational / docs grounding — RAG-strong model
+  docs_explain: GROUNDED, mcp_setup: GROUNDED, claude_setup: GROUNDED,
+  self_verify: GROUNDED, x402_pay: GROUNDED,
+  // Fast structured data formatting
+  balance: FAST, token_balance: FAST, token_price: FAST, token_info: FAST,
+  market_trending: FAST, recent_launches: FAST, wallet_portfolio: FAST,
+  recent_transactions: FAST, swap_quote: FAST, aave_position: FAST, agent_id_check: FAST,
+  send: FAST, swap_execute: FAST, aave_supply: FAST,
+};
+
+/** The provider+model best suited to a given intent. */
+export function routeForIntent(intent: string): Route {
+  return (INTENT_ROUTES[intent] ?? DEFAULT_ROUTE)();
+}
+
+// ─── Provider availability & failover ─────────────────────────────────────────
+function configuredProviders(): AIProvider[] {
+  const list: AIProvider[] = [];
+  if (process.env.GROQ_API_KEY) list.push("groq");
+  if (process.env.COHERE_API_KEY) list.push("cohere");
+  if (process.env.GEMINI_API_KEY) list.push("gemini");
+  if (process.env.OPENROUTER_API_KEY) list.push("openrouter");
+  return list;
+}
+
+/**
+ * Complete a chat request. Picks the primary provider from (in order):
+ * opts.provider → AI_PROVIDER env → first configured provider, then fails over
+ * to every other configured provider if the primary errors.
+ */
+export async function aiComplete(opts: AICompletionOptions): Promise<AICompletionResult> {
+  const available = configuredProviders();
+  if (available.length === 0) {
+    throw new Error("No AI provider configured — set GROQ_API_KEY / COHERE_API_KEY / OPENROUTER_API_KEY / GEMINI_API_KEY.");
+  }
+
+  const forced = (process.env.AI_PROVIDER as AIProvider | undefined) || undefined;
+  const primary = forced ?? opts.provider ?? available[0];
+  const primaryModel = (primary === opts.provider && opts.model) ? opts.model : defaultModel(primary);
+
+  // Try primary first (with its task-routed model), then the rest with their defaults.
+  const order: { provider: AIProvider; model: string }[] = [
+    { provider: primary, model: primaryModel },
+    ...available.filter((p) => p !== primary).map((p) => ({ provider: p, model: defaultModel(p) })),
+  ];
+
+  let lastErr: unknown;
+  for (const { provider, model } of order) {
+    try {
+      const result = await callProvider(provider, opts, model);
+      if (result.text.trim()) return result;
+      lastErr = new Error(`${provider} returned empty response`);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr ?? new Error("All AI providers failed");
 }
