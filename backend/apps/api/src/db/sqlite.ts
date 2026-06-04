@@ -1,12 +1,20 @@
 import { createClient, type Client } from "@libsql/client";
 
-const DB_URL = `file:${process.env.DATABASE_URL ?? "./celomind.db"}`;
+// Accepts a local file path (default) or a hosted Turso/libsql URL.
+// libsql://, https://, ws:// (+ file:) are used verbatim; a bare path becomes file:.
+// For Turso, also set DATABASE_AUTH_TOKEN so logs persist beyond an ephemeral disk.
+function resolveDbConfig(): { url: string; authToken?: string } {
+  const raw = process.env.DATABASE_URL ?? "./celomind.db";
+  const authToken = process.env.DATABASE_AUTH_TOKEN;
+  const url = /^(libsql|https?|wss?|file):/.test(raw) ? raw : `file:${raw}`;
+  return authToken ? { url, authToken } : { url };
+}
 
 let _client: Client | null = null;
 
 export function getClient(): Client {
   if (!_client) {
-    _client = createClient({ url: DB_URL });
+    _client = createClient(resolveDbConfig());
   }
   return _client;
 }

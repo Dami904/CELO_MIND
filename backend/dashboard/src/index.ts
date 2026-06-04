@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ChatRequest, Intent } from "../../packages/shared/src/index.js";
+import { sqlHincrbyBatch, sqlPfaddBatch, sqlHgetall, sqlPfcount, type CounterOp, type UniqueOp } from "./store.js";
 
 export type MetricsProvider = "claude" | "openai" | "gemini" | "deepseek" | "ollama" | "fallback";
 
@@ -178,56 +179,102 @@ function lastNDates(days: number): string[] {
 }
 
 export async function recordChatRequest(input: RecordChatRequestInput): Promise<void> {
-  try {
-    const date = todayKeyDate();
-    const dailyKey = `metrics:daily:${date}`;
-    const modelKey = `${input.provider}/${input.model}`;
-    const latencyMs = Math.max(0, Math.round(input.latencyMs));
+  const date = todayKeyDate();
+  const dailyKey = `metrics:daily:${date}`;
+  const modelKey = `${input.provider}/${input.model}`;
+  const latencyMs = Math.max(0, Math.round(input.latencyMs));
 
-    await Promise.all([
-      hincrby("metrics:totals", "chat_requests", 1),
-      hincrby("metrics:totals", "model_calls", input.fallback ? 0 : 1),
-      hincrby("metrics:totals", "fallbacks", input.fallback ? 1 : 0),
-      hincrby("metrics:intents", input.intent, 1),
-      hincrby("metrics:providers", input.provider, 1),
-      hincrby("metrics:models", modelKey, 1),
-      hincrby("metrics:chatbots", input.chatbotType, 1),
-      hincrby("metrics:latency:sum", input.provider, latencyMs),
-      hincrby("metrics:latency:count", input.provider, 1),
-      hincrby(dailyKey, "chat_requests", 1),
-      hincrby(dailyKey, "model_calls", input.fallback ? 0 : 1),
-      expire(dailyKey, DAILY_TTL_SECONDS),
-      input.walletAddress ? pfadd("metrics:users", input.walletAddress) : Promise.resolve(),
-      input.conversationId ? pfadd("metrics:sessions", input.conversationId) : Promise.resolve(),
-    ]);
-  } catch {
-    // Metrics must never break user-facing requests.
-  }
+  const counters: CounterOp[] = [
+    { hkey: "metrics:totals", field: "chat_requests", amount: 1 },
+    { hkey: "metrics:totals", field: "model_calls", amount: input.fallback ? 0 : 1 },
+    { hkey: "metrics:totals", field: "fallbacks", amount: input.fallback ? 1 : 0 },
+    { hkey: "metrics:intents", field: input.intent, amount: 1 },
+    { hkey: "metrics:providers", field: input.provider, amount: 1 },
+    { hkey: "metrics:models", field: modelKey, amount: 1 },
+    { hkey: "metrics:chatbots", field: input.chatbotType, amount: 1 },
+    { hkey: "metrics:latency:sum", field: input.provider, amount: latencyMs },
+    { hkey: "metrics:latency:count", field: input.provider, amount: 1 },
+    { hkey: dailyKey, field: "chat_requests", amount: 1 },
+    { hkey: dailyKey, field: "model_calls", amount: input.fallback ? 0 : 1 },
+  ];
+  const uniques: UniqueOp[] = [
+    ...(input.walletAddress ? [{ skey: "metrics:users", member: input.walletAddress }] : []),
+    ...(input.conversationId ? [{ skey: "metrics:sessions", member: input.conversationId }] : []),
+  ];
+
+  // Primary: Redis (fast). Durable mirror runs independently so one failing never skips the other.
+  await Promise.all([
+    (async () => {
+      try {
+        await Promise.all([
+          ...counters.map((o) => hincrby(o.hkey, o.field, o.amount)),
+          expire(dailyKey, DAILY_TTL_SECONDS),
+          ...uniques.map((o) => pfadd(o.skey, o.member)),
+        ]);
+      } catch {
+        // Metrics must never break user-facing requests.
+      }
+    })(),
+    sqlHincrbyBatch(counters),
+    sqlPfaddBatch(uniques),
+  ]);
 }
 
 export async function recordToolCall(input: RecordToolCallInput): Promise<void> {
+  const dailyKey = `metrics:daily:${todayKeyDate()}`;
+  const counters: CounterOp[] = [
+    { hkey: "metrics:totals", field: "tool_calls", amount: 1 },
+    { hkey: "metrics:totals", field: "errors", amount: input.success ? 0 : 1 },
+    { hkey: "metrics:tools", field: input.tool, amount: 1 },
+    { hkey: dailyKey, field: "tool_calls", amount: 1 },
+  ];
+
+  await Promise.all([
+    (async () => {
+      try {
+        await Promise.all([
+          ...counters.map((o) => hincrby(o.hkey, o.field, o.amount)),
+          expire(dailyKey, DAILY_TTL_SECONDS),
+        ]);
+      } catch {
+        // Metrics must never break user-facing requests.
+      }
+    })(),
+    sqlHincrbyBatch(counters),
+  ]);
+}
+
+// ── Resilient reads ──────────────────────────────────────────────────────────
+// Prefer Redis (fast, authoritative); fall back to the durable SQL mirror when
+// Redis is unreachable OR has been wiped (returns empty), so dashboards keep working.
+async function hgetallResilient(key: string): Promise<Record<string, string>> {
   try {
-    const dailyKey = `metrics:daily:${todayKeyDate()}`;
-    await Promise.all([
-      hincrby("metrics:totals", "tool_calls", 1),
-      hincrby("metrics:totals", "errors", input.success ? 0 : 1),
-      hincrby("metrics:tools", input.tool, 1),
-      hincrby(dailyKey, "tool_calls", 1),
-      expire(dailyKey, DAILY_TTL_SECONDS),
-    ]);
+    const r = await hgetall(key);
+    if (Object.keys(r).length > 0) return r;
   } catch {
-    // Metrics must never break user-facing requests.
+    /* Redis down → fall through to the mirror */
   }
+  return sqlHgetall(key);
+}
+
+async function pfcountResilient(key: string): Promise<number> {
+  try {
+    const c = await pfcount(key);
+    if (c > 0) return c;
+  } catch {
+    /* Redis down → fall through to the mirror */
+  }
+  return sqlPfcount(key);
 }
 
 export async function getMetricsOverview() {
   const [totalsHash, toolsHash, intentsHash, providersHash, uniqueUsers, uniqueSessions] = await Promise.all([
-    hgetall("metrics:totals"),
-    hgetall("metrics:tools"),
-    hgetall("metrics:intents"),
-    hgetall("metrics:providers"),
-    pfcount("metrics:users"),
-    pfcount("metrics:sessions"),
+    hgetallResilient("metrics:totals"),
+    hgetallResilient("metrics:tools"),
+    hgetallResilient("metrics:intents"),
+    hgetallResilient("metrics:providers"),
+    pfcountResilient("metrics:users"),
+    pfcountResilient("metrics:sessions"),
   ]);
 
   const totals = {
@@ -250,7 +297,7 @@ export async function getMetricsOverview() {
 }
 
 export async function getMetricsTools() {
-  const toolsHash = await hgetall("metrics:tools");
+  const toolsHash = await hgetallResilient("metrics:tools");
   return envelope("metrics_tools", {
     tools: sortedCounts(toolsHash, "tool"),
   });
@@ -258,10 +305,10 @@ export async function getMetricsTools() {
 
 export async function getMetricsModels() {
   const [providersHash, modelsHash, latencySumHash, latencyCountHash] = await Promise.all([
-    hgetall("metrics:providers"),
-    hgetall("metrics:models"),
-    hgetall("metrics:latency:sum"),
-    hgetall("metrics:latency:count"),
+    hgetallResilient("metrics:providers"),
+    hgetallResilient("metrics:models"),
+    hgetallResilient("metrics:latency:sum"),
+    hgetallResilient("metrics:latency:count"),
   ]);
 
   const avgLatencyMs = Object.fromEntries(
@@ -281,7 +328,7 @@ export async function getMetricsModels() {
 
 export async function getMetricsTimeseries(daysInput?: unknown) {
   const dates = lastNDates(clampDays(daysInput));
-  const dailyHashes = await Promise.all(dates.map((date) => hgetall(`metrics:daily:${date}`)));
+  const dailyHashes = await Promise.all(dates.map((date) => hgetallResilient(`metrics:daily:${date}`)));
 
   return envelope("metrics_timeseries", {
     series: dates.map((date, i) => {
