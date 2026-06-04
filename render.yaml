@@ -5,15 +5,15 @@ services:
     rootDir: backend
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run build
+    # --include=dev so the bundler (esbuild, pulled in via devDeps) is installed
+    # even with NODE_ENV=production; build needs it, runtime does not.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 20.19.0
-      - key: NODE_ENV
-        value: production
       - key: HOST
         value: 0.0.0.0
       - key: CELO_NETWORK
