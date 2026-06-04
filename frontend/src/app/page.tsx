@@ -22,16 +22,16 @@ export default function LandingPage() {
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm justify-center">
           <Link
-            href="/dashboard"
+            href="/chat"
             className="flex-1 py-3 px-6 text-center text-xs font-mono uppercase tracking-wider font-bold bg-cy text-dark border border-cy hover:bg-transparent hover:text-cy transition-all cursor-pointer"
           >
-            Open Dashboard
+            Try Chat Agent
           </Link>
           <Link
-            href="/chat"
+            href="/dashboard"
             className="flex-1 py-3 px-6 text-center text-xs font-mono uppercase tracking-wider font-bold bg-transparent text-text border border-border hover:border-cy hover:text-cy transition-all cursor-pointer"
           >
-            Try Chat Agent
+            Open Dashboard
           </Link>
         </div>
       </section>

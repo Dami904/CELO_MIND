@@ -1,11 +1,21 @@
 'use client'
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { useAppKit } from "@reown/appkit/react";
+import { useAccount } from "wagmi";
+import { cn, truncateAddress } from "@/lib/utils";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { open } = useAppKit();
+  const { address, isConnected } = useAccount();
+
+  // Avoid hydration mismatch: render the disconnected label until mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const connectLabel = mounted && isConnected && address ? truncateAddress(address) : "Connect Wallet";
 
   const navItems = [
     { name: "Terminal", path: "/" },
@@ -44,11 +54,20 @@ export default function Navbar() {
         })}
       </nav>
 
-      {/* Right: Connect Button */}
+      {/* Right: Connect Button — themed trigger that opens the Reown AppKit modal */}
       <div className="flex items-center shrink-0">
-        {/* Reown AppKit web component (replaces the old w3m-button) */}
-        {/* @ts-ignore */}
-        <appkit-button balance="hide" size="sm" />
+        <button
+          type="button"
+          onClick={() => open()}
+          className={cn(
+            "px-2.5 sm:px-4 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider font-bold border transition-colors cursor-pointer whitespace-nowrap",
+            mounted && isConnected
+              ? "bg-transparent text-cy border-cy hover:bg-cy hover:text-dark"
+              : "bg-cy text-dark border-cy hover:bg-transparent hover:text-cy"
+          )}
+        >
+          {connectLabel}
+        </button>
       </div>
     </header>
   );

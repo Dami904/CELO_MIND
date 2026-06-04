@@ -170,7 +170,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden h-full relative">
+    <div className="flex-1 min-h-0 flex overflow-hidden relative">
       
       {/* ConfirmModal Overlay */}
       {pendingTxData && (
@@ -238,7 +238,7 @@ export default function ChatPage() {
       </aside>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col bg-dark overflow-hidden h-full">
+      <main className="flex-1 min-h-0 flex flex-col bg-dark overflow-hidden">
         
         {/* Chat Header */}
         <div className="h-12 border-b border-border px-4 md:px-5 flex items-center justify-between gap-2 shrink-0 bg-surface/30">
@@ -268,7 +268,7 @@ export default function ChatPage() {
         </div>
 
         {/* Message Feed */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
           {messages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
