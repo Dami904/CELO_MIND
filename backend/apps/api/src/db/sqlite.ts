@@ -85,6 +85,10 @@ export async function initDb(): Promise<void> {
       snapshot TEXT,
       timestamp TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE INDEX IF NOT EXISTS chat_messages_wallet_idx ON chat_messages(wallet_address);
+    CREATE INDEX IF NOT EXISTS chat_messages_conversation_idx ON chat_messages(conversation_id);
+    CREATE INDEX IF NOT EXISTS chat_messages_timestamp_idx ON chat_messages(timestamp);
   `);
 }
 
@@ -125,6 +129,80 @@ export async function logChatMessage(msg: {
       args: [msg.conversationId ?? null, msg.chatbotType, msg.role, msg.content, msg.intent ?? null, msg.walletAddress ?? null],
     });
   } catch { /* non-fatal */ }
+}
+
+export type ChatMessageRecord = {
+  id: number;
+  conversationId: string | null;
+  chatbotType: string;
+  role: string;
+  content: string;
+  intent: string | null;
+  walletAddress: string | null;
+  timestamp: string;
+};
+
+export async function getChatMessages(filters: {
+  walletAddress?: string;
+  conversationId?: string;
+  chatbotType?: string;
+  limit?: number;
+}): Promise<ChatMessageRecord[]> {
+  try {
+    const db = getClient();
+    const where: string[] = [];
+    const args: unknown[] = [];
+
+    if (filters.walletAddress) {
+      where.push("lower(wallet_address) = lower(?)");
+      args.push(filters.walletAddress);
+    }
+
+    if (filters.conversationId) {
+      where.push("conversation_id = ?");
+      args.push(filters.conversationId);
+    }
+
+    if (filters.chatbotType) {
+      where.push("chatbot_type = ?");
+      args.push(filters.chatbotType);
+    }
+
+    const limit = Math.max(1, Math.min(filters.limit ?? 200, 1000));
+    const sql = `
+      SELECT
+        id,
+        conversation_id AS conversationId,
+        chatbot_type AS chatbotType,
+        role,
+        content,
+        intent,
+        wallet_address AS walletAddress,
+        timestamp
+      FROM chat_messages
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY datetime(timestamp) DESC, id DESC
+      LIMIT ?
+    `;
+
+    const result = await db.execute({
+      sql,
+      args: [...args, limit],
+    });
+
+    return result.rows.map((row) => ({
+      id: Number(row.id ?? 0),
+      conversationId: (row.conversationId as string | null) ?? null,
+      chatbotType: String(row.chatbotType ?? ""),
+      role: String(row.role ?? ""),
+      content: String(row.content ?? ""),
+      intent: (row.intent as string | null) ?? null,
+      walletAddress: (row.walletAddress as string | null) ?? null,
+      timestamp: String(row.timestamp ?? ""),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function addWatchedWallet(address: string, label?: string, network?: string): Promise<void> {

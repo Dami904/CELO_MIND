@@ -3,7 +3,7 @@ import { makeOk, makeErr, ChatRequestSchema, type Intent } from "@celomind/share
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
 import { detectIntent } from "../ai/intent-router.js";
 import { aiComplete } from "../ai/providers.js";
-import { logChatMessage } from "../db/sqlite.js";
+import { getChatMessages, logChatMessage } from "../db/sqlite.js";
 import { recordChatRequest, type MetricsProvider } from "../../../../dashboard/src/index.js";
 import { findToken, getTokenList, marketNetwork } from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
@@ -532,6 +532,39 @@ export async function chatRoutes(app: FastifyInstance) {
       intentData,
       conversationId: chatReq.conversationId,
     }, uiHintMap[intent] ?? { type: "result_card" });
+  });
+
+  app.get("/api/chat/history", async (req, reply) => {
+    const query = req.query as {
+      walletAddress?: string;
+      conversationId?: string;
+      chatbotType?: string;
+      limit?: string;
+    };
+
+    const limit = Number.parseInt(query.limit ?? "200", 10);
+    const walletAddress = query.walletAddress?.trim();
+    const conversationId = query.conversationId?.trim();
+    const chatbotType = query.chatbotType?.trim();
+
+    if (!walletAddress && !conversationId) {
+      return reply.code(400).send(makeErr("chat_history", NETWORK, "MISSING_PARAM", "Provide walletAddress or conversationId"));
+    }
+
+    const messages = await getChatMessages({
+      walletAddress,
+      conversationId,
+      chatbotType,
+      limit: Number.isFinite(limit) ? limit : 200,
+    });
+
+    return makeOk("chat_history", NETWORK, {
+      scope: walletAddress ? "wallet" : "conversation",
+      walletAddress: walletAddress ?? null,
+      conversationId: conversationId ?? null,
+      count: messages.length,
+      messages: messages.reverse(),
+    }, { type: "result_card" });
   });
 
   app.post("/api/docs/ask", async (req, reply) => {

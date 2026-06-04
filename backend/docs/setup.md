@@ -62,6 +62,7 @@ GET  /api/health                     Health check
 GET  /api/dashboard/metrics          Celo price, TVL, trending tokens
 GET  /api/wallet/:address/balances   CELO + token balances for a wallet
 GET  /api/transactions?address=0x..  Recent transactions for a wallet
+GET  /api/chat/history               Saved chat history by wallet or conversation
 POST /api/chat                       Unified chatbot for all surfaces
 POST /api/docs/ask                   Celo documentation assistant
 POST /api/risk/check                 Contract / token / tx risk analysis
@@ -108,6 +109,21 @@ POST /api/tools/:tool/run            Run a specific tool directly
 - `docs_answer` — documentation response
 - `confirmation_required` — write action needs user approval
 - `error_card` — error state
+
+### GET /api/chat/history
+
+Query parameters:
+
+```json
+{
+  "walletAddress": "0x...",
+  "conversationId": "uuid-optional",
+  "limit": 200
+}
+```
+
+- If a wallet is connected, the frontend should request history by `walletAddress` to show all-time saved chats.
+- If no wallet is connected, the frontend can request the active `conversationId` to show the current session only.
 
 ## Claude Desktop MCP Setup
 

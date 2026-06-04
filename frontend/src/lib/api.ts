@@ -38,6 +38,25 @@ export interface MessageResponse {
   data?: { resultCard?: ResultCardData; pendingTx?: PendingTxData };
 }
 
+export interface ChatHistoryMessage {
+  id: number;
+  conversationId: string | null;
+  chatbotType: string;
+  role: string;
+  content: string;
+  intent: string | null;
+  walletAddress: string | null;
+  timestamp: string;
+}
+
+export interface ChatHistoryResponse {
+  scope: "wallet" | "conversation";
+  walletAddress: string | null;
+  conversationId: string | null;
+  count: number;
+  messages: ChatHistoryMessage[];
+}
+
 interface ApiEnvelope<T> {
   success: boolean;
   action: string;
@@ -289,7 +308,7 @@ export const apiClient = {
   async sendMessage(
     message: string,
     walletAddress?: string,
-    chatbotType: "full" | "mini" | "landing" | "docs" = "full",
+    chatbotType: "full" | "mini" | "landing" | "docs" | "tool" = "full",
     conversationId?: string
   ): Promise<MessageResponse> {
     try {
@@ -324,6 +343,28 @@ export const apiClient = {
             ? `Could not reach the CeloMind backend (${API_BASE}). ${error.message}`
             : "Unknown error",
       };
+    }
+  },
+
+  async getChatHistory(
+    walletAddress?: string,
+    conversationId?: string,
+    limit = 200
+  ): Promise<ChatHistoryResponse | null> {
+    try {
+      const params = new URLSearchParams();
+      if (walletAddress) params.set("walletAddress", walletAddress);
+      if (conversationId) params.set("conversationId", conversationId);
+      params.set("limit", String(limit));
+
+      const res = await fetch(`${API_BASE}/api/chat/history?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return null;
+      const env = (await res.json()) as ApiEnvelope<ChatHistoryResponse>;
+      return env.success ? env.data : null;
+    } catch {
+      return null;
     }
   },
 };

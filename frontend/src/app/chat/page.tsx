@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAccount, useSendTransaction, useSwitchChain, usePublicClient } from "wagmi";
 import { motion, useReducedMotion } from "framer-motion";
-import { apiClient, type PendingTxData } from "@/lib/api";
+import { apiClient, type ChatHistoryMessage, type PendingTxData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import ResultCard from "@/components/ui/ResultCard";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -20,6 +20,46 @@ interface Message {
     data: { label: string; value: string; color?: "green" | "yellow" | "red" | "default" }[];
   };
   pendingTx?: PendingTxData;
+}
+
+type HistoryThread = {
+  key: string;
+  conversationId: string | null;
+  walletAddress: string | null;
+  messages: ChatHistoryMessage[];
+  firstAt: string;
+  lastAt: string;
+};
+
+function groupHistory(messages: ChatHistoryMessage[]): HistoryThread[] {
+  const groups = new Map<string, ChatHistoryMessage[]>();
+
+  for (const message of messages) {
+    const key = message.conversationId ?? `session:${message.walletAddress ?? "anonymous"}`;
+    const current = groups.get(key) ?? [];
+    current.push(message);
+    groups.set(key, current);
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, items]) => {
+      const ordered = [...items].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+      return {
+        key,
+        conversationId: ordered[0]?.conversationId ?? null,
+        walletAddress: ordered[0]?.walletAddress ?? null,
+        messages: ordered,
+        firstAt: ordered[0]?.timestamp ?? "",
+        lastAt: ordered[ordered.length - 1]?.timestamp ?? "",
+      };
+    })
+    .sort((a, b) => Date.parse(b.lastAt || "0") - Date.parse(a.lastAt || "0"));
+}
+
+function formatHistoryTitle(thread: HistoryThread): string {
+  if (thread.conversationId) return thread.conversationId.slice(0, 8);
+  if (thread.walletAddress) return `${thread.walletAddress.slice(0, 6)}...${thread.walletAddress.slice(-4)}`;
+  return "Session";
 }
 
 export default function ChatPage() {
@@ -42,6 +82,12 @@ export default function ChatPage() {
   ]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [history, setHistory] = useState<ChatHistoryMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
+  const [selectedThreadKey, setSelectedThreadKey] = useState<string | null>(null);
 
   // Transaction signing states
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -78,6 +124,178 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    setHistoryOpen(isConnected);
+  }, [isConnected]);
+
+  useEffect(() => {
+    let active = true;
+    const walletHistory = isConnected && address ? address : undefined;
+    const sessionHistory = !walletHistory ? conversationId : undefined;
+
+    if (!walletHistory && !sessionHistory) {
+      setHistory([]);
+      setHistoryError(null);
+      setHistoryLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    apiClient.getChatHistory(walletHistory, sessionHistory, walletHistory ? 500 : 200)
+      .then((data) => {
+        if (!active) return;
+        setHistory(data?.messages ?? []);
+        if (!data) {
+          setHistoryError("Could not load chat history right now.");
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setHistory([]);
+        setHistoryError("Could not load chat history right now.");
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [address, conversationId, historyRefreshToken, isConnected]);
+
+  const historyThreads = useMemo(() => groupHistory(history), [history]);
+  const activeThread =
+    historyThreads.find((thread) => thread.key === selectedThreadKey) ?? historyThreads[0] ?? null;
+
+  useEffect(() => {
+    if (activeThread && activeThread.key !== selectedThreadKey) {
+      setSelectedThreadKey(activeThread.key);
+    }
+  }, [activeThread, selectedThreadKey]);
+
+  const historyScopeLabel = isConnected && address
+    ? `All-time wallet history for ${address.slice(0, 6)}...${address.slice(-4)}`
+    : "Current session history";
+
+  const historyPanel = (
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      <div className="shrink-0 border-b border-border2 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <span className="block text-[10px] font-mono uppercase tracking-wider text-muted">History</span>
+            <h3 className="font-syne text-sm font-bold uppercase text-text">Chat History</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHistoryRefreshToken((n) => n + 1)}
+            className="px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
+          >
+            Refresh
+          </button>
+        </div>
+        <p className="mt-2 text-[10px] font-mono text-muted leading-relaxed">{historyScopeLabel}</p>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-3 space-y-3">
+        {!isConnected && (
+          <div className="border border-border2 bg-dark/40 p-3 text-[10px] font-mono text-muted leading-relaxed">
+            Connect a wallet to unlock all-time history. Your current session remains visible here too.
+          </div>
+        )}
+
+        {historyLoading && (
+          <div className="space-y-2">
+            <div className="h-14 rounded border border-border2 bg-dark/40 animate-shimmer" />
+            <div className="h-14 rounded border border-border2 bg-dark/40 animate-shimmer" />
+            <div className="h-14 rounded border border-border2 bg-dark/40 animate-shimmer" />
+          </div>
+        )}
+
+        {historyError && (
+          <div className="border border-error/30 bg-error/10 p-3 text-[10px] font-mono text-error leading-relaxed">
+            {historyError}
+          </div>
+        )}
+
+        {!historyLoading && historyThreads.length === 0 && (
+          <div className="border border-border2 bg-dark/40 p-3 text-[10px] font-mono text-muted leading-relaxed">
+            No saved messages yet. Start chatting to build your history.
+          </div>
+        )}
+
+        {historyThreads.length > 0 && (
+          <div className="space-y-2">
+            {historyThreads.slice(0, 12).map((thread) => {
+              const isActive = activeThread?.key === thread.key;
+              const lastMessage = thread.messages[thread.messages.length - 1];
+              return (
+                <button
+                  key={thread.key}
+                  type="button"
+                  onClick={() => setSelectedThreadKey(thread.key)}
+                  className={cn(
+                    "w-full border p-3 text-left transition-colors press",
+                    isActive ? "border-cy bg-cy/5" : "border-border2 bg-dark/40 hover:border-cy/50"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text">
+                      {formatHistoryTitle(thread)}
+                    </span>
+                    <span className="text-[9px] font-mono text-muted">
+                      {thread.messages.length} msgs
+                    </span>
+                  </div>
+                  <p className="mt-1 max-h-10 overflow-hidden text-[10px] font-mono text-muted leading-relaxed">
+                    {lastMessage?.content ?? "No preview available"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {activeThread && (
+          <div className="border-t border-border2 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted">
+                Selected Session
+              </span>
+              <span className="text-[9px] font-mono text-muted">
+                {activeThread.messages.length} msgs
+              </span>
+            </div>
+
+            <div className="mt-2 space-y-2">
+              {activeThread.messages.slice(-10).map((msg) => {
+                const isUser = msg.role === "user";
+                return (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      "rounded border p-2.5 text-[10px] font-mono leading-relaxed",
+                      isUser ? "border-cy/20 bg-cy/10 text-cy" : "border-border2 bg-dark/40 text-text"
+                    )}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2 text-[9px] uppercase tracking-wider">
+                      <span>{isUser ? "User" : "Assistant"}</span>
+                      <span className="text-muted">{msg.timestamp}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
@@ -112,6 +330,7 @@ export default function ChatPage() {
       );
     } finally {
       setIsTyping(false);
+      setHistoryRefreshToken((n) => n + 1);
     }
   };
 
@@ -250,9 +469,18 @@ export default function ChatPage() {
               CeloMind MCP
             </span>
           </div>
-          <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
-            <span className="pulse-green"></span>
-            Agent Ready
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((open) => !open)}
+              className="lg:hidden px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
+            >
+              {historyOpen ? "Hide History" : "View History"}
+            </button>
+            <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
+              <span className="pulse-green"></span>
+              Agent Ready
+            </div>
           </div>
         </div>
 
@@ -268,6 +496,12 @@ export default function ChatPage() {
             </button>
           ))}
         </div>
+
+        {historyOpen && (
+          <div className="lg:hidden border-b border-border bg-surface/50 max-h-96 overflow-hidden">
+            {historyPanel}
+          </div>
+        )}
 
         {/* Message Feed */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
@@ -367,6 +601,10 @@ export default function ChatPage() {
         </div>
 
       </main>
+
+      <aside className="hidden lg:flex w-[320px] shrink-0 border-l border-border overflow-hidden">
+        {historyPanel}
+      </aside>
 
     </div>
   );

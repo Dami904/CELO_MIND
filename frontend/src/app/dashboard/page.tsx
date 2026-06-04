@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { apiGet } from "@/lib/api";
 import { truncateAddress } from "@/lib/utils";
-import Reveal from "@/components/motion/Reveal";
 import CountUp from "@/components/motion/CountUp";
 
 /** Shimmer placeholder bar for loading states. */
@@ -95,7 +94,7 @@ function txLabel(tx: TransactionItem): string {
   return `${method} ${shortHash(tx.hash)}`;
 }
 
-const CARD = "bg-surface border border-border flex flex-col hover-lift";
+const CARD = "bg-surface border border-border flex flex-col";
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
@@ -193,8 +192,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric tiles */}
-      <Reveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">CELO Price</span>
             <span className="block text-xl font-mono font-bold text-text mt-1">
@@ -206,7 +205,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Celo TVL</span>
             <span className="block text-xl font-mono font-bold text-text mt-1">
@@ -218,7 +217,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">MCP Tool Calls</span>
             <span className="block text-xl font-mono font-bold text-cy mt-1">
@@ -230,7 +229,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Chat Requests</span>
             <span className="block text-xl font-mono font-bold text-text mt-1">
@@ -241,9 +240,9 @@ export default function DashboardPage() {
             Sessions: <CountUp value={overview?.uniqueSessions ?? 0} />
           </div>
         </div>
-      </Reveal>
+      </div>
 
-      <Reveal delay={0.1} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6">
           <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
@@ -402,7 +401,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </Reveal>
+      </div>
     </div>
   );
 }

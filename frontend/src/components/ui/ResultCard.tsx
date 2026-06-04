@@ -9,7 +9,7 @@ export interface ResultCardProps {
 
 export default function ResultCard({ title, data, className }: ResultCardProps) {
   return (
-    <div className={cn("bg-surface border border-border rounded overflow-hidden flex flex-col font-sans w-full hover-lift", className)}>
+    <div className={cn("bg-surface border border-border rounded overflow-hidden flex flex-col font-sans w-full", className)}>
       {/* Title */}
       <div className="bg-dark/40 border-b border-border px-3.5 py-2 flex items-center justify-between">
         <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">

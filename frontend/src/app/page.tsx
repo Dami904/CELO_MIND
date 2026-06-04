@@ -84,7 +84,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {features.map((f, i) => (
             <Reveal key={f.n} delay={i * 0.08} className="h-full">
-              <div className="bg-surface border border-border2 p-6 transition-all hover:border-cy flex flex-col gap-4 h-full hover-lift">
+              <div className="bg-surface border border-border2 p-6 transition-all hover:border-cy flex flex-col gap-4 h-full">
                 <div className="text-cy text-xl font-mono font-bold">{f.n}</div>
                 <h3 className="font-syne font-bold text-sm uppercase text-text tracking-wide">{f.title}</h3>
                 <p className="text-muted text-xs leading-relaxed font-sans">{f.body}</p>
