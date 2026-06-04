@@ -87,6 +87,16 @@ body {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+/* Typing indicator dots in the chat feed */
+.typing-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background-color: var(--muted);
+  border-radius: 9999px;
+  animation: blink 1.4s infinite both;
+}
+
 /* Brutalist Custom Scrollbar for Chat panel and lists */
 .custom-scroll {
   scrollbar-width: thin;

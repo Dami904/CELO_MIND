@@ -184,8 +184,8 @@ export default function ChatPage() {
         />
       )}
 
-      {/* Left Sidebar (220px) */}
-      <aside className="w-[220px] bg-surface border-r border-border flex flex-col overflow-y-auto shrink-0 select-none custom-scroll">
+      {/* Left Sidebar (220px) — hidden on mobile; presets move to a scroll strip below the header */}
+      <aside className="hidden md:flex w-[220px] bg-surface border-r border-border flex-col overflow-y-auto shrink-0 select-none custom-scroll">
         
         {/* Wallet & Balances preset */}
         <div className="p-4 border-b border-border2">
@@ -241,21 +241,34 @@ export default function ChatPage() {
       <main className="flex-1 flex flex-col bg-dark overflow-hidden h-full">
         
         {/* Chat Header */}
-        <div className="h-12 border-b border-border px-5 flex items-center justify-between shrink-0 bg-surface/30">
-          <div className="flex items-center gap-2">
-            <span className="font-syne font-bold text-xs uppercase text-text">CeloMind Agent</span>
-            <span className="px-1.5 py-0.5 bg-border2 border border-border text-[9px] font-mono text-muted uppercase">
-              claude-3.5-sonnet
+        <div className="h-12 border-b border-border px-4 md:px-5 flex items-center justify-between gap-2 shrink-0 bg-surface/30">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-syne font-bold text-xs uppercase text-text whitespace-nowrap">CeloMind Agent</span>
+            <span className="hidden sm:inline px-1.5 py-0.5 bg-border2 border border-border text-[9px] font-mono text-muted uppercase">
+              CeloMind MCP
             </span>
           </div>
-          <div className="text-[10px] font-mono text-muted flex items-center gap-1.5">
+          <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
             <span className="pulse-green"></span>
             Agent Ready
           </div>
         </div>
 
+        {/* Mobile quick actions (the sidebar is hidden on small screens) */}
+        <div className="md:hidden flex gap-1.5 overflow-x-auto px-4 py-2 border-b border-border2 bg-surface/30 shrink-0 custom-scroll">
+          {[...sidebarActions.wallet, ...sidebarActions.defi, ...sidebarActions.analysis].map((act) => (
+            <button
+              key={act.label}
+              onClick={() => setInputText(act.cmd)}
+              className="shrink-0 bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1 text-[10px] font-mono whitespace-nowrap transition-colors"
+            >
+              {act.label}
+            </button>
+          ))}
+        </div>
+
         {/* Message Feed */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scroll">
+        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
           {messages.map((msg) => {
             const isUser = msg.sender === "user";
             return (

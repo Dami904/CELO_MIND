@@ -14,17 +14,17 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 h-14 w-full bg-surface border-b border-border flex items-center justify-between px-6 select-none">
+    <header className="sticky top-0 z-50 h-14 w-full bg-surface border-b border-border flex items-center justify-between gap-2 px-3 sm:px-6 select-none">
       {/* Left: Logo */}
-      <div className="flex items-center">
-        <Link href="/" className="font-syne font-extrabold text-lg text-cy tracking-tight hover:opacity-90 flex items-center gap-2">
+      <div className="flex items-center shrink-0">
+        <Link href="/" className="font-syne font-extrabold text-base sm:text-lg text-cy tracking-tight hover:opacity-90 flex items-center gap-2">
           CELOMIND
           <span className="pulse-green"></span>
         </Link>
       </div>
 
       {/* Center: Links */}
-      <nav className="flex items-center gap-1 md:gap-2">
+      <nav className="flex items-center gap-0.5 sm:gap-2">
         {navItems.map((item) => {
           const isActive = pathname === item.path;
           return (
@@ -32,7 +32,7 @@ export default function Navbar() {
               key={item.path}
               href={item.path}
               className={cn(
-                "px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors border border-transparent font-medium",
+                "px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider transition-colors border border-transparent font-medium",
                 isActive
                   ? "bg-border text-cy border-border"
                   : "text-muted hover:text-text"
@@ -45,7 +45,7 @@ export default function Navbar() {
       </nav>
 
       {/* Right: Connect Button */}
-      <div className="flex items-center">
+      <div className="flex items-center shrink-0">
         {/* Reown AppKit web component (replaces the old w3m-button) */}
         {/* @ts-ignore */}
         <appkit-button balance="hide" size="sm" />

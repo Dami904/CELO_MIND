@@ -175,8 +175,8 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col bg-dark text-text p-6 overflow-y-auto custom-scroll">
-      <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
+    <div className="flex-1 flex flex-col bg-dark text-text p-4 md:p-6 overflow-y-auto custom-scroll">
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-6 border-b border-border pb-4">
         <div>
           <span className="text-2xs font-mono uppercase tracking-widest text-muted">Management Console</span>
           <h2 className="text-xl md:text-2xl font-syne font-extrabold uppercase tracking-tight text-text">Command Center</h2>

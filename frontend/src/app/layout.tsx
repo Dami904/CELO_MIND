@@ -15,11 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased bg-[#050605] py-6 px-4 md:px-8 min-h-screen flex items-center justify-center font-sans">
+      <body className="antialiased bg-[#050605] min-h-screen flex md:items-center md:justify-center md:py-6 md:px-8 font-sans">
         <Web3ModalProvider>
           <div
             id="cm-root"
-            className="w-full max-w-6xl bg-dark text-text border border-border rounded-2xl overflow-hidden flex flex-col min-h-[680px] shadow-[0_0_50px_rgba(0,0,0,0.85)]"
+            className="w-full md:max-w-6xl bg-dark text-text border-0 md:border border-border rounded-none md:rounded-2xl overflow-hidden flex flex-col min-h-screen md:min-h-[680px] shadow-none md:shadow-[0_0_50px_rgba(0,0,0,0.85)]"
           >
             <Navbar />
             <div className="flex-1 flex flex-col overflow-hidden relative">
