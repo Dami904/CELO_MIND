@@ -9,6 +9,7 @@ import { chatRoutes } from "./routes/chat.js";
 import { riskRoutes } from "./routes/risk.js";
 import { whaleRoutes } from "./routes/whales.js";
 import { toolRoutes } from "./routes/tools.js";
+import { mcpHttpRoutes } from "./routes/mcp-http.js";
 import { metricsRoutes } from "../../../dashboard/src/index.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -45,6 +46,7 @@ async function main() {
   await app.register(riskRoutes);
   await app.register(whaleRoutes);
   await app.register(toolRoutes);
+  await app.register(mcpHttpRoutes);
   await app.register(metricsRoutes);
 
   await app.listen({ port: PORT, host: HOST });

@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./tools": "./src/tools.ts",
     "./celo-client": "./src/celo-client.ts",
     "./market": "./src/market.ts",
     "./risk": "./src/risk.ts",

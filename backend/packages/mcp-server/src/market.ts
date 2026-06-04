@@ -1,5 +1,9 @@
 import { marketNetwork, cached, type Network } from "@celomind/shared";
-import { getTokenBalancesV2, getAddressTxsV2, getTokenInfoV2 } from "./blockscout.js";
+import {
+  getTokenBalancesV2, getAddressTxsV2, getTokenInfoV2,
+  getTokenHoldersV2, getAddressNFTsV2, getNetworkStatsV2,
+  getAddressStatsV2, searchTokensV2,
+} from "./blockscout.js";
 import { getDuneTrendingTokens } from "./dune.js";
 
 // Public/free CoinGecko + GeckoTerminal APIs (no paid key). Base URLs may be supplied via env.
@@ -132,6 +136,207 @@ export async function getCeloRecentTransactions(address: string, network: Networ
   } catch {
     return { data: [], source: "unavailable" };
   }
+}
+
+/** Top Celo ERC-20 tokens ranked by on-chain holder count (Blockscout). */
+export async function getCeloTopTokensByHolders(): Promise<Sourced<unknown[]>> {
+  try {
+    const BLOCKSCOUT = "https://celo.blockscout.com/api/v2";
+    // Blockscout doesn't support server-side holder sort; fetch first 50 and rank client-side.
+    const data = await cached("blockscout:tokens:holders", 180, () =>
+      fetchJson<{ items: { name: string; symbol: string; address_hash: string; holders_count: string; circulating_market_cap: string; exchange_rate: string }[] }>(
+        `${BLOCKSCOUT}/tokens?type=ERC-20`
+      )
+    );
+    const tokens = (data.items ?? [])
+      .map((t) => ({
+        name: t.name,
+        symbol: t.symbol,
+        address: t.address_hash,
+        holders: Number(t.holders_count ?? 0),
+        priceUsd: t.exchange_rate,
+        circulatingMarketCapUsd: t.circulating_market_cap,
+      }))
+      .sort((a, b) => b.holders - a.holders)
+      .slice(0, 20);
+    return { data: tokens, source: "Blockscout" };
+  } catch {
+    return { data: [], source: "unavailable" };
+  }
+}
+
+/** Top Celo ecosystem tokens ranked by market cap (CoinGecko). */
+export async function getCeloTopTokensByMarketCap(): Promise<Sourced<unknown[]>> {
+  try {
+    const data = await cached("coingecko:celo:marketcap", 300, () =>
+      fetchJson<{ id: string; symbol: string; name: string; market_cap: number; current_price: number; price_change_percentage_24h: number; total_volume: number }[]>(
+        `${COINGECKO_BASE}/coins/markets?vs_currency=usd&category=celo-ecosystem&order=market_cap_desc&per_page=20&page=1`
+      )
+    );
+    const tokens = (Array.isArray(data) ? data : []).map((t) => ({
+      name: t.name,
+      symbol: t.symbol.toUpperCase(),
+      marketCapUsd: t.market_cap,
+      priceUsd: t.current_price,
+      priceChange24h: t.price_change_percentage_24h,
+      volume24h: t.total_volume,
+    }));
+    return { data: tokens, source: "CoinGecko" };
+  } catch {
+    return { data: [], source: "unavailable" };
+  }
+}
+
+// ─── 10 new live-data functions ───────────────────────────────────────────────
+
+const CELO_RPC_URL = process.env.CELO_MAINNET_RPC_URL ?? process.env.CELO_RPC_URL ?? "https://forno.celo.org";
+
+/** Current Celo network gas price via JSON-RPC eth_gasPrice. */
+export async function getCeloGasPrice(): Promise<{ gasPriceGwei: string; gasPriceWei: string } | null> {
+  try {
+    const res = await fetch(CELO_RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_gasPrice", params: [], id: 1 }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = (await res.json()) as { result?: string };
+    const weiHex = data.result;
+    if (!weiHex) return null;
+    const wei = BigInt(weiHex);
+    return { gasPriceGwei: (Number(wei) / 1e9).toFixed(6), gasPriceWei: wei.toString() };
+  } catch { return null; }
+}
+
+/** Top DeFi protocols deployed on Celo ranked by TVL (DefiLlama). */
+export async function getCeloDefiProtocols(): Promise<Sourced<unknown[]>> {
+  try {
+    const data = await cached("llama:celo:protocols", 600, () =>
+      fetchJson<{ name: string; tvl: number; chains: string[]; category: string; url: string }[]>(
+        `${DEFILLAMA_BASE}/protocols`
+      )
+    );
+    const protocols = (Array.isArray(data) ? data : [])
+      .filter((p) => Array.isArray(p.chains) && p.chains.some((c) => c.toLowerCase() === "celo") && p.tvl > 0)
+      .sort((a, b) => b.tvl - a.tvl)
+      .slice(0, 20)
+      .map((p) => ({ name: p.name, tvlUsd: p.tvl, category: p.category, url: p.url }));
+    return { data: protocols, source: "DefiLlama" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Celo network-level stats: block count, address count, daily txs, avg block time (Blockscout). */
+export async function getCeloNetworkStats(): Promise<Sourced<unknown | null>> {
+  try {
+    const stats = await getNetworkStatsV2(marketNetwork());
+    return { data: stats, source: "Blockscout" };
+  } catch { return { data: null, source: "unavailable" }; }
+}
+
+/** Historical price data for a CoinGecko token (sampled to ~10 data points). */
+export async function getCeloPriceHistory(coingeckoId: string, days: number): Promise<Sourced<unknown[]>> {
+  try {
+    const keyParam = (() => {
+      const k = process.env.COINGECKO_API_KEY;
+      return k && k.startsWith("CG-") ? `&x_cg_demo_api_key=${k}` : "";
+    })();
+    const data = await cached(`cg:history:${coingeckoId}:${days}`, 1800, () =>
+      fetchJson<{ prices: [number, number][] }>(
+        `${COINGECKO_BASE}/coins/${coingeckoId}/market_chart?vs_currency=usd&days=${days}${keyParam}`
+      )
+    );
+    const prices = data.prices ?? [];
+    const step = Math.max(1, Math.floor(prices.length / 10));
+    const sampled = prices
+      .filter((_, i) => i % step === 0)
+      .map(([ts, price]) => ({ date: new Date(ts).toISOString().split("T")[0], priceUsd: price.toFixed(4) }));
+    return { data: sampled, source: "CoinGecko" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Top DEX liquidity pools on Celo by reserve (GeckoTerminal). */
+export async function getCeloTopPools(): Promise<Sourced<unknown[]>> {
+  try {
+    const data = await cached("gt:pools:celo", 180, () =>
+      fetchJson<{
+        data: {
+          attributes: {
+            name: string;
+            reserve_in_usd: string;
+            volume_usd: { h24: string };
+            fee_tier: string | null;
+            base_token_price_usd: string;
+          };
+        }[];
+      }>(`${GECKOTERMINAL_BASE}/networks/celo/pools?page=1`)
+    );
+    const pools = (data.data ?? []).slice(0, 15).map((p) => ({
+      name: p.attributes.name,
+      reserveUsd: p.attributes.reserve_in_usd,
+      volume24hUsd: p.attributes.volume_usd?.h24,
+      feeTier: p.attributes.fee_tier,
+    }));
+    return { data: pools, source: "GeckoTerminal" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Search Celo ERC-20 tokens by name or symbol (Blockscout). */
+export async function searchCeloTokens(query: string): Promise<Sourced<unknown[]>> {
+  try {
+    const results = await searchTokensV2(query, marketNetwork(), 10);
+    return { data: results, source: "Blockscout" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Top holders of a specific ERC-20 token by on-chain balance (Blockscout). */
+export async function getCeloTokenHolders(tokenAddress: string): Promise<Sourced<unknown[]>> {
+  try {
+    const holders = await getTokenHoldersV2(tokenAddress, marketNetwork(), 20);
+    return { data: holders, source: "Blockscout" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Wallet stats: transaction count, token transfer count, native balance (Blockscout). */
+export async function getCeloWalletStats(address: string): Promise<Sourced<unknown | null>> {
+  try {
+    const stats = await getAddressStatsV2(address, marketNetwork());
+    return { data: stats, source: "Blockscout" };
+  } catch { return { data: null, source: "unavailable" }; }
+}
+
+/** ERC-721 and ERC-1155 NFT balances for a wallet (Blockscout). */
+export async function getCeloNFTBalances(address: string): Promise<Sourced<unknown[]>> {
+  try {
+    const nfts = await getAddressNFTsV2(address, marketNetwork(), 20);
+    return { data: nfts, source: "Blockscout" };
+  } catch { return { data: [], source: "unavailable" }; }
+}
+
+/** Yield / APY opportunities on Celo across DeFi protocols (DefiLlama Yields). */
+export async function getCeloYieldOpportunities(): Promise<Sourced<unknown[]>> {
+  try {
+    const data = await cached("llama:celo:yields", 900, () =>
+      fetchJson<{
+        data: {
+          pool: string; project: string; chain: string; symbol: string;
+          apy: number; tvlUsd: number; apyBase: number | null; apyReward: number | null;
+        }[];
+      }>("https://yields.llama.fi/pools")
+    );
+    const yields = (data.data ?? [])
+      .filter((p) => p.chain?.toLowerCase() === "celo" && p.apy > 0 && p.tvlUsd > 1000)
+      .sort((a, b) => b.apy - a.apy)
+      .slice(0, 15)
+      .map((p) => ({
+        project: p.project,
+        symbol: p.symbol,
+        apy: `${p.apy.toFixed(2)}%`,
+        apyBase: p.apyBase != null ? `${p.apyBase.toFixed(2)}%` : null,
+        apyReward: p.apyReward != null ? `${p.apyReward.toFixed(2)}%` : null,
+        tvlUsd: p.tvlUsd,
+      }));
+    return { data: yields, source: "DefiLlama Yields" };
+  } catch { return { data: [], source: "unavailable" }; }
 }
 
 export async function getCeloTVL(): Promise<{ tvl: number; change_1d: number } | null> {

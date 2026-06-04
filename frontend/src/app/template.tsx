@@ -12,12 +12,12 @@ export default function Template({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
 
   if (reduce) {
-    return <div className="flex-1 flex flex-col min-w-0">{children}</div>;
+    return <div className="flex-1 min-h-0 flex flex-col min-w-0">{children}</div>;
   }
 
   return (
     <motion.div
-      className="flex-1 flex flex-col min-w-0"
+      className="flex-1 min-h-0 flex flex-col min-w-0"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: "easeOut" }}

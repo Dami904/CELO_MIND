@@ -194,14 +194,24 @@ export default function ChatPage() {
   ).current;
   const [activeConversationId, setActiveConversationId] = useState(initialConversationId);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      sender: "bot",
-      text: "CeloMind MCP Interface Initialized. Awaiting prompts. Use the sidebar controls to pre-populate typical queries or enter your custom request below.",
-      timestamp: "12:00:00",
-    }
-  ]);
+  // Restore messages from sessionStorage so they survive navigation within the same tab.
+  const WELCOME: Message = {
+    id: "1",
+    sender: "bot",
+    text: "CeloMind MCP Interface Initialized. Awaiting prompts. Use the sidebar controls to pre-populate typical queries or enter your custom request below.",
+    timestamp: "12:00:00",
+  };
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === "undefined") return [WELCOME];
+    try {
+      const raw = sessionStorage.getItem(`celomind:messages:${initialConversationId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [WELCOME];
+  });
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
@@ -278,6 +288,17 @@ export default function ChatPage() {
       }
     });
   };
+
+  // Persist messages to sessionStorage so navigating away and back restores the chat.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      // Only persist if it's still the initial (non-restored) conversation.
+      if (activeConversationId === initialConversationId) {
+        sessionStorage.setItem(`celomind:messages:${initialConversationId}`, JSON.stringify(messages));
+      }
+    } catch { /* storage quota / private mode */ }
+  }, [messages, activeConversationId, initialConversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -843,8 +864,8 @@ export default function ChatPage() {
           >
             <div className="flex items-center justify-between border-b border-border2 px-4 py-3">
               <div>
-                <span className="block text-[10px] font-mono uppercase tracking-wider text-muted">Sidebar</span>
-                <span className="block text-sm font-syne uppercase text-text">History</span>
+                <span className="block text-[10px] font-mono uppercase tracking-wider text-muted"></span>
+                <span className="block text-sm font-syne uppercase text-text"></span>
               </div>
               <button
                 type="button"

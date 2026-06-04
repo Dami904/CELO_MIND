@@ -14,6 +14,18 @@ import {
   getCeloTokenInfo,
   getCeloWalletPortfolio,
   getCeloRecentTransactions,
+  getCeloTopTokensByHolders,
+  getCeloTopTokensByMarketCap,
+  getCeloGasPrice,
+  getCeloDefiProtocols,
+  getCeloNetworkStats,
+  getCeloPriceHistory,
+  getCeloTopPools,
+  searchCeloTokens,
+  getCeloTokenHolders,
+  getCeloWalletStats,
+  getCeloNFTBalances,
+  getCeloYieldOpportunities,
 } from "@celomind/mcp-server/market";
 import { checkContractRisk, checkTokenRisk, explainTransaction } from "@celomind/mcp-server/risk";
 import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "@celomind/mcp-server/whale";
@@ -199,6 +211,121 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       const copy = data as { sourceWallet?: string; myWallet?: string; tokensToAdd?: string[]; tokensToRemove?: string[]; warning?: string };
       return `Copy-wallet analysis only, no trade executed.\nSource wallet: ${copy.sourceWallet ?? "unknown"}\nYour wallet: ${copy.myWallet ?? "unknown"}\nTokens to research/add: ${(copy.tokensToAdd ?? []).join(", ") || "none"}\nTokens to review/remove: ${(copy.tokensToRemove ?? []).join(", ") || "none"}\n${copy.warning ?? "Prepared actions require review and wallet confirmation."}`;
     }
+    case "gas_price": {
+      const gp = payload as { gasPriceGwei?: string; gasPriceWei?: string };
+      if (!gp?.gasPriceGwei) return "Could not fetch current gas price. Try again shortly.";
+      return `Current Celo gas price: ${gp.gasPriceGwei} Gwei (${gp.gasPriceWei} wei).\nSource: Celo RPC.`;
+    }
+    case "defi_protocols": {
+      const items = Array.isArray(payload) ? payload.slice(0, 10) : [];
+      if (!items.length) return "Could not fetch DeFi protocol data from DefiLlama right now.";
+      return [
+        `Top DeFi protocols on Celo (${source ?? "DefiLlama"}):`,
+        ...items.map((p, i) => {
+          const prot = p as { name?: string; tvlUsd?: number; category?: string };
+          return `${i + 1}. ${prot.name ?? "?"}${prot.category ? ` (${prot.category})` : ""}${typeof prot.tvlUsd === "number" ? ` — TVL $${prot.tvlUsd.toLocaleString()}` : ""}`;
+        }),
+        `Source: ${source ?? "DefiLlama"}.`,
+      ].join("\n");
+    }
+    case "network_stats": {
+      const s = payload as { totalBlocks?: number; totalAddresses?: number; totalTransactions?: number; transactionsToday?: number; averageBlockTimeMs?: number; coinPriceUsd?: string | null };
+      if (!s) return "Could not fetch Celo network stats right now.";
+      return [
+        "Celo network stats (Blockscout):",
+        `Total blocks: ${s.totalBlocks?.toLocaleString() ?? "?"}`,
+        `Total addresses: ${s.totalAddresses?.toLocaleString() ?? "?"}`,
+        `Total transactions: ${s.totalTransactions?.toLocaleString() ?? "?"}`,
+        `Transactions today: ${s.transactionsToday?.toLocaleString() ?? "?"}`,
+        `Avg block time: ${s.averageBlockTimeMs ? `${(s.averageBlockTimeMs / 1000).toFixed(1)}s` : "?"}`,
+        s.coinPriceUsd ? `CELO price: $${s.coinPriceUsd}` : "",
+        `Source: ${source ?? "Blockscout"}.`,
+      ].filter(Boolean).join("\n");
+    }
+    case "price_history": {
+      const items = Array.isArray(payload) ? payload : [];
+      if (!items.length) return "Could not fetch price history from CoinGecko right now.";
+      return [
+        `${(data as { token?: string }).token?.toUpperCase() ?? "CELO"} price over ${(data as { period?: string }).period ?? "7 days"} (${source ?? "CoinGecko"}):`,
+        ...items.map((p) => {
+          const pt = p as { date?: string; priceUsd?: string };
+          return `  ${pt.date ?? "?"}: $${pt.priceUsd ?? "?"}`;
+        }),
+      ].join("\n");
+    }
+    case "top_pools": {
+      const items = Array.isArray(payload) ? payload.slice(0, 10) : [];
+      if (!items.length) return "Could not fetch pool data from GeckoTerminal right now.";
+      return [
+        `Top Celo liquidity pools (${source ?? "GeckoTerminal"}):`,
+        ...items.map((p, i) => {
+          const pool = p as { name?: string; reserveUsd?: string; volume24hUsd?: string; feeTier?: string | null };
+          return `${i + 1}. ${pool.name ?? "?"}${pool.reserveUsd ? ` — Reserve $${Number(pool.reserveUsd).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : ""}${pool.volume24hUsd ? `, 24h Vol $${Number(pool.volume24hUsd).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : ""}`;
+        }),
+        `Source: ${source ?? "GeckoTerminal"}.`,
+      ].join("\n");
+    }
+    case "token_search": {
+      const items = Array.isArray(payload) ? payload : [];
+      if (!items.length) return `No tokens found matching that search on Celo. Try a different name or symbol.`;
+      return [
+        `Celo tokens matching "${(data as { query?: string }).query ?? ""}" (${source ?? "Blockscout"}):`,
+        ...items.map((t, i) => {
+          const tok = t as { symbol?: string; name?: string; address?: string; holdersCount?: string | null; usdPrice?: string | null };
+          return `${i + 1}. ${tok.symbol ?? "?"} — ${tok.name ?? "?"}${tok.usdPrice ? ` @ $${tok.usdPrice}` : ""}${tok.holdersCount ? `, ${Number(tok.holdersCount).toLocaleString()} holders` : ""}`;
+        }),
+        `Source: ${source ?? "Blockscout"}.`,
+      ].join("\n");
+    }
+    case "token_holders": {
+      const items = Array.isArray(payload) ? payload.slice(0, 10) : [];
+      if (!items.length) return "Could not fetch token holders from Blockscout. Make sure the address is a valid ERC-20 token.";
+      return [
+        "Top token holders (Blockscout):",
+        ...items.map((h, i) => {
+          const holder = h as { address?: string; value?: string; isContract?: boolean; label?: string | null };
+          return `${i + 1}. ${holder.address ?? "?"}${holder.label ? ` (${holder.label})` : ""}${holder.isContract ? " [contract]" : ""} — ${holder.value ?? "?"}`;
+        }),
+        `Source: ${source ?? "Blockscout"}.`,
+      ].join("\n");
+    }
+    case "wallet_stats": {
+      const s = payload as { address?: string; nativeBalance?: string; txCount?: number; tokenTransfersCount?: number; isContract?: boolean };
+      if (!s) return "Could not fetch wallet stats from Blockscout.";
+      return [
+        `Wallet stats (${source ?? "Blockscout"}):`,
+        `Address: ${s.address ?? "?"}`,
+        `Native balance: ${s.nativeBalance ?? "0"} CELO`,
+        `Total transactions: ${s.txCount?.toLocaleString() ?? "0"}`,
+        `Token transfers: ${s.tokenTransfersCount?.toLocaleString() ?? "0"}`,
+        s.isContract ? "Type: Contract" : "Type: Externally-owned account (EOA)",
+        `Source: ${source ?? "Blockscout"}.`,
+      ].join("\n");
+    }
+    case "nft_balances": {
+      const items = Array.isArray(payload) ? payload : [];
+      if (!items.length) return `No NFTs found in that wallet on Celo. NFTs must be ERC-721 or ERC-1155 tokens indexed on Blockscout.`;
+      return [
+        `NFTs in wallet (${source ?? "Blockscout"}):`,
+        ...items.map((n, i) => {
+          const nft = n as { name?: string | null; symbol?: string | null; tokenId?: string; type?: string };
+          return `${i + 1}. ${nft.name ?? nft.symbol ?? "Unknown NFT"} #${nft.tokenId ?? "?"} (${nft.type ?? "ERC-721"})`;
+        }),
+        `Source: ${source ?? "Blockscout"}.`,
+      ].join("\n");
+    }
+    case "yield_info": {
+      const items = Array.isArray(payload) ? payload.slice(0, 10) : [];
+      if (!items.length) return "Could not fetch yield data from DefiLlama Yields right now.";
+      return [
+        `Best yield opportunities on Celo (${source ?? "DefiLlama Yields"}):`,
+        ...items.map((y, i) => {
+          const yld = y as { project?: string; symbol?: string; apy?: string; apyBase?: string | null; apyReward?: string | null; tvlUsd?: number };
+          return `${i + 1}. ${yld.project ?? "?"} — ${yld.symbol ?? "?"} — APY ${yld.apy ?? "?"}${yld.apyReward ? ` (base ${yld.apyBase ?? "?"} + reward ${yld.apyReward})` : ""}${yld.tvlUsd ? `, TVL $${yld.tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : ""}`;
+        }),
+        `Source: ${source ?? "DefiLlama Yields"}.`,
+      ].join("\n");
+    }
     case "docs_explain":
     case "mcp_setup":
     case "claude_setup": {
@@ -279,6 +406,20 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "market_trending": {
+        const msg = req.message.toLowerCase();
+        const wantsHolders = /holder|most holder|by holder/.test(msg);
+        const wantsMarketCap = /market cap|by market cap|highest market|largest market/.test(msg);
+
+        if (wantsHolders) {
+          const r = await getCeloTopTokensByHolders();
+          return { items: r.data, source: r.source, note: "Tokens ranked by on-chain holder count (Blockscout)" };
+        }
+        if (wantsMarketCap) {
+          const [mc, trending] = await Promise.allSettled([getCeloTopTokensByMarketCap(), getTrendingCeloTokens()]);
+          const mcData = mc.status === "fulfilled" ? mc.value : { data: [], source: "unavailable" };
+          const trendData = trending.status === "fulfilled" ? trending.value : { data: [], source: "unavailable" };
+          return { marketCapItems: mcData.data, trendingItems: trendData.data, source: `${mcData.source} + ${trendData.source}` };
+        }
         const r = await getTrendingCeloTokens();
         return { items: r.data, source: r.source };
       }
@@ -403,6 +544,80 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
 
       case "transaction_explain":
         return { result: await explainTransaction(req.message, marketNetwork()), source: "Blockscout" };
+
+      case "gas_price": {
+        const gp = await getCeloGasPrice();
+        return gp ? { result: gp, source: "Celo RPC" } : { note: "Could not fetch current gas price from the Celo RPC." };
+      }
+
+      case "defi_protocols": {
+        const r = await getCeloDefiProtocols();
+        return { items: r.data, source: r.source };
+      }
+
+      case "network_stats": {
+        const r = await getCeloNetworkStats();
+        return { result: r.data, source: r.source };
+      }
+
+      case "price_history": {
+        const msg = req.message.toLowerCase();
+        const days = /(\d+)\s*day/i.test(msg)
+          ? parseInt(msg.match(/(\d+)\s*day/i)?.[1] ?? "7", 10)
+          : /month/i.test(msg) ? 30 : /year/i.test(msg) ? 365 : /week/i.test(msg) ? 7 : 7;
+        const id = /cusd|celo.dollar/i.test(msg) ? "celo-dollar"
+          : /ceur|celo.euro/i.test(msg) ? "celo-euro" : "celo";
+        const r = await getCeloPriceHistory(id, days);
+        return { items: r.data, source: r.source, period: `${days} days`, token: id };
+      }
+
+      case "top_pools": {
+        const r = await getCeloTopPools();
+        return { items: r.data, source: r.source };
+      }
+
+      case "token_search": {
+        const query = req.message
+          .replace(/\b(search|find|look up|show|token|tokens|on celo|celo|for|me|the|a|an|of|list|all|any|some|coin|coins|called|named)\b/gi, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!query) return { note: "Tell me what token name or symbol to search for." };
+        const r = await searchCeloTokens(query);
+        return { items: r.data, source: r.source, query };
+      }
+
+      case "token_holders": {
+        const address = extractAddress(req.message);
+        if (!address) return { note: "Provide a token contract address (0x…) to see its top holders." };
+        const [info, holders] = await Promise.allSettled([
+          getCeloTokenInfo(address, marketNetwork()),
+          getCeloTokenHolders(address),
+        ]);
+        return {
+          tokenInfo: info.status === "fulfilled" ? info.value?.data : null,
+          items: holders.status === "fulfilled" ? holders.value.data : [],
+          source: "Blockscout",
+        };
+      }
+
+      case "wallet_stats": {
+        const address = extractAddress(req.message, wa);
+        if (!address) return { note: "Provide or connect a wallet address to see its stats." };
+        const r = await getCeloWalletStats(address);
+        return { result: r.data, source: r.source };
+      }
+
+      case "nft_balances": {
+        const address = extractAddress(req.message, wa);
+        if (!address) return { note: "Connect your wallet or provide an address to see its NFTs." };
+        const r = await getCeloNFTBalances(address);
+        return { items: r.data, source: r.source };
+      }
+
+      case "yield_info": {
+        const r = await getCeloYieldOpportunities();
+        return { items: r.data, source: r.source };
+      }
 
       case "swap_execute": {
         const parsed = parseSwapRequest(req.message);
@@ -551,6 +766,16 @@ export async function chatRoutes(app: FastifyInstance) {
       recent_transactions: { type: "transaction_card" },
       whale_watch: { type: "result_card" },
       whale_activity: { type: "result_card" },
+      gas_price: { type: "result_card" },
+      defi_protocols: { type: "result_card" },
+      network_stats: { type: "result_card" },
+      price_history: { type: "token_card" },
+      top_pools: { type: "result_card" },
+      token_search: { type: "token_card" },
+      token_holders: { type: "result_card" },
+      wallet_stats: { type: "result_card" },
+      nft_balances: { type: "result_card" },
+      yield_info: { type: "result_card" },
       copy_wallet_analyze: { type: "result_card" },
       copy_wallet_prepare: { type: "confirmation_required" },
     };

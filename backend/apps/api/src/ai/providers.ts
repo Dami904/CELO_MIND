@@ -174,6 +174,10 @@ const INTENT_ROUTES: Record<string, () => Route> = {
   market_trending: FAST, recent_launches: FAST, wallet_portfolio: FAST,
   recent_transactions: FAST, swap_quote: FAST, aave_position: FAST, agent_id_check: FAST,
   send: FAST, swap_execute: FAST, aave_supply: FAST,
+  // New live-data intents — structured results, fast model is ideal
+  gas_price: FAST, defi_protocols: FAST, network_stats: FAST, price_history: FAST,
+  top_pools: FAST, token_search: FAST, token_holders: FAST,
+  wallet_stats: FAST, nft_balances: FAST, yield_info: FAST,
 };
 
 /** The provider+model best suited to a given intent. */

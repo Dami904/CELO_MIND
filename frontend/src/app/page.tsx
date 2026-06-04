@@ -4,7 +4,7 @@ import Reveal from "@/components/motion/Reveal";
 const stats = [
   { label: "ACTIVE MCP TOOLS", value: "18 NATIVE", color: "text-cy" },
   { label: "AVG EXECUTION", value: "1.2 SEC", color: "text-cg" },
-  { label: "SUPPORTED LLMS", value: "CLAUDE / GPT / GEMINI", color: "text-text" },
+  { label: "SUPPORTED LLMS", value: "GROQ / COHERE / GEMINI", color: "text-text" },
   { label: "RPC LATENCY", value: "3ms", color: "text-cg" },
 ];
 

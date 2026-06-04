@@ -23,13 +23,14 @@ export default function Navbar() {
     { name: "Dashboard", desktopName: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { name: "Chat", desktopName: "Chat", path: "/chat", icon: MessageSquare },
   ];
-  const mobileNavItems = [navItems[0], navItems[2], navItems[1]];
+  const mobileNavItems = navItems;
+  const isWalletConnected = mounted && isConnected;
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-16 md:h-14 w-full bg-surface border-b border-border flex items-center justify-between gap-3 px-3 sm:px-6 select-none">
+      <header className="sticky top-0 z-50 h-14 w-full bg-surface border-b border-border flex items-center justify-between gap-2 px-3 sm:px-6 select-none">
         {/* Left: Logo */}
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 min-w-0">
           <Link href="/" className="font-syne font-extrabold text-base sm:text-lg text-cy tracking-tight hover:opacity-90 flex items-center gap-2">
             CELOMIND
             <span className="pulse-green"></span>
@@ -58,18 +59,20 @@ export default function Navbar() {
         </nav>
 
         {/* Right: Connect Button — themed trigger that opens the Reown AppKit modal */}
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 min-w-0">
           <button
             type="button"
             onClick={() => open()}
+            aria-label={isWalletConnected ? "Wallet connected — manage account" : "Connect wallet"}
             className={cn(
-              "min-h-10 px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-mono uppercase tracking-wider font-bold border transition-colors cursor-pointer whitespace-nowrap press shadow-[0_0_22px_rgba(6,242,157,0.16)]",
-              mounted && isConnected
+              "inline-flex items-center gap-2 h-10 px-3.5 sm:px-4 text-[11px] sm:text-xs font-mono uppercase tracking-wider font-bold border transition-colors cursor-pointer whitespace-nowrap press shadow-[0_0_22px_rgba(6,242,157,0.16)]",
+              isWalletConnected
                 ? "bg-transparent text-cy border-cy hover:bg-cy hover:text-dark"
                 : "bg-cy text-dark border-cy hover:bg-transparent hover:text-cy"
             )}
           >
-            {connectLabel}
+            {isWalletConnected && <span className="h-1.5 w-1.5 rounded-full bg-cy shrink-0" aria-hidden="true" />}
+            <span className="truncate max-w-[120px] sm:max-w-none">{connectLabel}</span>
           </button>
         </div>
       </header>

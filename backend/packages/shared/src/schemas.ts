@@ -146,6 +146,16 @@ export const INTENTS = [
   "transaction_explain",
   "mcp_setup",
   "claude_setup",
+  "gas_price",
+  "defi_protocols",
+  "network_stats",
+  "price_history",
+  "top_pools",
+  "token_search",
+  "token_holders",
+  "wallet_stats",
+  "nft_balances",
+  "yield_info",
   "unsupported",
 ] as const;
 

@@ -258,6 +258,130 @@ export async function getTransactionV2(hash: string, network: Network): Promise<
   }
 }
 
+// ─── New data functions ───────────────────────────────────────────────────────
+
+export type NFTBalanceV2 = {
+  name: string | null;
+  symbol: string | null;
+  address: string;
+  tokenId: string;
+  type: string;
+  iconUrl: string | null;
+  imageUrl: string | null;
+};
+
+export async function getAddressNFTsV2(address: string, network: Network, limit = 20): Promise<NFTBalanceV2[]> {
+  return cached(`bs:v2:nfts:${network}:${address.toLowerCase()}:${limit}`, 120, async () => {
+    try {
+      const raw = await fetchJson<{
+        items?: {
+          token?: { name: string | null; symbol: string | null; address?: string; address_hash?: string; type: string | null; icon_url: string | null };
+          id?: string; token_id?: string; image_url?: string | null;
+        }[];
+      }>(`${v2Base(network)}/addresses/${address}/nft?type=ERC-721,ERC-1155`);
+      return (raw.items ?? []).slice(0, limit).map((i) => ({
+        name: i.token?.name ?? null,
+        symbol: i.token?.symbol ?? null,
+        address: i.token?.address_hash ?? i.token?.address ?? "",
+        tokenId: i.id ?? i.token_id ?? "0",
+        type: i.token?.type ?? "ERC-721",
+        iconUrl: i.token?.icon_url ?? null,
+        imageUrl: i.image_url ?? null,
+      }));
+    } catch { return []; }
+  });
+}
+
+export type NetworkStatsV2 = {
+  totalBlocks: number;
+  totalAddresses: number;
+  totalTransactions: number;
+  transactionsToday: number;
+  averageBlockTimeMs: number;
+  coinPriceUsd: string | null;
+};
+
+export async function getNetworkStatsV2(network: Network): Promise<NetworkStatsV2 | null> {
+  return cached(`bs:v2:netstats:${network}`, 60, async () => {
+    try {
+      const raw = await fetchJson<{
+        total_blocks?: string | number;
+        total_addresses?: string | number;
+        total_transactions?: string | number;
+        transactions_today?: string | number;
+        average_block_time?: string | number;
+        coin_price?: string | null;
+      }>(`${v2Base(network)}/stats`);
+      return {
+        totalBlocks: Number(raw.total_blocks ?? 0),
+        totalAddresses: Number(raw.total_addresses ?? 0),
+        totalTransactions: Number(raw.total_transactions ?? 0),
+        transactionsToday: Number(raw.transactions_today ?? 0),
+        averageBlockTimeMs: Number(raw.average_block_time ?? 0),
+        coinPriceUsd: typeof raw.coin_price === "string" ? raw.coin_price : null,
+      };
+    } catch { return null; }
+  });
+}
+
+export type AddressStatsV2 = {
+  address: string;
+  nativeBalance: string;
+  txCount: number;
+  tokenTransfersCount: number;
+  isContract: boolean;
+  hasTokens: boolean;
+};
+
+export async function getAddressStatsV2(address: string, network: Network): Promise<AddressStatsV2 | null> {
+  return cached(`bs:v2:addrstats:${network}:${address.toLowerCase()}`, 120, async () => {
+    try {
+      const raw = await fetchJson<{
+        coin_balance?: string | null;
+        transaction_count?: string | number | null;
+        token_transfers_count?: string | number | null;
+        is_contract?: boolean;
+        has_tokens?: boolean;
+      }>(`${v2Base(network)}/addresses/${address}`);
+      return {
+        address,
+        nativeBalance: fmtUnits(raw.coin_balance ?? "0", 18),
+        txCount: Number(raw.transaction_count ?? 0),
+        tokenTransfersCount: Number(raw.token_transfers_count ?? 0),
+        isContract: Boolean(raw.is_contract),
+        hasTokens: Boolean(raw.has_tokens),
+      };
+    } catch { return null; }
+  });
+}
+
+export async function searchTokensV2(query: string, network: Network, limit = 10): Promise<TokenInfoV2[]> {
+  return cached(`bs:v2:tokensearch:${network}:${encodeURIComponent(query.toLowerCase())}`, 120, async () => {
+    try {
+      const raw = await fetchJson<{
+        items?: {
+          address_hash?: string; address?: string; symbol: string | null; name: string | null;
+          decimals: string | null; exchange_rate: string | null; holders_count: string | null;
+          circulating_market_cap: string | null; total_supply: string | null; icon_url: string | null;
+          volume_24h?: string | null;
+        }[];
+      }>(`${v2Base(network)}/tokens?q=${encodeURIComponent(query)}&type=ERC-20`);
+      return (raw.items ?? []).slice(0, limit).map((t) => ({
+        address: t.address_hash ?? t.address ?? "",
+        symbol: t.symbol ?? "?",
+        name: t.name ?? "Unknown",
+        decimals: Number(t.decimals ?? "18"),
+        usdPrice: t.exchange_rate,
+        holdersCount: t.holders_count,
+        circulatingMarketCap: t.circulating_market_cap,
+        totalSupply: t.total_supply,
+        iconUrl: t.icon_url,
+        volume24h: t.volume_24h ?? null,
+      }));
+    } catch { return []; }
+  });
+}
+
 /** Whether a contract is verified on Blockscout (used by risk checks). */
 export async function isContractVerifiedV2(address: string, network: Network): Promise<boolean | null> {
   try {
