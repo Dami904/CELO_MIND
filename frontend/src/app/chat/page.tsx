@@ -26,10 +26,44 @@ type HistoryThread = {
   key: string;
   conversationId: string | null;
   walletAddress: string | null;
+  subject: string;
   messages: ChatHistoryMessage[];
   firstAt: string;
   lastAt: string;
 };
+
+function shortenText(text: string, maxChars = 48): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "Session";
+  if (cleaned.length <= maxChars) return cleaned;
+  return `${cleaned.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
+function buildThreadSubject(messages: ChatHistoryMessage[]): string {
+  const seed = messages.find((message) => message.role === "user") ?? messages[0];
+  return shortenText(seed?.content ?? "Session", 56);
+}
+
+function formatHistoryDate(value: string): string {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return value;
+
+  const date = new Date(time);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diffDays = Math.round((startOfToday - startOfDate) / 86400000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatHistoryStamp(value: string): string {
+  const time = Date.parse(value);
+  if (Number.isFinite(time)) return new Date(time).toLocaleString();
+  return value;
+}
 
 function groupHistory(messages: ChatHistoryMessage[]): HistoryThread[] {
   const groups = new Map<string, ChatHistoryMessage[]>();
@@ -48,6 +82,7 @@ function groupHistory(messages: ChatHistoryMessage[]): HistoryThread[] {
         key,
         conversationId: ordered[0]?.conversationId ?? null,
         walletAddress: ordered[0]?.walletAddress ?? null,
+        subject: buildThreadSubject(ordered),
         messages: ordered,
         firstAt: ordered[0]?.timestamp ?? "",
         lastAt: ordered[ordered.length - 1]?.timestamp ?? "",
@@ -57,15 +92,7 @@ function groupHistory(messages: ChatHistoryMessage[]): HistoryThread[] {
 }
 
 function formatHistoryTitle(thread: HistoryThread): string {
-  if (thread.conversationId) return thread.conversationId.slice(0, 8);
-  if (thread.walletAddress) return `${thread.walletAddress.slice(0, 6)}...${thread.walletAddress.slice(-4)}`;
-  return "Session";
-}
-
-function formatHistoryStamp(value: string): string {
-  const time = Date.parse(value);
-  if (Number.isFinite(time)) return new Date(time).toLocaleString();
-  return value;
+  return thread.subject;
 }
 
 function messageMatchesQuery(message: ChatHistoryMessage, query: string): boolean {
@@ -101,7 +128,7 @@ function toLiveMessage(message: ChatHistoryMessage): Message {
     id: `history-${message.id}`,
     sender: message.role === "assistant" ? "bot" : "user",
     text: message.content,
-    timestamp: formatHistoryStamp(message.timestamp),
+    timestamp: new Date(message.timestamp).toLocaleString(),
   };
 }
 
@@ -168,10 +195,6 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    setHistoryOpen(isConnected);
-  }, [isConnected]);
 
   useEffect(() => {
     let active = true;
@@ -253,7 +276,7 @@ export default function ChatPage() {
   };
 
   const historyPanel = (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-col bg-dark">
       <div className="shrink-0 border-b border-border2 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -329,7 +352,6 @@ export default function ChatPage() {
           <div className="space-y-2">
             {visibleHistoryThreads.slice(0, 12).map((thread) => {
               const isActive = activeThread?.key === thread.key;
-              const lastMessage = thread.messages[thread.messages.length - 1];
               return (
                 <button
                   key={thread.key}
@@ -340,66 +362,21 @@ export default function ChatPage() {
                     isActive ? "border-cy bg-cy/5" : "border-border2 bg-dark/40 hover:border-cy/50"
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-text">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 flex-1 text-sm font-medium text-text truncate">
                       {formatHistoryTitle(thread)}
                     </span>
-                    <span className="text-[9px] font-mono text-muted">
-                      {thread.messages.length} msgs
+                    <span className="shrink-0 text-[9px] font-mono text-muted uppercase tracking-wider">
+                      {formatHistoryDate(thread.lastAt)}
                     </span>
                   </div>
-                  <p className="mt-1 max-h-10 overflow-hidden text-[10px] font-mono text-muted leading-relaxed">
-                    {lastMessage?.content ?? "No preview available"}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-wider text-cy">
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-wider text-muted">
+                    <span>{thread.messages.length} msgs</span>
                     <span>{isActive ? "Restored" : "Click to restore"}</span>
-                    <span>{thread.conversationId ? "Conversation" : "Session"}</span>
                   </div>
                 </button>
               );
             })}
-          </div>
-        )}
-
-        {activeThread && (
-          <div className="border-t border-border2 pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted">
-                Selected Session
-              </span>
-              <span className="text-[9px] font-mono text-muted">
-                {activeThread.messages.length} msgs
-              </span>
-            </div>
-
-            <div className="mt-2 space-y-2">
-              {(normalizedHistorySearch
-                ? activeThread.messages.filter((msg) => messageMatchesQuery(msg, normalizedHistorySearch))
-                : activeThread.messages
-              ).slice(-10).map((msg) => {
-                const isUser = msg.role === "user";
-                return (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "rounded border p-2.5 text-[10px] font-mono leading-relaxed",
-                      isUser ? "border-cy/20 bg-cy/10 text-cy" : "border-border2 bg-dark/40 text-text"
-                    )}
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2 text-[9px] uppercase tracking-wider">
-                      <span>{isUser ? "User" : "Assistant"}</span>
-                      <span className="text-muted">{formatHistoryStamp(msg.timestamp)}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  </div>
-                );
-              })}
-              {normalizedHistorySearch && activeThread.messages.filter((msg) => messageMatchesQuery(msg, normalizedHistorySearch)).length === 0 && (
-                <div className="border border-border2 bg-dark/40 p-3 text-[10px] font-mono text-muted leading-relaxed">
-                  No messages in this conversation match your search.
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
@@ -583,9 +560,9 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setHistoryOpen((open) => !open)}
-              className="lg:hidden px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
+              className="px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
             >
-              {historyOpen ? "Hide History" : "View History"}
+              {historyOpen ? "Close History" : "Open History"}
             </button>
             <div className="text-[10px] font-mono text-muted flex items-center gap-1.5 shrink-0">
               <span className="pulse-green"></span>
@@ -609,12 +586,6 @@ export default function ChatPage() {
             </button>
           ))}
         </div>
-
-        {historyOpen && (
-          <div className="lg:hidden border-b border-border bg-surface/50 max-h-96 overflow-hidden">
-            {historyPanel}
-          </div>
-        )}
 
         {/* Message Feed */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 custom-scroll">
@@ -714,10 +685,37 @@ export default function ChatPage() {
         </div>
 
       </main>
-
-      <aside className="hidden lg:flex w-[320px] shrink-0 border-l border-border overflow-hidden">
-        {historyPanel}
-      </aside>
+      {historyOpen && (
+        <div className="fixed inset-0 z-40">
+          <button
+            type="button"
+            aria-label="Close history drawer"
+            onClick={() => setHistoryOpen(false)}
+            className="absolute inset-0 bg-black/55 backdrop-blur-[1px]"
+          />
+          <motion.aside
+            initial={reduce ? false : { x: 24, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute right-0 top-0 h-full w-full max-w-[420px] border-l border-border bg-dark shadow-[0_0_40px_rgba(0,0,0,0.4)]"
+          >
+            <div className="flex items-center justify-between border-b border-border2 px-4 py-3">
+              <div>
+                <span className="block text-[10px] font-mono uppercase tracking-wider text-muted">Sidebar</span>
+                <span className="block text-sm font-syne uppercase text-text">History</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                className="px-2.5 py-1 border border-border2 bg-dark/40 text-[10px] font-mono uppercase tracking-wider text-muted hover:border-cy hover:text-cy transition-colors press"
+              >
+                Close
+              </button>
+            </div>
+            {historyPanel}
+          </motion.aside>
+        </div>
+      )}
 
     </div>
   );
