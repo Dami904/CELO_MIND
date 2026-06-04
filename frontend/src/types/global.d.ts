@@ -3,11 +3,8 @@ import * as React from 'react';
 declare module 'react' {
   namespace JSX {
     interface IntrinsicElements {
-      'w3m-button': any;
+      // Reown AppKit web component used in the navbar.
+      'appkit-button': any;
     }
   }
-}
-
-declare module 'viem/chains' {
-  export const celo: any;
 }

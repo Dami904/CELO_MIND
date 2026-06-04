@@ -46,9 +46,9 @@ export default function Navbar() {
 
       {/* Right: Connect Button */}
       <div className="flex items-center">
-        {/* Render standard Web3Modal button */}
+        {/* Reown AppKit web component (replaces the old w3m-button) */}
         {/* @ts-ignore */}
-        <w3m-button balance="hide" size="sm" />
+        <appkit-button balance="hide" size="sm" />
       </div>
     </header>
   );

@@ -1,25 +1,22 @@
-import { defaultWagmiConfig } from '@web3modal/wagmi/react/config'
 import { cookieStorage, createStorage } from 'wagmi'
-// @ts-ignore
-import { celo } from 'viem/chains'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import { celo, type AppKitNetwork } from '@reown/appkit/networks'
 
-// CeloMind is mainnet-only (chainId 42220). No testnet chains are configured.
+// CeloMind is mainnet-only (chainId 42220). No testnet networks are configured.
 export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || 'a30d5b51a0293049b49bcf5c36dfc2e5'
 
-const metadata = {
-  name: 'CeloMind MCP',
-  description: 'Autonomous Celo Agent Console',
-  url: 'http://localhost:3000',
-  icons: ['https://avatars.githubusercontent.com/u/37784886']
-}
+// createAppKit / WagmiAdapter expect a non-empty tuple of networks.
+export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [celo]
 
-export const config = defaultWagmiConfig({
-  chains: [celo] as const,
+export const wagmiAdapter = new WagmiAdapter({
   projectId,
-  metadata,
+  networks,
   ssr: true,
-  // @ts-ignore - Storage type compatibility
+  // @ts-ignore - wagmi createStorage vs adapter Storage type mismatch (runtime-compatible)
   storage: createStorage({
     storage: cookieStorage,
   }),
 })
+
+// wagmi config consumed by WagmiProvider and the read/write hooks.
+export const config = wagmiAdapter.wagmiConfig

@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useAccount, useSendTransaction, useSwitchChain, usePublicClient } from "wagmi";
-import { celo } from "viem/chains";
 import { apiClient, type PendingTxData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import ResultCard from "@/components/ui/ResultCard";
@@ -26,7 +25,7 @@ export default function ChatPage() {
   const { address, isConnected, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
-  const publicClient = usePublicClient({ chainId: celo.id });
+  const publicClient = usePublicClient({ chainId: CELO_CHAIN_ID });
   const conversationId = useRef<string>(
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
   ).current;
