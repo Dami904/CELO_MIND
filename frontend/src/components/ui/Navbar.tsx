@@ -42,7 +42,7 @@ export default function Navbar() {
               key={item.path}
               href={item.path}
               className={cn(
-                "px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider transition-colors border border-transparent font-medium",
+                "px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider transition-colors border border-transparent font-medium press",
                 isActive
                   ? "bg-border text-cy border-border"
                   : "text-muted hover:text-text"
@@ -60,7 +60,7 @@ export default function Navbar() {
           type="button"
           onClick={() => open()}
           className={cn(
-            "px-2.5 sm:px-4 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider font-bold border transition-colors cursor-pointer whitespace-nowrap",
+            "px-2.5 sm:px-4 py-1.5 text-[11px] sm:text-xs font-mono uppercase tracking-wider font-bold border transition-colors cursor-pointer whitespace-nowrap press",
             mounted && isConnected
               ? "bg-transparent text-cy border-cy hover:bg-cy hover:text-dark"
               : "bg-cy text-dark border-cy hover:bg-transparent hover:text-cy"

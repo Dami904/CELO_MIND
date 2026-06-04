@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useAccount, useSendTransaction, useSwitchChain, usePublicClient } from "wagmi";
+import { motion, useReducedMotion } from "framer-motion";
 import { apiClient, type PendingTxData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import ResultCard from "@/components/ui/ResultCard";
@@ -26,6 +27,7 @@ export default function ChatPage() {
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: CELO_CHAIN_ID });
+  const reduce = useReducedMotion();
   const conversationId = useRef<string>(
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
   ).current;
@@ -195,7 +197,7 @@ export default function ChatPage() {
               <button
                 key={act.label}
                 onClick={() => setInputText(act.cmd)}
-                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors"
+                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors press"
               >
                 &gt; {act.label}
               </button>
@@ -211,7 +213,7 @@ export default function ChatPage() {
               <button
                 key={act.label}
                 onClick={() => setInputText(act.cmd)}
-                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors"
+                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors press"
               >
                 &gt; {act.label}
               </button>
@@ -227,7 +229,7 @@ export default function ChatPage() {
               <button
                 key={act.label}
                 onClick={() => setInputText(act.cmd)}
-                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors"
+                className="w-full text-left bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1.5 text-[10px] font-mono transition-colors press"
               >
                 &gt; {act.label}
               </button>
@@ -260,7 +262,7 @@ export default function ChatPage() {
             <button
               key={act.label}
               onClick={() => setInputText(act.cmd)}
-              className="shrink-0 bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1 text-[10px] font-mono whitespace-nowrap transition-colors"
+              className="shrink-0 bg-dark/40 border border-border2 hover:border-cy text-muted hover:text-text px-2.5 py-1 text-[10px] font-mono whitespace-nowrap transition-colors press"
             >
               {act.label}
             </button>
@@ -272,8 +274,11 @@ export default function ChatPage() {
           {messages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
-              <div
+              <motion.div
                 key={msg.id}
+                initial={reduce ? false : { opacity: 0, x: isUser ? 24 : -24, y: 4 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ duration: 0.28, ease: "easeOut" }}
                 className={cn(
                   "flex flex-col gap-1.5 max-w-[85%] text-xs",
                   isUser ? "ml-auto items-end" : "mr-auto items-start"
@@ -298,7 +303,7 @@ export default function ChatPage() {
                     <div className="mt-3">
                       <button
                         onClick={() => triggerPendingTx(msg.pendingTx!)}
-                        className="px-3 py-1.5 bg-cy text-dark font-bold text-2xs uppercase tracking-wider hover:bg-transparent hover:text-cy border border-cy transition-colors cursor-pointer"
+                        className="px-3 py-1.5 bg-cy text-dark font-bold text-2xs uppercase tracking-wider hover:bg-transparent hover:text-cy border border-cy transition-colors cursor-pointer hover-lift press"
                       >
                         Sign & Send Transaction
                       </button>
@@ -312,7 +317,7 @@ export default function ChatPage() {
                     <ResultCard title={msg.resultCard.title} data={msg.resultCard.data} />
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
 
@@ -354,7 +359,7 @@ export default function ChatPage() {
             <button
               type="submit"
               disabled={!inputText.trim() || isTyping}
-              className="h-11 px-5 bg-cy border border-cy text-dark hover:bg-transparent hover:text-cy font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+              className="h-11 px-5 bg-cy border border-cy text-dark hover:bg-transparent hover:text-cy font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer press"
             >
               Send
             </button>

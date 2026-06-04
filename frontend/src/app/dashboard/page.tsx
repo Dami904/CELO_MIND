@@ -4,6 +4,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { apiGet } from "@/lib/api";
 import { truncateAddress } from "@/lib/utils";
+import Reveal from "@/components/motion/Reveal";
+import CountUp from "@/components/motion/CountUp";
+
+/** Shimmer placeholder bar for loading states. */
+function Skel({ className = "" }: { className?: string }) {
+  return <span className={`inline-block rounded animate-shimmer align-middle ${className}`} />;
+}
 
 type DashboardMetrics = {
   celoPrice?: { usd?: number; usd_24h_change?: number } | null;
@@ -61,11 +68,6 @@ type Transactions = {
   source?: string;
 };
 
-function fmtNumber(value?: number | null, digits = 2): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "No data";
-  return value.toLocaleString(undefined, { maximumFractionDigits: digits });
-}
-
 function fmtUsd(value?: number | string | null): string {
   const n = typeof value === "string" ? Number(value) : value;
   if (typeof n !== "number" || !Number.isFinite(n)) return "No data";
@@ -92,6 +94,8 @@ function txLabel(tx: TransactionItem): string {
   const method = tx.method ?? "transaction";
   return `${method} ${shortHash(tx.hash)}`;
 }
+
+const CARD = "bg-surface border border-border flex flex-col hover-lift";
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
@@ -163,10 +167,11 @@ export default function DashboardPage() {
   const txs = transactions?.transactions.slice(0, 6) ?? [];
   const celoPrice = metrics?.celoPrice?.usd;
   const celoChange = metrics?.celoPrice?.usd_24h_change;
+  const tvlUsd = metrics?.tvl?.usd;
 
   const whaleAlerts = [
     { asset: "Live trend", desc: metrics?.trendingTokens?.[0]?.name ?? "waiting for GeckoTerminal", type: "MARKET", time: loading ? "loading" : "now" },
-    { asset: "TVL", desc: metrics?.tvl?.usd ? `${fmtUsd(metrics.tvl.usd)} tracked by DefiLlama` : "not available", type: "CELO", time: "live" },
+    { asset: "TVL", desc: typeof tvlUsd === "number" ? `${fmtUsd(tvlUsd)} tracked by DefiLlama` : "not available", type: "CELO", time: "live" },
   ];
 
   const riskAlerts = [
@@ -187,32 +192,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
+      {/* Metric tiles */}
+      <Reveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">CELO Price</span>
-            <span className="block text-xl font-mono font-bold text-text mt-1">{loading ? "Loading" : fmtUsd(celoPrice)}</span>
+            <span className="block text-xl font-mono font-bold text-text mt-1">
+              {loading ? <Skel className="h-5 w-20" /> : typeof celoPrice === "number" ? <CountUp value={celoPrice} prefix="$" decimals={2} /> : "No data"}
+            </span>
           </div>
           <div className={`mt-2 text-2xs font-mono ${(celoChange ?? 0) >= 0 ? "text-cg" : "text-error"}`}>
             {typeof celoChange === "number" ? `${celoChange >= 0 ? "+" : ""}${celoChange.toFixed(2)}%` : "No change"} <span className="text-muted">(24h)</span>
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Celo TVL</span>
-            <span className="block text-xl font-mono font-bold text-text mt-1">{loading ? "Loading" : fmtUsd(metrics?.tvl?.usd)}</span>
+            <span className="block text-xl font-mono font-bold text-text mt-1">
+              {loading ? <Skel className="h-5 w-24" /> : typeof tvlUsd === "number" ? <CountUp value={tvlUsd} prefix="$" /> : "No data"}
+            </span>
           </div>
           <div className={`mt-2 text-2xs font-mono ${(metrics?.tvl?.change1d ?? 0) >= 0 ? "text-cg" : "text-error"}`}>
             {typeof metrics?.tvl?.change1d === "number" ? `${metrics.tvl.change1d >= 0 ? "+" : ""}${metrics.tvl.change1d.toFixed(2)}%` : "No change"} <span className="text-muted">(1d)</span>
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">MCP Tool Calls</span>
             <span className="block text-xl font-mono font-bold text-cy mt-1">
-              {loading ? "Loading" : fmtNumber(overview?.totals.toolCalls ?? 0, 0)}
+              {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.totals.toolCalls ?? 0} />}
             </span>
           </div>
           <div className="mt-2 text-2xs font-mono text-muted">
@@ -220,22 +230,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-surface border border-border p-4 flex flex-col justify-between">
+        <div className="bg-surface border border-border p-4 flex flex-col justify-between hover-lift">
           <div>
             <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Chat Requests</span>
             <span className="block text-xl font-mono font-bold text-text mt-1">
-              {loading ? "Loading" : fmtNumber(overview?.totals.chatRequests ?? 0, 0)}
+              {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.totals.chatRequests ?? 0} />}
             </span>
           </div>
           <div className="mt-2 text-2xs font-mono text-cy">
-            Sessions: {fmtNumber(overview?.uniqueSessions ?? 0, 0)}
+            Sessions: <CountUp value={overview?.uniqueSessions ?? 0} />
           </div>
         </div>
-      </div>
+      </Reveal>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Reveal delay={0.1} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Wallet Summary</span>
               <span className="text-2xs font-mono text-muted">
@@ -248,17 +258,14 @@ export default function DashboardPage() {
                   Connect a wallet to load balances from the backend.
                 </div>
               )}
-              {isConnected && walletLoading && (
-                <div className="md:col-span-3 border border-border2 bg-dark/20 p-3.5 text-xs text-muted font-mono">
-                  Loading wallet balances...
-                </div>
-              )}
+              {isConnected && walletLoading &&
+                [0, 1, 2].map((i) => <div key={i} className="h-16 border border-border2 bg-dark/20 animate-shimmer" />)}
               {isConnected && !walletLoading && !topBalances.length && (
                 <div className="md:col-span-3 border border-border2 bg-dark/20 p-3.5 text-xs text-muted font-mono">
                   No wallet balances returned yet.
                 </div>
               )}
-              {topBalances.map((item) => (
+              {!walletLoading && topBalances.map((item) => (
                 <div key={`${item.symbol}-${item.name}`} className="border border-border2 bg-dark/20 p-3.5 flex flex-col">
                   <span className="text-2xs text-muted font-mono uppercase">{item.symbol}</span>
                   <span className="text-lg font-mono font-bold text-text mt-1">{fmtBalance(item.balance)}</span>
@@ -268,7 +275,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Activity Feed</span>
             </div>
@@ -276,13 +283,16 @@ export default function DashboardPage() {
               {!isConnected && (
                 <div className="px-4 py-3.5 text-xs text-muted font-mono">Connect a wallet to load recent transactions.</div>
               )}
-              {isConnected && walletLoading && (
-                <div className="px-4 py-3.5 text-xs text-muted font-mono">Loading transactions...</div>
-              )}
+              {isConnected && walletLoading &&
+                [0, 1, 2, 3].map((i) => (
+                  <div key={i} className="px-4 py-3.5">
+                    <Skel className="h-4 w-2/3" />
+                  </div>
+                ))}
               {isConnected && !walletLoading && !txs.length && (
                 <div className="px-4 py-3.5 text-xs text-muted font-mono">No recent transactions returned.</div>
               )}
-              {txs.map((item) => {
+              {!walletLoading && txs.map((item) => {
                 const status = txStatus(item);
                 return (
                   <div key={item.hash ?? Math.random().toString()} className="px-4 py-3.5 flex items-center justify-between gap-4 text-xs font-mono">
@@ -312,7 +322,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Market Watch</span>
             </div>
@@ -333,7 +343,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-error font-bold">Risk Monitor</span>
             </div>
@@ -354,7 +364,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Loaded MCP Tools</span>
             </div>
@@ -368,7 +378,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-surface border border-border flex flex-col">
+          <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Server Diagnostic</span>
             </div>
@@ -387,12 +397,12 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-muted">UNIQUE USERS</span>
-                <span className="text-text">{fmtNumber(overview?.uniqueUsers ?? 0, 0)}</span>
+                <span className="text-text"><CountUp value={overview?.uniqueUsers ?? 0} /></span>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </Reveal>
     </div>
   );
 }
