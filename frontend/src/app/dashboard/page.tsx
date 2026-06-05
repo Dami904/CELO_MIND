@@ -1,75 +1,59 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { apiGet } from "@/lib/api";
 import { truncateAddress } from "@/lib/utils";
 import CountUp from "@/components/motion/CountUp";
 
-/** Shimmer placeholder bar for loading states. */
 function Skel({ className = "" }: { className?: string }) {
   return <span className={`inline-block rounded animate-shimmer align-middle ${className}`} />;
 }
 
+type MarketItem = { type: string; tag: string; name: string; desc: string; time: string; change?: string; isPositive?: boolean };
+type RiskItem = { level: "HIGH" | "MED" | "LOW"; title: string; desc: string; time: string };
+
 type DashboardMetrics = {
   celoPrice?: { usd?: number; usd_24h_change?: number } | null;
   tvl?: { usd?: number; change1d?: number } | null;
-  trendingTokens?: { name: string; symbol: string; priceUsd?: string }[];
+  trendingTokens?: { name: string; priceUsd?: string; change24h?: string; volume24h?: string }[];
+  marketFeed?: MarketItem[];
+  riskFeed?: RiskItem[];
 };
 
 type MetricsOverview = {
-  totals: {
-    chatRequests: number;
-    toolCalls: number;
-    modelCalls: number;
-    fallbacks: number;
-    errors: number;
-  };
-  uniqueUsers: number;
-  uniqueSessions: number;
-  fallbackRate: number;
-  topTool: string | null;
-  topIntent: string | null;
-  topProvider: string | null;
+  totals: { chatRequests: number; toolCalls: number; modelCalls: number; fallbacks: number; errors: number };
+  uniqueUsers: number; uniqueSessions: number; fallbackRate: number;
+  topTool: string | null; topIntent: string | null; topProvider: string | null;
 };
 
-type MetricsTools = {
-  tools: { tool: string; count: number }[];
-};
-
-type WalletBalance = {
-  symbol: string;
-  name: string;
-  balance: string;
-  usdValue?: string | number | null;
-};
-
-type WalletBalances = {
-  address: string;
-  balances: WalletBalance[];
-  source?: string;
-};
-
+type WalletBalance = { symbol: string; name: string; balance: string; usdValue?: string | number | null };
+type WalletBalances = { address: string; balances: WalletBalance[]; source?: string };
 type TransactionItem = {
-  hash?: string;
-  method?: string | null;
-  status?: string | null;
-  result?: string | null;
-  timestamp?: string | null;
-  from?: { hash?: string } | null;
-  to?: { hash?: string } | null;
-  value?: string | null;
+  hash?: string; method?: string | null; status?: string | null; result?: string | null;
+  timestamp?: string | null; from?: { hash?: string } | null; to?: { hash?: string } | null; value?: string | null;
 };
+type Transactions = { address: string; transactions: TransactionItem[]; source?: string };
 
-type Transactions = {
-  address: string;
-  transactions: TransactionItem[];
-  source?: string;
-};
+// All 35 CeloMind MCP tools — shown in the "Available MCP Tools" panel.
+const ALL_MCP_TOOLS = [
+  "celo_get_balance", "celo_get_token_balance", "celo_send", "celo_swap_quote",
+  "celo_swap_execute", "prepare_celo_swap", "celo_aave_position", "celo_aave_supply",
+  "self_verify", "self_agent_id_check", "x402_pay", "celo_docs_explain",
+  "get_celo_gas_price", "get_celo_network_stats", "get_celo_defi_protocols",
+  "get_celo_yield_opportunities", "get_trending_celo_tokens", "get_celo_top_pools",
+  "get_celo_top_tokens_by_holders", "get_celo_top_tokens_by_market_cap",
+  "get_recently_launched_celo_tokens", "search_celo_tokens", "get_celo_token_price",
+  "get_celo_price_history", "get_celo_token_info", "get_celo_token_holders",
+  "get_celo_wallet_portfolio", "get_celo_wallet_stats", "get_celo_nft_balances",
+  "get_celo_recent_transactions", "check_malicious_transaction", "check_contract_risk",
+  "check_token_risk", "explain_transaction_risk", "get_whale_wallet_activity",
+  "compare_wallets", "analyze_copy_wallet_strategy", "get_portfolio_risk_score",
+];
 
 function fmtUsd(value?: number | string | null): string {
   const n = typeof value === "string" ? Number(value) : value;
-  if (typeof n !== "number" || !Number.isFinite(n)) return "No data";
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
@@ -89,18 +73,30 @@ function txStatus(tx: TransactionItem): string {
   return raw === "ok" || raw === "success" ? "confirmed" : raw;
 }
 
-function txLabel(tx: TransactionItem): string {
-  const method = tx.method ?? "transaction";
-  return `${method} ${shortHash(tx.hash)}`;
-}
-
 const CARD = "bg-surface border border-border flex flex-col";
+
+const RISK_COLOR: Record<string, string> = {
+  HIGH: "text-error border-error/20 bg-error/10",
+  MED: "text-yellow-400 border-yellow-400/20 bg-yellow-400/10",
+  LOW: "text-muted border-border2 bg-dark/20",
+};
+
+const TAG_COLOR: Record<string, string> = {
+  TRENDING: "text-cg border-cg/25 bg-cg/10",
+  NEW: "text-cy border-cy/25 bg-cy/10",
+  WHALE: "text-purple-400 border-purple-400/25 bg-purple-400/10",
+  LAUNCH: "text-cy border-cy/25 bg-cy/10",
+  ALERT: "text-error border-error/25 bg-error/10",
+  PUMP: "text-cg border-cg/25 bg-cg/10",
+  TVL: "text-text border-border2 bg-dark/20",
+  MARKET: "text-cy border-cy/25 bg-cy/10",
+  LIQUIDITY: "text-purple-400 border-purple-400/25 bg-purple-400/10",
+};
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [overview, setOverview] = useState<MetricsOverview | null>(null);
-  const [tools, setTools] = useState<MetricsTools | null>(null);
   const [wallet, setWallet] = useState<WalletBalances | null>(null);
   const [transactions, setTransactions] = useState<Transactions | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,168 +104,127 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true;
-
     function fetchMetrics() {
       setLoading(true);
       Promise.all([
         apiGet<DashboardMetrics>("/api/dashboard/metrics"),
         apiGet<MetricsOverview>("/api/metrics/overview"),
-        apiGet<MetricsTools>("/api/metrics/tools"),
-      ]).then(([nextMetrics, nextOverview, nextTools]) => {
+      ]).then(([nextMetrics, nextOverview]) => {
         if (!active) return;
         setMetrics(nextMetrics);
         setOverview(nextOverview);
-        setTools(nextTools);
         setLoading(false);
       });
     }
-
     fetchMetrics();
-    // Refresh price/TVL/activity every 60 s while the dashboard is open.
     const id = setInterval(fetchMetrics, 60_000);
-
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
+    return () => { active = false; clearInterval(id); };
   }, []);
 
   useEffect(() => {
     let active = true;
-
     if (!address) {
-      setWallet(null);
-      setTransactions(null);
-      setWalletLoading(false);
-      return () => {
-        active = false;
-      };
+      setWallet(null); setTransactions(null); setWalletLoading(false);
+      return () => { active = false; };
     }
-
     setWalletLoading(true);
     Promise.all([
       apiGet<WalletBalances>(`/api/wallet/${address}/balances`),
       apiGet<Transactions>(`/api/transactions?address=${address}`),
-    ]).then(([nextWallet, nextTransactions]) => {
+    ]).then(([nextWallet, nextTxs]) => {
       if (!active) return;
-      setWallet(nextWallet);
-      setTransactions(nextTransactions);
-      setWalletLoading(false);
+      setWallet(nextWallet); setTransactions(nextTxs); setWalletLoading(false);
     });
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [address]);
 
   const topBalances = useMemo(() => {
-    const balances = wallet?.balances ?? [];
-    return balances
-      .filter((item) => Number(item.balance) > 0 || item.symbol === "CELO")
-      .slice(0, 3);
+    const b = wallet?.balances ?? [];
+    return b.filter((item) => Number(item.balance) > 0 || item.symbol === "CELO").slice(0, 3);
   }, [wallet]);
 
-  const activeTools = tools?.tools.slice(0, 8) ?? [];
   const txs = transactions?.transactions.slice(0, 6) ?? [];
   const celoPrice = metrics?.celoPrice?.usd;
   const celoChange = metrics?.celoPrice?.usd_24h_change;
   const tvlUsd = metrics?.tvl?.usd;
-
-  const whaleAlerts = [
-    { asset: "Live trend", desc: metrics?.trendingTokens?.[0]?.name ?? "waiting for GeckoTerminal", type: "MARKET", time: loading ? "loading" : "now" },
-    { asset: "TVL", desc: typeof tvlUsd === "number" ? `${fmtUsd(tvlUsd)} tracked by DefiLlama` : "not available", type: "CELO", time: "live" },
-  ];
-
-  const riskAlerts = [
-    { title: "Backend errors", desc: `${overview?.totals.errors ?? 0} recorded tool/chat errors`, level: overview?.totals.errors ? "MED" : "LOW", time: "live" },
-    { title: "Fallback rate", desc: `${(((overview?.fallbackRate ?? 0) * 100)).toFixed(1)}% AI fallback usage`, level: (overview?.fallbackRate ?? 0) > 0.2 ? "MED" : "LOW", time: "live" },
-  ];
+  const marketFeed = metrics?.marketFeed ?? [];
+  const riskFeed = metrics?.riskFeed ?? [];
 
   return (
     <div className="flex-1 flex flex-col bg-dark text-text p-4 md:p-6 overflow-y-auto custom-scroll">
+      {/* Header */}
       <div className="flex justify-between items-center gap-3 flex-wrap mb-6 border-b border-border pb-4">
         <div>
           <span className="text-2xs font-mono uppercase tracking-widest text-muted">Management Console</span>
           <h2 className="text-xl md:text-2xl font-syne font-extrabold uppercase tracking-tight text-text">Command Center</h2>
         </div>
         <div className="flex items-center gap-2 border border-cg/20 bg-cg/5 text-cg px-3 py-1 font-mono text-2xs uppercase font-semibold">
-          <span className="h-1.5 w-1.5 rounded-full bg-cg animate-pulse"></span>
-          Celo Mainnet
+          <span className="h-1.5 w-1.5 rounded-full bg-cg animate-pulse" />
+          Celo Mainnet · refreshes every 60s
         </div>
       </div>
 
       {/* Metric tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-surface border border-border p-4 flex flex-col justify-between">
-          <div>
-            <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">CELO Price</span>
-            <span className="block text-xl font-mono font-bold text-text mt-1">
-              {loading ? <Skel className="h-5 w-20" /> : typeof celoPrice === "number" ? <CountUp value={celoPrice} prefix="$" decimals={2} /> : "No data"}
-            </span>
-          </div>
+          <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">CELO Price</span>
+          <span className="block text-xl font-mono font-bold text-text mt-1">
+            {loading ? <Skel className="h-5 w-20" /> : typeof celoPrice === "number" ? <CountUp value={celoPrice} prefix="$" decimals={4} /> : "—"}
+          </span>
           <div className={`mt-2 text-2xs font-mono ${(celoChange ?? 0) >= 0 ? "text-cg" : "text-error"}`}>
-            {typeof celoChange === "number" ? `${celoChange >= 0 ? "+" : ""}${celoChange.toFixed(2)}%` : "No change"} <span className="text-muted">(24h)</span>
+            {typeof celoChange === "number" ? `${celoChange >= 0 ? "+" : ""}${celoChange.toFixed(2)}%` : "—"} <span className="text-muted">(24h)</span>
           </div>
         </div>
 
         <div className="bg-surface border border-border p-4 flex flex-col justify-between">
-          <div>
-            <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Celo TVL</span>
-            <span className="block text-xl font-mono font-bold text-text mt-1">
-              {loading ? <Skel className="h-5 w-24" /> : typeof tvlUsd === "number" ? <CountUp value={tvlUsd} prefix="$" /> : "No data"}
-            </span>
-          </div>
+          <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Celo TVL</span>
+          <span className="block text-xl font-mono font-bold text-text mt-1">
+            {loading ? <Skel className="h-5 w-24" /> : typeof tvlUsd === "number" ? <CountUp value={tvlUsd} prefix="$" /> : "—"}
+          </span>
           <div className={`mt-2 text-2xs font-mono ${(metrics?.tvl?.change1d ?? 0) >= 0 ? "text-cg" : "text-error"}`}>
-            {typeof metrics?.tvl?.change1d === "number" ? `${metrics.tvl.change1d >= 0 ? "+" : ""}${metrics.tvl.change1d.toFixed(2)}%` : "No change"} <span className="text-muted">(1d)</span>
+            {typeof metrics?.tvl?.change1d === "number" ? `${metrics.tvl.change1d >= 0 ? "+" : ""}${metrics.tvl.change1d.toFixed(2)}%` : "—"} <span className="text-muted">(1d)</span>
           </div>
         </div>
 
         <div className="bg-surface border border-border p-4 flex flex-col justify-between">
-          <div>
-            <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">MCP Tool Calls</span>
-            <span className="block text-xl font-mono font-bold text-cy mt-1">
-              {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.totals.toolCalls ?? 0} />}
-            </span>
-          </div>
+          <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Chat Messages</span>
+          <span className="block text-xl font-mono font-bold text-cy mt-1">
+            {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.totals.chatRequests ?? 0} />}
+          </span>
           <div className="mt-2 text-2xs font-mono text-muted">
-            Top: {overview?.topTool ?? "none yet"}
+            Sessions: {loading ? "—" : (overview?.uniqueSessions ?? 0)}
           </div>
         </div>
 
         <div className="bg-surface border border-border p-4 flex flex-col justify-between">
-          <div>
-            <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Chat Requests</span>
-            <span className="block text-xl font-mono font-bold text-text mt-1">
-              {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.totals.chatRequests ?? 0} />}
-            </span>
-          </div>
-          <div className="mt-2 text-2xs font-mono text-cy">
-            Sessions: <CountUp value={overview?.uniqueSessions ?? 0} />
+          <span className="block text-[10px] text-muted font-mono uppercase tracking-wide">Unique Users</span>
+          <span className="block text-xl font-mono font-bold text-text mt-1">
+            {loading ? <Skel className="h-5 w-16" /> : <CountUp value={overview?.uniqueUsers ?? 0} />}
+          </span>
+          <div className="mt-2 text-2xs font-mono text-muted">
+            AI: <span className="text-cg font-bold">{overview?.topProvider ?? "—"}</span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2/3 */}
         <div className="lg:col-span-2 flex flex-col gap-6">
+          {/* Wallet Summary */}
           <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Wallet Summary</span>
-              <span className="text-2xs font-mono text-muted">
-                {isConnected ? truncateAddress(address) : "No wallet connected"}
-              </span>
+              <span className="text-2xs font-mono text-muted">{isConnected ? truncateAddress(address) : "No wallet connected"}</span>
             </div>
             <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               {!isConnected && (
                 <div className="md:col-span-3 border border-border2 bg-dark/20 p-3.5 text-xs text-muted font-mono">
-                  Connect a wallet to load balances from the backend.
+                  Connect a wallet to load live balances.
                 </div>
               )}
-              {isConnected && walletLoading &&
-                [0, 1, 2].map((i) => <div key={i} className="h-16 border border-border2 bg-dark/20 animate-shimmer" />)}
+              {isConnected && walletLoading && [0, 1, 2].map((i) => <div key={i} className="h-16 border border-border2 bg-dark/20 animate-shimmer" />)}
               {isConnected && !walletLoading && !topBalances.length && (
-                <div className="md:col-span-3 border border-border2 bg-dark/20 p-3.5 text-xs text-muted font-mono">
-                  No wallet balances returned yet.
-                </div>
+                <div className="md:col-span-3 border border-border2 bg-dark/20 p-3.5 text-xs text-muted font-mono">No balances returned yet.</div>
               )}
               {!walletLoading && topBalances.map((item) => (
                 <div key={`${item.symbol}-${item.name}`} className="border border-border2 bg-dark/20 p-3.5 flex flex-col">
@@ -281,109 +236,127 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Activity Feed */}
           <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Activity Feed</span>
             </div>
             <div className="divide-y divide-border2">
-              {!isConnected && (
-                <div className="px-4 py-3.5 text-xs text-muted font-mono">Connect a wallet to load recent transactions.</div>
-              )}
-              {isConnected && walletLoading &&
-                [0, 1, 2, 3].map((i) => (
-                  <div key={i} className="px-4 py-3.5">
-                    <Skel className="h-4 w-2/3" />
-                  </div>
-                ))}
+              {!isConnected && <div className="px-4 py-3.5 text-xs text-muted font-mono">Connect a wallet to load recent transactions.</div>}
+              {isConnected && walletLoading && [0, 1, 2, 3].map((i) => (
+                <div key={i} className="px-4 py-3.5"><Skel className="h-4 w-2/3" /></div>
+              ))}
               {isConnected && !walletLoading && !txs.length && (
-                <div className="px-4 py-3.5 text-xs text-muted font-mono">No recent transactions returned.</div>
+                <div className="px-4 py-3.5 text-xs text-muted font-mono">No recent transactions found.</div>
               )}
               {!walletLoading && txs.map((item) => {
                 const status = txStatus(item);
                 return (
                   <div key={item.hash ?? Math.random().toString()} className="px-4 py-3.5 flex items-center justify-between gap-4 text-xs font-mono">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-6 h-6 flex items-center justify-center border font-bold ${
-                        status === "pending" ? "border-cy/30 bg-cy/5 text-cy" : "border-border2 bg-dark text-muted"
-                      }`}>
-                        {status === "pending" ? "..." : "OK"}
+                      <span className={`w-6 h-6 flex items-center justify-center border font-bold text-[10px] ${status === "pending" ? "border-cy/30 bg-cy/5 text-cy" : "border-border2 bg-dark text-muted"}`}>
+                        {status === "pending" ? "···" : "OK"}
                       </span>
-                      <span className="text-text truncate">{txLabel(item)}</span>
+                      <span className="text-text truncate">{item.method ?? "tx"} {shortHash(item.hash)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-2xs text-muted shrink-0">
                       <span>{item.timestamp ? new Date(item.timestamp).toLocaleDateString() : "recent"}</span>
-                      <span className={`px-1.5 py-0.5 border uppercase ${
-                        status === "pending"
-                          ? "border-cy/25 bg-cy/5 text-cy"
-                          : "border-border2 bg-dark/40 text-muted"
-                      }`}>
-                        {status}
-                      </span>
+                      <span className={`px-1.5 py-0.5 border uppercase ${status === "pending" ? "border-cy/25 bg-cy/5 text-cy" : "border-border2 bg-dark/40 text-muted"}`}>{status}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-6">
+          {/* Available MCP Tools */}
           <div className={CARD}>
-            <div className="border-b border-border bg-dark/30 px-4 py-3">
-              <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Market Watch</span>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-              {whaleAlerts.map((item) => (
-                <div key={`${item.type}-${item.asset}`} className="border border-border2 bg-dark/20 p-3 flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="px-1.5 py-0.5 bg-cy/10 border border-cy/20 text-cy text-[9px] font-mono font-bold tracking-wide">
-                      [{item.type}]
-                    </span>
-                    <span className="text-[9px] text-muted font-mono">{item.time}</span>
-                  </div>
-                  <p className="text-xs font-mono">
-                    <span className="text-text font-bold">{item.asset}</span> <span className="text-muted">{item.desc}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={CARD}>
-            <div className="border-b border-border bg-dark/30 px-4 py-3">
-              <span className="text-2xs font-mono uppercase tracking-widest text-error font-bold">Risk Monitor</span>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-              {riskAlerts.map((item) => (
-                <div key={item.title} className="border border-error/15 bg-dark/20 p-3 flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="px-1.5 py-0.5 bg-error/10 border border-error/20 text-error text-[9px] font-mono font-bold tracking-wide">
-                      [{item.level} RISK]
-                    </span>
-                    <span className="text-[9px] text-muted font-mono">{item.time}</span>
-                  </div>
-                  <p className="text-xs font-mono">
-                    <span className="text-text font-bold">{item.title}:</span> <span className="text-muted">{item.desc}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={CARD}>
-            <div className="border-b border-border bg-dark/30 px-4 py-3">
-              <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Loaded MCP Tools</span>
+            <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
+              <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Available MCP Tools</span>
+              <span className="text-2xs font-mono text-muted">{ALL_MCP_TOOLS.length} tools</span>
             </div>
             <div className="p-4 flex flex-wrap gap-1.5">
-              {!activeTools.length && <span className="text-muted font-mono text-[10px]">No tool calls recorded yet.</span>}
-              {activeTools.map((tool) => (
-                <span key={tool.tool} className="bg-dark border border-border2 text-muted px-2 py-1 font-mono text-[10px]">
-                  {tool.tool} ({tool.count})
+              {ALL_MCP_TOOLS.map((tool) => (
+                <span key={tool} className="bg-dark border border-border2 text-muted hover:border-cy hover:text-text px-2 py-1 font-mono text-[10px] transition-colors">
+                  {tool}
                 </span>
               ))}
             </div>
           </div>
+        </div>
 
+        {/* Right 1/3 */}
+        <div className="flex flex-col gap-6">
+          {/* Market Watch */}
+          <div className={CARD}>
+            <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
+              <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Market Watch</span>
+              <span className="text-[9px] font-mono text-muted uppercase">live · GeckoTerminal</span>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              {loading && [0, 1, 2].map((i) => <div key={i} className="h-14 border border-border2 bg-dark/20 animate-shimmer" />)}
+              {!loading && marketFeed.length === 0 && (
+                <div className="text-muted font-mono text-[10px] p-2">No market data yet — check back shortly.</div>
+              )}
+              {!loading && marketFeed.map((item, i) => {
+                const tagClass = TAG_COLOR[item.tag] ?? TAG_COLOR[item.type] ?? "text-muted border-border2 bg-dark/20";
+                return (
+                  <div key={i} className="border border-border2 bg-dark/20 p-3 flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className={`px-1.5 py-0.5 border text-[9px] font-mono font-bold tracking-wide ${tagClass}`}>
+                        [{item.type}]
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {item.change && (
+                          <span className={`text-[10px] font-mono font-bold ${item.isPositive ? "text-cg" : "text-error"}`}>
+                            {item.change}
+                          </span>
+                        )}
+                        <span className="text-[9px] text-muted font-mono">{item.time}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-mono leading-snug">
+                      <span className="text-text font-bold">{item.name}</span>{" "}
+                      <span className="text-muted">{item.desc}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Risk Monitor */}
+          <div className={CARD}>
+            <div className="border-b border-border bg-dark/30 px-4 py-3 flex justify-between items-center">
+              <span className="text-2xs font-mono uppercase tracking-widest text-error font-bold">Risk Monitor</span>
+              <span className="text-[9px] font-mono text-muted uppercase">DefiLlama Hacks</span>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              {loading && [0, 1].map((i) => <div key={i} className="h-14 border border-border2 bg-dark/20 animate-shimmer" />)}
+              {!loading && riskFeed.length === 0 && (
+                <div className="text-muted font-mono text-[10px] p-2">No risk alerts detected.</div>
+              )}
+              {!loading && riskFeed.map((item, i) => {
+                const cls = RISK_COLOR[item.level] ?? RISK_COLOR.LOW;
+                return (
+                  <div key={i} className={`border p-3 flex flex-col gap-1.5 ${cls}`}>
+                    <div className="flex justify-between items-center">
+                      <span className={`px-1.5 py-0.5 border text-[9px] font-mono font-bold tracking-wide ${cls}`}>
+                        [{item.level} RISK]
+                      </span>
+                      <span className="text-[9px] font-mono opacity-70">{item.time}</span>
+                    </div>
+                    <p className="text-xs font-mono leading-snug">
+                      <span className="font-bold">{item.title}:</span>{" "}
+                      <span className="opacity-80">{item.desc}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Server Diagnostic */}
           <div className={CARD}>
             <div className="border-b border-border bg-dark/30 px-4 py-3">
               <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">Server Diagnostic</span>
@@ -394,16 +367,24 @@ export default function DashboardPage() {
                 <span className="text-text font-bold">CELO MAINNET</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-muted">TOP INTENT</span>
-                <span className="text-cg font-bold">{overview?.topIntent ?? "NONE"}</span>
-              </div>
-              <div className="flex justify-between gap-3">
                 <span className="text-muted">AI PROVIDER</span>
-                <span className="text-cg font-bold">{overview?.topProvider ?? "NONE"}</span>
+                <span className="text-cg font-bold">{loading ? "—" : (overview?.topProvider?.toUpperCase() ?? "NONE")}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-muted">UNIQUE USERS</span>
-                <span className="text-text"><CountUp value={overview?.uniqueUsers ?? 0} /></span>
+                <span className="text-muted">FALLBACK RATE</span>
+                <span className={`font-bold ${(overview?.fallbackRate ?? 0) > 0.2 ? "text-yellow-400" : "text-cg"}`}>
+                  {loading ? "—" : `${((overview?.fallbackRate ?? 0) * 100).toFixed(1)}%`}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted">ERRORS</span>
+                <span className={`font-bold ${(overview?.totals.errors ?? 0) > 0 ? "text-error" : "text-cg"}`}>
+                  {loading ? "—" : (overview?.totals.errors ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted">MCP TOOLS</span>
+                <span className="text-text font-bold">{ALL_MCP_TOOLS.length} loaded</span>
               </div>
             </div>
           </div>

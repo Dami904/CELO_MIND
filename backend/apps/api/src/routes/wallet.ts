@@ -38,7 +38,15 @@ export async function walletRoutes(app: FastifyInstance) {
           ? { symbol: "CELO", name: "Celo", address: "native", decimals: 18, ...native.value, usdValue: null }
           : { symbol: "CELO", name: "Celo", address: "native", decimals: 18, balance: "0", balanceRaw: "0", usdValue: null };
 
-      const balances = [nativeEntry, ...(tokens.status === "fulfilled" ? tokens.value : [])];
+      const raw = [nativeEntry, ...(tokens.status === "fulfilled" ? tokens.value : [])];
+      // Blockscout also returns a CELO entry — deduplicate by symbol, keeping the first occurrence (RPC native has accurate balance).
+      const seen = new Set<string>();
+      const balances = raw.filter((b) => {
+        const key = b.symbol.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
       void logPortfolioSnapshot(address, NETWORK, balances);
 
