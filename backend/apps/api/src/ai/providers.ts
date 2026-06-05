@@ -172,7 +172,8 @@ const INTENT_ROUTES: Record<string, () => Route> = {
   // Fast structured data formatting
   balance: FAST, token_balance: FAST, token_price: FAST, token_info: FAST,
   market_trending: FAST, recent_launches: FAST, wallet_portfolio: FAST,
-  recent_transactions: FAST, swap_quote: FAST, aave_position: FAST, agent_id_check: FAST,
+  recent_transactions: FAST, swap_quote: FAST, aave_position: FAST,
+  agent_id_check: GROUNDED,
   send: FAST, swap_execute: FAST, aave_supply: FAST,
   // New live-data intents — structured results, fast model is ideal
   gas_price: FAST, defi_protocols: FAST, network_stats: FAST, price_history: FAST,

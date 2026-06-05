@@ -58,6 +58,16 @@ export async function initDb(): Promise<void> {
       timestamp TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS chat_conversation_summaries (
+      scope_key TEXT PRIMARY KEY,
+      scope_type TEXT NOT NULL,
+      conversation_id TEXT,
+      wallet_address TEXT,
+      chatbot_type TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS watched_wallets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       address TEXT NOT NULL UNIQUE,
@@ -89,6 +99,8 @@ export async function initDb(): Promise<void> {
     CREATE INDEX IF NOT EXISTS chat_messages_wallet_idx ON chat_messages(wallet_address);
     CREATE INDEX IF NOT EXISTS chat_messages_conversation_idx ON chat_messages(conversation_id);
     CREATE INDEX IF NOT EXISTS chat_messages_timestamp_idx ON chat_messages(timestamp);
+    CREATE INDEX IF NOT EXISTS chat_conversation_summaries_conversation_idx ON chat_conversation_summaries(conversation_id);
+    CREATE INDEX IF NOT EXISTS chat_conversation_summaries_wallet_idx ON chat_conversation_summaries(wallet_address);
   `);
 }
 
@@ -141,6 +153,22 @@ export type ChatMessageRecord = {
   walletAddress: string | null;
   timestamp: string;
 };
+
+export type ChatSummaryScope = {
+  conversationId?: string;
+  walletAddress?: string;
+  chatbotType: string;
+};
+
+export function getChatSummaryScopeKey(scope: ChatSummaryScope): string | null {
+  const conversationId = scope.conversationId?.trim();
+  if (conversationId) return `conversation:${conversationId}`;
+
+  const walletAddress = scope.walletAddress?.trim();
+  if (walletAddress) return `wallet:${walletAddress.toLowerCase()}:${scope.chatbotType}`;
+
+  return null;
+}
 
 export async function getChatMessages(filters: {
   walletAddress?: string;
@@ -203,6 +231,52 @@ export async function getChatMessages(filters: {
   } catch {
     return [];
   }
+}
+
+export async function getChatConversationSummary(scope: ChatSummaryScope): Promise<string | null> {
+  try {
+    const scopeKey = getChatSummaryScopeKey(scope);
+    if (!scopeKey) return null;
+
+    const db = getClient();
+    const result = await db.execute({
+      sql: `SELECT summary FROM chat_conversation_summaries WHERE scope_key = ? LIMIT 1`,
+      args: [scopeKey],
+    });
+
+    const summary = String(result.rows[0]?.summary ?? "").trim();
+    return summary || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertChatConversationSummary(scope: ChatSummaryScope, summary: string): Promise<void> {
+  try {
+    const scopeKey = getChatSummaryScopeKey(scope);
+    const cleaned = summary.trim();
+    if (!scopeKey || !cleaned) return;
+
+    const db = getClient();
+    const conversationId = scope.conversationId?.trim() || null;
+    const walletAddress = scope.walletAddress?.trim()?.toLowerCase() || null;
+    const scopeType = conversationId ? "conversation" : "wallet";
+
+    await db.execute({
+      sql: `
+        INSERT INTO chat_conversation_summaries (scope_key, scope_type, conversation_id, wallet_address, chatbot_type, summary, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(scope_key) DO UPDATE SET
+          scope_type = excluded.scope_type,
+          conversation_id = excluded.conversation_id,
+          wallet_address = excluded.wallet_address,
+          chatbot_type = excluded.chatbot_type,
+          summary = excluded.summary,
+          updated_at = datetime('now')
+      `,
+      args: [scopeKey, scopeType, conversationId, walletAddress, scope.chatbotType, cleaned],
+    });
+  } catch { /* non-fatal */ }
 }
 
 export async function addWatchedWallet(address: string, label?: string, network?: string): Promise<void> {

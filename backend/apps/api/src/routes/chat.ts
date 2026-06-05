@@ -1,11 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { makeOk, makeErr, ChatRequestSchema, type Intent } from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
-import { detectIntent } from "../ai/intent-router.js";
-import { aiComplete, routeForIntent } from "../ai/providers.js";
-import { getChatMessages, logChatMessage } from "../db/sqlite.js";
+import { resolveIntent } from "../ai/intent-router.js";
+import { aiComplete, routeForIntent, type AIMessage } from "../ai/providers.js";
+import {
+  getChatMessages,
+  getChatConversationSummary,
+  logChatMessage,
+  upsertChatConversationSummary,
+} from "../db/sqlite.js";
 import { recordChatRequest, type MetricsProvider } from "../../../../dashboard/src/index.js";
-import { findToken, getTokenList, marketNetwork } from "@celomind/shared";
+import { getTokenList, marketNetwork } from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
 import {
   getCeloTokenPrice,
@@ -37,6 +42,7 @@ import { resolveNetwork } from "@celomind/shared";
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_RE = /0x[0-9a-fA-F]{40}/;
 const HASH_RE = /0x[0-9a-fA-F]{64}/;
+const CHAT_MEMORY_LIMIT = 8;
 
 function extractAddress(message: string, fallback?: string): string | undefined {
   return message.match(ADDRESS_RE)?.[0] ?? fallback;
@@ -99,6 +105,104 @@ function getX402Info(message: string) {
     detectedRequest: message,
     flow: ["Request gated resource", "Receive HTTP 402 payment requirements", "Review payment", "Confirm with wallet", "Retry request with proof"],
   };
+}
+
+export async function buildChatMemory(chatReq: { conversationId?: string; walletAddress?: string; chatbotType: string }): Promise<AIMessage[]> {
+  try {
+    const conversationId = chatReq.conversationId?.trim();
+    const walletAddress = chatReq.walletAddress?.trim();
+
+    if (!conversationId && !walletAddress) return [];
+
+    const messages = await getChatMessages({
+      conversationId: conversationId || undefined,
+      walletAddress: walletAddress || undefined,
+      chatbotType: chatReq.chatbotType,
+      limit: CHAT_MEMORY_LIMIT,
+    });
+
+    return messages
+      .reverse()
+      .filter((msg) => msg.role === "user" || msg.role === "assistant")
+      .map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function compactText(value: string, maxChars: number): string {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxChars) return cleaned;
+  return `${cleaned.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
+function buildSummaryFallback(previousSummary: string | null, recentTurns: AIMessage[], userMessage: string, assistantReply: string): string {
+  const parts: string[] = [];
+  if (previousSummary?.trim()) parts.push(previousSummary.trim());
+
+  const recent = recentTurns
+    .slice(-4)
+    .map((msg) => `${msg.role === "assistant" ? "Assistant" : "User"}: ${compactText(msg.content, 180)}`);
+
+  if (recent.length) {
+    parts.push(`Recent turns:\n${recent.join("\n")}`);
+  }
+
+  parts.push(`Latest user message: ${compactText(userMessage, 220)}`);
+  parts.push(`Latest assistant reply: ${compactText(assistantReply, 220)}`);
+
+  return compactText(parts.join("\n\n"), 1200);
+}
+
+async function refreshConversationSummary(
+  chatReq: { conversationId?: string; walletAddress?: string; chatbotType: string },
+  previousSummary: string | null,
+  recentTurns: AIMessage[],
+  userMessage: string,
+  assistantReply: string
+): Promise<void> {
+  const scope = {
+    conversationId: chatReq.conversationId,
+    walletAddress: chatReq.walletAddress,
+    chatbotType: chatReq.chatbotType,
+  };
+
+  const transcript = [
+    previousSummary?.trim() ? `Existing summary:\n${previousSummary.trim()}` : "Existing summary: (none)",
+    "Recent conversation turns:",
+    ...recentTurns.map((msg) => `${msg.role === "assistant" ? "Assistant" : "User"}: ${msg.content}`),
+    `User: ${userMessage}`,
+    `Assistant: ${assistantReply}`,
+  ].join("\n");
+
+  try {
+    const result = await aiComplete({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You maintain a compact long-term memory for a Celo blockchain chat assistant. Rewrite the conversation summary so it stays short, factual, and useful for future turns. Keep at most 5 bullet points or one short paragraph, under 900 characters if possible. Preserve durable facts like user goals, wallet addresses, token names, protocol names, amounts, and open questions. Drop filler, repetition, and chain-of-thought. Output only the updated summary.",
+        },
+        { role: "user", content: transcript },
+      ],
+      maxTokens: 180,
+      temperature: 0.1,
+    });
+
+    const summary = compactText(result.text, 1200);
+    if (summary) {
+      await upsertChatConversationSummary(scope, summary);
+      return;
+    }
+  } catch {
+    // Fall through to the deterministic summary below.
+  }
+
+  const fallbackSummary = buildSummaryFallback(previousSummary, recentTurns, userMessage, assistantReply);
+  await upsertChatConversationSummary(scope, fallbackSummary);
 }
 
 /** Unwrap a `{ items|result, source }` envelope (used by market/data intents) into payload + source. */
@@ -665,7 +769,8 @@ export async function chatRoutes(app: FastifyInstance) {
     }
 
     const chatReq = parsed.data;
-    const intent = detectIntent(chatReq.message, chatReq.chatbotType);
+    const resolved = resolveIntent(chatReq.message, chatReq.chatbotType);
+    const intent = resolved.intent;
 
     // Log user message (fire-and-forget — non-fatal)
     void logChatMessage({
@@ -677,20 +782,55 @@ export async function chatRoutes(app: FastifyInstance) {
       walletAddress: chatReq.walletAddress,
     });
 
-    // Fetch live data based on intent
-    const intentData = await fetchIntentData(intent, {
-      message: chatReq.message,
-      walletAddress: chatReq.walletAddress,
-      selectedTool: chatReq.selectedTool,
-    });
+    if (resolved.clarification) {
+      const reply = resolved.clarification;
+      void recordChatRequest({
+        chatbotType: chatReq.chatbotType,
+        intent,
+        provider: "fallback",
+        model: "clarification-rule",
+        fallback: true,
+        latencyMs: 0,
+        walletAddress: chatReq.walletAddress,
+        conversationId: chatReq.conversationId,
+      });
+      void logChatMessage({
+        conversationId: chatReq.conversationId,
+        chatbotType: chatReq.chatbotType,
+        role: "assistant",
+        content: reply,
+        intent,
+        walletAddress: chatReq.walletAddress,
+      });
+
+      return makeOk("chat", NETWORK, {
+        reply,
+        intent,
+        aiProvider: "fallback",
+        intentData: { clarification: reply },
+        conversationId: chatReq.conversationId,
+      }, { type: "result_card" });
+    }
+
+    const [conversationMemory, conversationSummary, intentData] = await Promise.all([
+      buildChatMemory(chatReq),
+      getChatConversationSummary(chatReq),
+      fetchIntentData(intent, {
+        message: chatReq.message,
+        walletAddress: chatReq.walletAddress,
+        selectedTool: chatReq.selectedTool,
+      }),
+    ]);
 
     // Build AI messages
     const systemPrompt = getSystemPrompt(chatReq.chatbotType, NETWORK);
+    const summaryBlock = conversationSummary
+      ? `\n\nLong-term conversation summary:\n${conversationSummary}\n\nUse this summary as durable context for the thread.`
+      : "";
     const contextBlock = intentData
       ? `\n\nLive Celo data for this request:\n${JSON.stringify(intentData, null, 2)}\n\nUse this data to answer the user's question accurately.`
       : "";
     const pageContext = chatReq.pageContext ? `\nUser is on page: ${chatReq.pageContext}` : "";
-
     let aiResponse: string;
     let aiProvider: string;
     let aiModel = "fallback";
@@ -701,7 +841,8 @@ export async function chatRoutes(app: FastifyInstance) {
       const route = routeForIntent(intent);
       const result = await aiComplete({
         messages: [
-          { role: "system", content: systemPrompt + contextBlock + pageContext },
+          { role: "system", content: systemPrompt + summaryBlock + contextBlock + pageContext },
+          ...conversationMemory,
           { role: "user", content: chatReq.message },
         ],
         maxTokens: 1024,
@@ -738,6 +879,8 @@ export async function chatRoutes(app: FastifyInstance) {
       intent,
       walletAddress: chatReq.walletAddress,
     });
+
+    void refreshConversationSummary(chatReq, conversationSummary, conversationMemory, chatReq.message, aiResponse);
 
     // Determine UI hint
     const uiHintMap: Record<string, NonNullable<ReturnType<typeof makeOk>>["uiHints"]> = {
