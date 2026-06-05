@@ -14,8 +14,53 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function applyTextNormalizations(message: string): string {
+  const replacements: Array<[RegExp, string]> = [
+    [/\bwhat['’]?s\b/gi, "what is"],
+    [/\bwho['’]?s\b/gi, "who is"],
+    [/\bwhere['’]?s\b/gi, "where is"],
+    [/\bwhen['’]?s\b/gi, "when is"],
+    [/\bhow['’]?s\b/gi, "how is"],
+    [/\bthat['’]?s\b/gi, "that is"],
+    [/\bthere['’]?s\b/gi, "there is"],
+    [/\bit['’]?s\b/gi, "it is"],
+    [/\bi['’]?m\b/gi, "i am"],
+    [/\bi['’]?ve\b/gi, "i have"],
+    [/\bi['’]?ll\b/gi, "i will"],
+    [/\byou['’]?re\b/gi, "you are"],
+    [/\bwe['’]?re\b/gi, "we are"],
+    [/\bthey['’]?re\b/gi, "they are"],
+    [/\bcan['’]?t\b/gi, "cannot"],
+    [/\bwon['’]?t\b/gi, "will not"],
+    [/\bdon['’]?t\b/gi, "do not"],
+    [/\bdoesn['’]?t\b/gi, "does not"],
+    [/\bdidn['’]?t\b/gi, "did not"],
+    [/\bisn['’]?t\b/gi, "is not"],
+    [/\baren['’]?t\b/gi, "are not"],
+    [/\bwasn['’]?t\b/gi, "was not"],
+    [/\bweren['’]?t\b/gi, "were not"],
+    [/\bshouldn['’]?t\b/gi, "should not"],
+    [/\bcouldn['’]?t\b/gi, "could not"],
+    [/\bwouldn['’]?t\b/gi, "would not"],
+    [/\bmustn['’]?t\b/gi, "must not"],
+    [/\bw\/\b/gi, "with"],
+    [/\bw\/o\b/gi, "without"],
+    [/\bnd\b/gi, "and"],
+    [/\bu\b/gi, "you"],
+    [/\bur\b/gi, "your"],
+    [/\bpls\b/gi, "please"],
+    [/\bplz\b/gi, "please"],
+  ];
+
+  let cleaned = message.replace(/[’]/g, "'");
+  for (const [pattern, replacement] of replacements) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+  return cleaned;
+}
+
 function normalizeMessage(message: string): string {
-  return message.replace(/\s+/g, " ").trim();
+  return applyTextNormalizations(message).replace(/\s+/g, " ").trim();
 }
 
 function extractKnownTokenSymbol(message: string): string | null {
@@ -49,6 +94,10 @@ function needsBestPoolClarification(message: string): boolean {
   return /\b(best pool|which pool|top pool)\b/i.test(message) && !/\b(tvl|volume|fee|apy|liquidity)\b/i.test(message);
 }
 
+function needsGasHistoryClarification(message: string): boolean {
+  return /\b(gas price history|gas history|historical gas|gas chart|gas over time|gas.*last\s+\d|gas.*week|gas.*month|gas.*year)\b/i.test(message);
+}
+
 function needsPriceHistoryClarification(message: string, tokenSymbol: string | null): boolean {
   return /\b(price history|price.*histor|historical price|price.*chart|price over time|price.*week|price.*month|price.*year|price.*last\s+\d)\b/i.test(message) && !tokenSymbol;
 }
@@ -65,11 +114,27 @@ function needsTokenClarification(message: string): boolean {
   return /\b(token info|tokenomics|token price|token balance|holder list|top holder|holder(s)? of|search.*token|find.*token|look.*up.*token)\b/i.test(message) && !hasTokenReference(message);
 }
 
+function needsWhaleTradeClarification(message: string): boolean {
+  return /\b(whale trade(s)?|detect whale|whale trade detection|whale trades? in|whale moves in|market-wide whale)\b/i.test(message) && !hasContractAddress(message);
+}
+
+function needsWhaleActivityClarification(message: string): boolean {
+  return /\b(whale activity|whale moves|whale transactions?|watch wallet|track wallet|whale wallet|wallet activity)\b/i.test(message) && !hasContractAddress(message);
+}
+
+function looksLikeWalletPortfolio(message: string): boolean {
+  return /\b(wallet holdings?|holdings? in my wallet|what tokens are in my wallet|show my wallet holdings|list my wallet holdings|what is in my wallet)\b/i.test(message);
+}
+
+function looksLikeTokenBalance(message: string, tokenSymbolLower: string | null): boolean {
+  return Boolean(tokenSymbolLower && tokenSymbolLower !== "celo") && /\b(how much|how many)\b/i.test(message) && /\b(do i have|do i own|do i hold|in my wallet|balance)\b/i.test(message);
+}
+
 const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "token_balance", patterns: [/\btoken balance\b/i, /\bcusd balance\b/i, /\bceur balance\b/i, /\bbalance of\b/i] },
   { intent: "balance", patterns: [/\bbalance\b/i, /\bhow much celo\b/i, /\bmy celo\b/i] },
   { intent: "send", patterns: [/\bsend\b.*\bcelo\b/i, /\btransfer\b/i, /\bpay\b.*\bwallet\b/i] },
-  { intent: "swap_quote", patterns: [/\bswap quote\b/i, /\bexchange rate\b/i, /\bhow much.*swap\b/i, /\bquote\b/i] },
+  { intent: "swap_quote", patterns: [/\bswap quote\b/i, /\bexchange rate\b/i, /\bhow much.*swap\b/i, /\bhow much would i get\b/i, /\bwhat would i get\b/i, /\bquote\b/i] },
   { intent: "swap_execute", patterns: [/\bswap\s+[\d.]+/i, /\bexchange\s+[\d.]+/i, /\btrade\s+[\d.]+/i] },
   { intent: "aave_supply", patterns: [/\bsupply to aave\b/i, /\baave supply\b/i, /\blend\b.*\baave\b/i, /\bdeposit\b.*\baave\b/i] },
   { intent: "aave_position", patterns: [/\baave position\b/i, /\blending position\b/i, /\bborrowings?\b/i, /\bsupplied\b/i, /\bhealth factor\b/i, /\bcollateral\b/i, /\bdebt\b/i] },
@@ -97,15 +162,15 @@ const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "token_price", patterns: [/\bprice of\b/i, /\btoken price\b/i, /\bcelo price\b/i, /\bcusd price\b/i] },
   { intent: "wallet_portfolio", patterns: [/\bportfolio\b/i, /\bmy tokens\b/i, /\bwallet tokens?\b/i, /\bholdings\b/i, /\bwhat do i hold\b/i, /\bwhat tokens do i have\b/i] },
   { intent: "recent_transactions", patterns: [/\brecent tx\b/i, /\btransaction history\b/i, /\blast.*transaction\b/i, /\bmy txs\b/i] },
-  { intent: "recent_launches", patterns: [/\bnew token\b/i, /\brecently launched\b/i, /\bnew project\b/i, /\bnew coin\b/i] },
+  { intent: "recent_launches", patterns: [/\bnew token\b/i, /\brecently launched\b/i, /\brecent launches\b/i, /\bnew tokens?\b/i, /\bnew project\b/i, /\bnew coin\b/i] },
   { intent: "malicious_tx_check", patterns: [/\bmalicious\b/i, /\bscam tx\b/i, /\bdangerous transaction\b/i, /\bcheck this tx\b/i] },
   { intent: "contract_risk", patterns: [/\bcontract risk\b/i, /\bcheck contract\b/i, /\bsafe contract\b/i, /\baudit\b/i] },
   { intent: "token_risk", patterns: [/\btoken risk\b/i, /\brug pull\b/i, /\bhoneypot\b/i, /\bsafe token\b/i] },
   { intent: "token_holders", patterns: [/\bholder(s)? of\b/i, /\bwho holds\b/i, /\bwho owns the most\b/i, /\btoken holder list\b/i, /\bholder list\b/i, /\bshow.*holder/i, /\btop holder.*of\b/i] },
   { intent: "nft_balances", patterns: [/\bnft\b/i, /\bcollectibl/i, /\bnon.fungible\b/i, /\berc.721\b/i, /\berc.1155\b/i, /\bmy.*nft\b/i, /\bnft.*balance\b/i, /\bnft.*wallet\b/i, /\bnft.*hold/i] },
   { intent: "wallet_stats", patterns: [/\bwallet (age|stats|statistics|info|summary)\b/i, /\bhow old is.*wallet\b/i, /\bwallet.*old\b/i, /\btx count\b/i, /\btransaction count\b/i, /\baccount age\b/i, /\bwallet.*active\b/i] },
-  { intent: "whale_activity", patterns: [/\bwhale activity\b/i, /\bwhale moves\b/i, /\bwhale transactions\b/i] },
-  { intent: "whale_watch", patterns: [/\bwhales?\b/i, /\bwatch wallet\b/i, /\btrack wallet\b/i, /\blarge holders?\b/i, /\btop holders?\b/i, /\bbiggest holders?\b/i] },
+  { intent: "whale_activity", patterns: [/\bwhale activity\b/i, /\bwhale moves\b/i, /\bwhale transactions\b/i, /\bwatch wallet\b/i, /\btrack wallet\b/i, /\bwhale wallet\b/i, /\bwallet activity\b/i] },
+  { intent: "whale_watch", patterns: [/\bwhales?\b/i, /\blarge holders?\b/i, /\btop holders?\b/i, /\bbiggest holders?\b/i, /\btop whales?\b/i, /\bwhale leaderboard\b/i, /\bwhale list\b/i] },
   { intent: "copy_wallet_analyze", patterns: [/\bcopy wallet\b/i, /\bmimic wallet\b/i, /\bfollow wallet\b/i, /\bcopy trader\b/i] },
   { intent: "copy_wallet_prepare", patterns: [/\bprepare copy\b/i, /\bcopy trade\b/i, /\bcopy.*portfolio\b/i] },
   { intent: "transaction_explain", patterns: [/\bexplain.*tx\b/i, /\bwhat is this transaction\b/i, /\bdecode tx\b/i] },
@@ -136,6 +201,10 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
     return { intent: "unsupported", clarification: "Do you mean the highest TVL pool, the highest volume pool, or the best fee tier?" };
   }
 
+  if (needsGasHistoryClarification(cleaned)) {
+    return { intent: "unsupported", clarification: "I can show the current Celo gas price, but I do not have historical gas charts yet." };
+  }
+
   if (needsPriceHistoryClarification(cleaned, tokenSymbol)) {
     return { intent: "unsupported", clarification: "Which token's price history do you want on Celo?" };
   }
@@ -152,7 +221,16 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
     return { intent: "unsupported", clarification: "Send the token symbol or contract address so I can fetch the right token." };
   }
 
-  if (/\bwhale activity\b/i.test(cleaned)) return { intent: "whale_activity" };
+  if (needsWhaleTradeClarification(cleaned)) {
+    return { intent: "unsupported", clarification: "I can show Whale Wallet Activity or the Whale Leaderboard, but I do not yet do market-wide whale trade detection." };
+  }
+
+  if (needsWhaleActivityClarification(cleaned)) {
+    return { intent: "unsupported", clarification: "Send the whale wallet address you want me to inspect, or ask for the Whale Leaderboard instead." };
+  }
+
+  if (looksLikeWalletPortfolio(cleaned)) return { intent: "wallet_portfolio" };
+  if (looksLikeTokenBalance(cleaned, tokenSymbolLower)) return { intent: "token_balance" };
 
   if (isAaveSupplyQuery(cleaned)) return { intent: "aave_supply" };
   if (isAavePositionQuery(cleaned)) return { intent: "aave_position" };
@@ -173,6 +251,10 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
     return { intent: "docs_explain" };
   }
 
+  if (/\bgas\b/i.test(cleaned) && /\b(price|fee|cost)\b/i.test(cleaned)) {
+    return { intent: "gas_price" };
+  }
+
   if (/\bprice\b/i.test(cleaned) && /\b(chart|histor|over time|week|month|year|last)\b/i.test(cleaned)) {
     return tokenSymbol ? { intent: "price_history" } : { intent: "unsupported", clarification: "Which token's price chart or history do you want?" };
   }
@@ -190,7 +272,6 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
     if (tokenSymbol) return { intent: "token_balance" };
     return { intent: "balance" };
   }
-
   if (/\bportfolio\b/i.test(cleaned)) return { intent: "wallet_portfolio" };
 
   if (tokenSymbol && tokenSymbolLower !== "celo" && /\b(what is|tell me about|token info|tokenomics|info on|details of)\b/i.test(cleaned)) {

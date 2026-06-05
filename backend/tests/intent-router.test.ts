@@ -18,8 +18,14 @@ describe("detectIntent", () => {
     expect(detectIntent("Show me trending tokens", "full")).toBe("market_trending");
   });
 
-  it("detects whale_watch intent", () => {
-    expect(detectIntent("Track this whale wallet", "full")).toBe("whale_watch");
+  it("asks for an address when a whale wallet is mentioned without one", () => {
+    const result = resolveIntent("Track this whale wallet", "full");
+    expect(result.intent).toBe("unsupported");
+    expect(result.clarification).toContain("wallet address");
+  });
+
+  it("detects whale_watch intent for top-whale queries", () => {
+    expect(detectIntent("Show top whales on Celo", "full")).toBe("whale_watch");
   });
 
   it("detects contract_risk intent", () => {
@@ -91,7 +97,13 @@ describe("detectIntent", () => {
   });
 
   it("routes whale activity queries to whale_activity", () => {
-    expect(detectIntent("Show whale activity", "full")).toBe("whale_activity");
+    const result = resolveIntent("Show whale activity", "full");
+    expect(result.intent).toBe("unsupported");
+    expect(result.clarification).toContain("wallet address");
+  });
+
+  it("detects whale_activity intent when a wallet address is included", () => {
+    expect(detectIntent("Show whale activity for 0x1234567890123456789012345678901234567890", "full")).toBe("whale_activity");
   });
 
   it("asks for pool metric clarification when best pool is ambiguous", () => {
@@ -104,6 +116,18 @@ describe("detectIntent", () => {
     const result = resolveIntent("price history", "full");
     expect(result.intent).toBe("unsupported");
     expect(result.clarification).toContain("Which token");
+  });
+
+  it("clarifies gas history requests instead of guessing current gas", () => {
+    const result = resolveIntent("Inspect Celo gas price history", "full");
+    expect(result.intent).toBe("unsupported");
+    expect(result.clarification).toContain("historical gas charts");
+  });
+
+  it("clarifies whale trade detection requests instead of guessing whale watch", () => {
+    const result = resolveIntent("Detect whale trades in past 24 hours", "full");
+    expect(result.intent).toBe("unsupported");
+    expect(result.clarification).toContain("market-wide whale trade detection");
   });
 
   it("asks for a tx hash when the request is missing one", () => {
@@ -121,5 +145,162 @@ describe("detectIntent", () => {
   it("landing chatbot blocks swap_execute", () => {
     // swap_execute now requires an amount (an actual command, not an explanation)
     expect(detectIntent("Swap 10 CELO for cUSD", "landing")).toBe("unsupported");
+  });
+});
+
+describe("quick action variants", () => {
+  const cases: Array<{
+    name: string;
+    intent: ReturnType<typeof detectIntent>;
+    variants: string[];
+  }> = [
+    {
+      name: "CELO balance",
+      intent: "balance",
+      variants: [
+        "What is my CELO balance?",
+        "Check my CELO balance",
+        "Show my CELO balance",
+        "How much CELO do I have?",
+        "View my CELO balance",
+      ],
+    },
+    {
+      name: "wallet portfolio",
+      intent: "wallet_portfolio",
+      variants: [
+        "Show my wallet portfolio",
+        "View my wallet portfolio",
+        "List my wallet holdings",
+        "What tokens are in my wallet?",
+        "What do I hold in this wallet?",
+      ],
+    },
+    {
+      name: "cUSD balance",
+      intent: "token_balance",
+      variants: [
+        "What is my cUSD balance?",
+        "Check my cUSD balance",
+        "Show my cUSD balance",
+        "How much cUSD do I have?",
+        "View my cUSD balance",
+      ],
+    },
+    {
+      name: "token price",
+      intent: "token_price",
+      variants: [
+        "What is the price of CELO?",
+        "Check the CELO price",
+        "Show cUSD price",
+        "What is the cEUR price?",
+        "Give me the USDC price",
+      ],
+    },
+    {
+      name: "trending tokens",
+      intent: "market_trending",
+      variants: [
+        "Show trending tokens on Celo",
+        "Show me trending tokens",
+        "What tokens are trending?",
+        "Show hot coins on Celo",
+        "List popular tokens",
+      ],
+    },
+    {
+      name: "recent launches",
+      intent: "recent_launches",
+      variants: [
+        "Show recently launched tokens on Celo",
+        "Show recent launches",
+        "What new tokens launched recently?",
+        "List recently launched tokens on Celo",
+        "Show new tokens on Celo",
+      ],
+    },
+    {
+      name: "whale leaderboard",
+      intent: "whale_watch",
+      variants: [
+        "Show the Whale Leaderboard on Celo",
+        "Show top whales on Celo",
+        "List top holders on Celo",
+        "Who are the biggest holders on Celo?",
+        "Whale leaderboard",
+      ],
+    },
+    {
+      name: "swap quote",
+      intent: "swap_quote",
+      variants: [
+        "Swap quote for 10 CELO to cUSD",
+        "Get swap quote for 10 CELO to cUSD",
+        "What is the quote for 10 CELO to cUSD?",
+        "How much would I get swapping 10 CELO?",
+        "Quote 10 CELO to cUSD",
+      ],
+    },
+    {
+      name: "swap execution",
+      intent: "swap_execute",
+      variants: [
+        "Swap 10 CELO for cUSD",
+        "Swap 2 CELO to cUSD",
+        "Trade 5 CELO for cUSD",
+        "Exchange 1 CELO for cUSD",
+        "Swap 0.5 CELO into cUSD",
+      ],
+    },
+    {
+      name: "send transfer",
+      intent: "send",
+      variants: [
+        "Transfer 1 CELO to 0xRecipientAddress",
+        "Send 1 CELO to 0xRecipientAddress",
+        "Transfer 1 CELO -> 0xRecipientAddress",
+        "Send 1 CELO to 0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+        "Transfer 0.5 CELO to 0xRecipientAddress",
+      ],
+    },
+    {
+      name: "contract risk",
+      intent: "contract_risk",
+      variants: [
+        "Check contract risk for 0x471EcE3750Da237f93B8E339c536989b8978a438",
+        "Audit contract risk for 0x471EcE3750Da237f93B8E339c536989b8978a438",
+        "Audit 0x471EcE3750Da237f93B8E339c536989b8978a438",
+        "Check contract 0x471EcE3750Da237f93B8E339c536989b8978a438",
+        "Audit contract for 0x471EcE3750Da237f93B8E339c536989b8978a438",
+      ],
+    },
+    {
+      name: "gas price",
+      intent: "gas_price",
+      variants: [
+        "What is the current Celo gas price?",
+        "Check current gas price",
+        "Show current gas price",
+        "How much is gas right now on Celo?",
+        "What's the gas price on Celo?",
+      ],
+    },
+  ];
+
+  it.each(cases)("$name stays on the intended route across common phrasings", ({ intent, variants }) => {
+    for (const variant of variants) {
+      expect(detectIntent(variant, "full")).toBe(intent);
+    }
+  });
+});
+
+describe("text normalization", () => {
+  it("handles contractions and shorthand before routing", () => {
+    expect(detectIntent("What's my CELO balance?", "full")).toBe("balance");
+    expect(detectIntent("What's my cUSD balance?", "full")).toBe("token_balance");
+    expect(detectIntent("What's cUSD?", "full")).toBe("token_info");
+    expect(detectIntent("What's the current Celo gas price?", "full")).toBe("gas_price");
+    expect(detectIntent("What would I get if I swapped 10 CELO nd cUSD?", "full")).toBe("swap_quote");
   });
 });

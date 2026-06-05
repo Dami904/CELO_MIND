@@ -207,8 +207,17 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
     }
     case "token_price": {
       const p = payload as Record<string, unknown>;
-      const fmt = (x: unknown) => (isObj(x) && "usd" in x ? `$${(x as Record<string, unknown>).usd}` : String(x ?? "?"));
-      return { title: "Token Prices", data: rowsFrom([["CELO", fmt(p?.CELO), "green"], ["cUSD", fmt(p?.cUSD), "green"]]) };
+      const fmt = (x: unknown) => {
+        if (isObj(x) && typeof x.usd === "number") {
+          const change = typeof x.usd_24h_change === "number" ? ` (${x.usd_24h_change >= 0 ? "+" : ""}${x.usd_24h_change.toFixed(2)}% 24h)` : "";
+          return `$${x.usd.toFixed(6)}${change}`;
+        }
+        return null;
+      };
+      const entries = Object.entries(p).filter(([, value]) => isObj(value) || value === null);
+      if (!entries.length) return undefined;
+      const rows = rowsFrom(entries.map(([label, value]) => [label, fmt(value) ?? "Unavailable", "green"] as [string, unknown, CardColor?]));
+      return { title: entries.length === 1 ? `${entries[0][0]} Price` : "Token Prices", data: rows };
     }
     case "market_trending":
     case "recent_launches": {
@@ -282,7 +291,7 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
         const items = payload.slice(0, 10);
         if (!items.length) return undefined;
         return {
-          title: "Top Celo Whales",
+          title: "Whale Leaderboard",
           data: items.map((it, i) => {
             const w = it as Record<string, unknown>;
             const addrRaw =
@@ -295,7 +304,7 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
       }
       const w = intentData as Record<string, unknown>;
       return {
-        title: "Whale Activity",
+        title: "Whale Wallet Activity",
         data: rowsFrom([
           ["Wallet", short(w?.address as string)],
           ["Native balance", w?.nativeBalance ? `${w.nativeBalance} CELO` : undefined],

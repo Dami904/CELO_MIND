@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { makeOk, makeErr, ChatRequestSchema, type Intent } from "@celomind/shared";
+import { makeOk, makeErr, ChatRequestSchema, type Intent, getTokenList, resolveNetwork } from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
 import { resolveIntent } from "../ai/intent-router.js";
 import { aiComplete, routeForIntent, type AIMessage } from "../ai/providers.js";
@@ -10,7 +10,7 @@ import {
   upsertChatConversationSummary,
 } from "../db/sqlite.js";
 import { recordChatRequest, type MetricsProvider } from "../../../../dashboard/src/index.js";
-import { getTokenList, marketNetwork } from "@celomind/shared";
+import { marketNetwork } from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
 import {
   getCeloTokenPrice,
@@ -38,7 +38,6 @@ import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-serve
 import { prepareTransfer, parseSendRequest } from "@celomind/mcp-server/transfer";
 import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
 
-import { resolveNetwork } from "@celomind/shared";
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_RE = /0x[0-9a-fA-F]{40}/;
 const HASH_RE = /0x[0-9a-fA-F]{64}/;
@@ -51,6 +50,22 @@ function extractAddress(message: string, fallback?: string): string | undefined 
 function extractTwoAddresses(message: string, fallback?: string): [string | undefined, string | undefined] {
   const matches = message.match(new RegExp(ADDRESS_RE.source, "g")) ?? [];
   return [matches[0] ?? fallback, matches[1] ?? fallback];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function resolveMentionedToken(message: string, network = NETWORK) {
+  const tokens = Object.values(getTokenList(network));
+  return tokens.find((token) => {
+    const candidates = [token.symbol, token.name, token.coingeckoId?.replace(/-/g, " "), token.address].filter(Boolean) as string[];
+    return candidates.some((candidate) => new RegExp(`\\b${escapeRegExp(candidate)}\\b`, "i").test(message));
+  });
 }
 
 /** Loosely extract a payment "{amount} {TOKEN} ... 0x{recipient}" from free text (used by x402). */
@@ -245,8 +260,21 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
         return `${i + 1}. ${pool.name ?? pool.symbol ?? "Unknown pool"}${pool.priceUsd ? ` at $${pool.priceUsd}` : ""}${pool.poolCreatedAt ? `, created ${pool.poolCreatedAt}` : ""}`;
       }), srcLine("GeckoTerminal")].join("\n");
     }
-    case "token_price":
-      return `Live token prices from ${source ?? "CoinGecko"}:\n${JSON.stringify(payload, null, 2)}`;
+    case "token_price": {
+      const entries = isRecord(payload) ? Object.entries(payload) : [];
+      if (!entries.length) return `Live token prices from ${source ?? "CoinGecko"} are currently unavailable.`;
+      const lines = entries.map(([label, value]) => {
+        const price = value as { usd?: number; usd_24h_change?: number } | null;
+        if (price && typeof price.usd === "number") {
+          const change = typeof price.usd_24h_change === "number"
+            ? ` (${price.usd_24h_change >= 0 ? "+" : ""}${price.usd_24h_change.toFixed(2)}% 24h)`
+            : "";
+          return `${label}: $${price.usd.toFixed(6)}${change}`;
+        }
+        return `${label}: unavailable`;
+      });
+      return `Live token prices from ${source ?? "CoinGecko"}:\n${lines.join("\n")}`;
+    }
     case "token_info": {
       const t = payload as { symbol?: string; name?: string; usdPrice?: string | null; holdersCount?: string | null; circulatingMarketCap?: string | null };
       return `${t.name ?? "Token"} (${t.symbol ?? "?"})${t.usdPrice ? ` — $${t.usdPrice}` : ""}${t.holdersCount ? `, ${Number(t.holdersCount).toLocaleString()} holders` : ""}${t.circulatingMarketCap ? `, market cap $${Number(t.circulatingMarketCap).toLocaleString()}` : ""}.\n${srcLine("Blockscout")}`;
@@ -293,9 +321,9 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       const { payload, source } = unwrapEnvelope(data);
       if (Array.isArray(payload)) {
         const items = payload.slice(0, 10);
-        if (!items.length) return "I couldn't fetch the Celo whale leaderboard right now.";
+        if (!items.length) return "I couldn't fetch the Whale Leaderboard right now.";
         return [
-          "Top Celo whales:",
+          "Whale Leaderboard:",
           ...items.map((it, i) => {
             const w = it as Record<string, unknown>;
             const addr =
@@ -308,7 +336,7 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
         ].join("\n");
       }
       const whale = payload as { address?: string; nativeBalance?: string; txCount?: number; label?: string };
-      return `Whale wallet activity from Blockscout:\nWallet: ${whale.address ?? "unknown"}${whale.label ? ` (${whale.label})` : ""}\nNative balance: ${whale.nativeBalance ?? "0"} CELO\nRecent transaction count fetched: ${whale.txCount ?? 0}`;
+      return `Whale Wallet Activity from Blockscout:\nWallet: ${whale.address ?? "unknown"}${whale.label ? ` (${whale.label})` : ""}\nNative balance: ${whale.nativeBalance ?? "0"} CELO\nRecent transaction count fetched: ${whale.txCount ?? 0}`;
     }
     case "copy_wallet_analyze":
     case "copy_wallet_prepare": {
@@ -504,9 +532,26 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_price": {
-        const celoPrice = await getCeloTokenPrice("celo");
-        const cUSDPrice = await getCeloTokenPrice("celo-dollar");
-        return { result: { CELO: celoPrice, cUSD: cUSDPrice }, source: "CoinGecko" };
+        const mentioned = resolveMentionedToken(req.message, net);
+        if (mentioned?.coingeckoId) {
+          const price = await getCeloTokenPrice(mentioned.coingeckoId);
+          return {
+            result: { [mentioned.symbol]: price },
+            source: "CoinGecko",
+            note: !price ? `Live price data for ${mentioned.symbol} is unavailable right now.` : undefined,
+          };
+        }
+
+        const supported = Object.values(getTokenList(net)).filter((token) => token.coingeckoId);
+        const prices = await Promise.all(
+          supported.map(async (token) => [token.symbol, await getCeloTokenPrice(token.coingeckoId as string)] as const)
+        );
+        const result = Object.fromEntries(prices);
+        return {
+          result,
+          source: "CoinGecko",
+          note: Object.values(result).every((price) => !price) ? "Live token price data is unavailable right now." : undefined,
+        };
       }
 
       case "market_trending": {
@@ -591,14 +636,15 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return getX402Info(req.message);
       }
 
-      case "whale_watch":
-      case "whale_activity": {
-        const address = extractAddress(req.message, wa);
-        // A specific address → that wallet's activity. No address (e.g. "top whales on Celo")
-        // → the network-wide whale leaderboard (Dune, falling back to top cUSD holders on Blockscout).
-        if (address) return await getWhaleWalletActivity(address, marketNetwork());
+      case "whale_watch": {
         const top = await getTopCeloWhales();
         return { items: top.data, source: top.source };
+      }
+
+      case "whale_activity": {
+        const address = extractAddress(req.message, wa);
+        if (!address) return { note: "Send the whale wallet address you want me to inspect, or ask for top whale wallets instead." };
+        return await getWhaleWalletActivity(address, marketNetwork());
       }
 
       case "contract_risk": {
@@ -669,10 +715,16 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         const days = /(\d+)\s*day/i.test(msg)
           ? parseInt(msg.match(/(\d+)\s*day/i)?.[1] ?? "7", 10)
           : /month/i.test(msg) ? 30 : /year/i.test(msg) ? 365 : /week/i.test(msg) ? 7 : 7;
-        const id = /cusd|celo.dollar/i.test(msg) ? "celo-dollar"
-          : /ceur|celo.euro/i.test(msg) ? "celo-euro" : "celo";
-        const r = await getCeloPriceHistory(id, days);
-        return { items: r.data, source: r.source, period: `${days} days`, token: id };
+        const token = resolveMentionedToken(req.message, net);
+        if (!token?.coingeckoId) {
+          return {
+            note: token
+              ? `${token.symbol} does not have historical price data configured yet.`
+              : "Which token's price history do you want?",
+          };
+        }
+        const r = await getCeloPriceHistory(token.coingeckoId, days);
+        return { items: r.data, source: r.source, period: `${days} days`, token: token.symbol };
       }
 
       case "top_pools": {

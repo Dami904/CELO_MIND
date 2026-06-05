@@ -22,29 +22,29 @@ type SlashCommand = {
 
 const SLASH_COMMANDS: SlashCommand[] = [
   // Wallet
-  { cmd: "/balance", label: "CELO balance", desc: "Native CELO balance for your wallet", template: "Check my CELO balance", group: "Wallet" },
-  { cmd: "/portfolio", label: "Portfolio", desc: "All token holdings in your wallet", template: "Show my wallet portfolio", group: "Wallet" },
-  { cmd: "/transactions", label: "Recent transactions", desc: "Your latest on-chain activity", template: "Show my recent transactions", group: "Wallet" },
-  { cmd: "/token-balance", label: "Token balance", desc: "Balance of a specific token", template: "What is my cUSD balance?", group: "Wallet" },
+  { cmd: "/balance", label: "Check CELO balance", desc: "See your native CELO balance", template: "What is my CELO balance?", group: "Wallet" },
+  { cmd: "/portfolio", label: "View wallet portfolio", desc: "See all token holdings in your wallet", template: "Show my wallet portfolio", group: "Wallet" },
+  { cmd: "/transactions", label: "View recent transactions", desc: "See your latest on-chain activity", template: "Show my recent transactions", group: "Wallet" },
+  { cmd: "/token-balance", label: "Check token balance", desc: "Check a specific token balance", template: "What is my cUSD balance?", group: "Wallet" },
   // Market
-  { cmd: "/price", label: "Token price", desc: "Live price of a Celo token", template: "What is the price of CELO?", group: "Market" },
-  { cmd: "/trending", label: "Trending tokens", desc: "Hottest tokens on Celo right now", template: "Show trending tokens on Celo", group: "Market" },
-  { cmd: "/launches", label: "New launches", desc: "Recently launched Celo tokens", template: "Show recently launched tokens on Celo", group: "Market" },
-  { cmd: "/whales", label: "Top whales", desc: "Largest holders / whale moves", template: "List the top 10 whales on Celo in the last 24 hours", group: "Market" },
+  { cmd: "/price", label: "Check token price", desc: "See the live price of a Celo token", template: "What is the price of CELO?", group: "Market" },
+  { cmd: "/trending", label: "Show trending tokens", desc: "See the hottest tokens on Celo right now", template: "Show trending tokens on Celo", group: "Market" },
+  { cmd: "/launches", label: "Show recent launches", desc: "See recently launched Celo tokens", template: "Show recently launched tokens on Celo", group: "Market" },
+  { cmd: "/whales", label: "Whale leaderboard", desc: "Top whale wallets on Celo", template: "Show the Whale Leaderboard on Celo", group: "Market" },
   // DeFi
-  { cmd: "/swap", label: "Swap tokens", desc: "Build a swap transaction", template: "Swap 10 CELO for cUSD", group: "DeFi" },
-  { cmd: "/quote", label: "Swap quote", desc: "Price quote without executing", template: "Swap quote for 10 CELO to cUSD", group: "DeFi" },
-  { cmd: "/send", label: "Send CELO", desc: "Transfer CELO to an address", template: "Send 1 CELO to 0x", group: "DeFi" },
-  { cmd: "/aave", label: "Aave position", desc: "Your lending / borrowing position", template: "Check my Aave position", group: "DeFi" },
+  { cmd: "/swap", label: "Prepare swap", desc: "Build a swap transaction", template: "Swap 10 CELO for cUSD", group: "DeFi" },
+  { cmd: "/quote", label: "Get swap quote", desc: "Get a price quote without executing", template: "Swap quote for 10 CELO to cUSD", group: "DeFi" },
+  { cmd: "/send", label: "Send CELO", desc: "Transfer CELO to an address", template: "Send 1 CELO to 0x71C7656EC7ab88b098defB751B7401B5f6d8976F", group: "DeFi" },
+  { cmd: "/aave", label: "Check Aave position", desc: "See your lending / borrowing position", template: "Check my Aave position", group: "DeFi" },
   // Security
-  { cmd: "/contract-risk", label: "Audit contract", desc: "Risk check on a contract address", template: "Check contract risk for 0x", group: "Security" },
-  { cmd: "/token-risk", label: "Token safety", desc: "Rug-pull / honeypot screen", template: "Is this token safe? 0x", group: "Security" },
-  { cmd: "/tx-check", label: "Inspect transaction", desc: "Screen a tx for malicious activity", template: "Check this transaction for malicious activity: 0x", group: "Security" },
+  { cmd: "/contract-risk", label: "Check contract risk", desc: "Run a risk check on a contract address", template: "Check contract risk for 0x471EcE3750Da237f93B8E339c536989b8978a438", group: "Security" },
+  { cmd: "/token-risk", label: "Check token safety", desc: "Screen a token for rug-pull or honeypot risk", template: "Is this token safe? 0x765DE816845861e75A25fCA122bb6898B8B1282a", group: "Security" },
+  { cmd: "/tx-check", label: "Inspect transaction", desc: "Screen a transaction for malicious activity", template: "Check this transaction for malicious activity: 0x", group: "Security" },
   { cmd: "/copy-wallet", label: "Analyze wallet", desc: "Copy-trade analysis of a wallet", template: "Analyze copy-trading strategy for wallet 0x", group: "Security" },
   // Learn
   { cmd: "/explain", label: "Explain a concept", desc: "Learn any Celo / DeFi topic", template: "Explain how Mento stablecoins work", group: "Learn" },
-  { cmd: "/verify", label: "Self verification", desc: "Verify identity with Self", template: "How do I verify my identity with Self?", group: "Learn" },
-  { cmd: "/mcp", label: "MCP setup", desc: "Connect the CeloMind MCP server", template: "How do I set up the CeloMind MCP server?", group: "Learn" },
+  { cmd: "/verify", label: "Verify with Self", desc: "Verify identity with Self", template: "How do I verify my identity with Self?", group: "Learn" },
+  { cmd: "/mcp", label: "Set up MCP", desc: "Connect the CeloMind MCP server", template: "How do I set up the CeloMind MCP server?", group: "Learn" },
 ];
 
 interface Message {
@@ -240,19 +240,19 @@ export default function ChatPage() {
 
   const sidebarActions = {
     wallet: [
-      { label: "Check CELO Balance", cmd: "Check CELO Balance" },
-      { label: "Get ERC20 Allowances", cmd: "Get ERC20 Allowances for Ubeswap Router" },
-      { label: "View Token Holdings", cmd: "View current token holdings" }
+      { label: "Check CELO balance", cmd: "What is my CELO balance?" },
+      { label: "View wallet portfolio", cmd: "Show my wallet portfolio" },
+      { label: "Check cUSD balance", cmd: "What is my cUSD balance?" }
     ],
     defi: [
       { label: "Swap 10 CELO for cUSD", cmd: "Swap 10 CELO for cUSD" },
-      { label: "Transfer 1 CELO", cmd: "Transfer 1 CELO to 0x71C7656EC7ab88b098defB751B7401B5f6d8976F" },
-      { label: "Approve Ubeswap", cmd: "Approve Ubeswap to spend 100 cUSD" }
+      { label: "Transfer 1 CELO to 0x...", cmd: "Transfer 1 CELO to 0xRecipientAddress" },
+      { label: "Get swap quote", cmd: "Swap quote for 10 CELO to cUSD" }
     ],
     analysis: [
-      { label: "Detect Whale Trades", cmd: "Detect Whale Trades in past 24 hours" },
-      { label: "Audit Target Contract", cmd: "Audit contract address 0x471EcE3750Da237f93B8E33BCEF3C9e9790a400f" },
-      { label: "Inspect Gas History", cmd: "Inspect Celo gas price history" }
+      { label: "Show Whale Leaderboard", cmd: "Show the Whale Leaderboard on Celo" },
+      { label: "Check contract risk for 0x...", cmd: "Check contract risk for 0xContractAddress" },
+      { label: "Check current gas price", cmd: "What is the current Celo gas price?" }
     ]
   };
 
