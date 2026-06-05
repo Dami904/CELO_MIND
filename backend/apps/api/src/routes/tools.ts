@@ -1,6 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { buildDocsContextAsync } from "@celomind/docs-knowledge";
-import { makeOk, makeErr, ToolRunRequestSchema, findTokenAsync, resolveNetwork } from "@celomind/shared";
+import {
+  CeloPreparedSwapParamsSchema,
+  CeloSwapQuoteParamsSchema,
+  CeloTransferParamsSchema,
+  makeOk,
+  makeErr,
+  ToolRunRequestSchema,
+  findTokenAsync,
+  resolveNetwork,
+} from "@celomind/shared";
 import { getNativeBalance, getTokenBalance } from "@celomind/mcp-server/celo-client";
 import {
   getCeloRecentTransactions,
@@ -30,7 +39,14 @@ function confirmationData(tool: string, params: Record<string, unknown>) {
 }
 
 async function swapQuoteData(params: Record<string, unknown>) {
-  const quote = await getSwapQuote(String(params.fromToken ?? ""), String(params.toToken ?? ""), String(params.amount ?? ""), NETWORK);
+  const parsed = CeloSwapQuoteParamsSchema.safeParse({
+    fromToken: params.fromToken,
+    toToken: params.toToken,
+    amount: params.amount,
+    network: NETWORK,
+  });
+  if (!parsed.success) return { status: "invalid_params", message: parsed.error.issues[0]?.message ?? "Invalid swap quote request." };
+  const quote = await getSwapQuote(parsed.data.fromToken, parsed.data.toToken, parsed.data.amount, parsed.data.network);
   if ("error" in quote) return { status: "no_quote", message: quote.error };
   return quote;
 }
@@ -38,13 +54,22 @@ async function swapQuoteData(params: Record<string, unknown>) {
 async function prepareSwapTx(params: Record<string, unknown>, walletAddress?: string) {
   const owner = (params.walletAddress as string) ?? walletAddress;
   if (!owner) return { status: "needs_wallet", message: "Provide walletAddress to prepare a signable swap." };
+  const parsed = CeloPreparedSwapParamsSchema.safeParse({
+    fromToken: params.fromToken,
+    toToken: params.toToken,
+    amount: params.amount,
+    walletAddress: owner,
+    slippageBps: params.slippageBps,
+    network: NETWORK,
+  });
+  if (!parsed.success) return { status: "invalid_params", message: parsed.error.issues[0]?.message ?? "Invalid swap request." };
   const prepared = await prepareSwap(
-    String(params.fromToken ?? ""),
-    String(params.toToken ?? ""),
-    String(params.amount ?? ""),
-    owner,
-    Number(params.slippageBps ?? 50),
-    NETWORK
+    parsed.data.fromToken,
+    parsed.data.toToken,
+    parsed.data.amount,
+    parsed.data.walletAddress,
+    parsed.data.slippageBps,
+    parsed.data.network
   );
   if ("error" in prepared) return { status: "no_quote", message: prepared.error };
   return prepared;
@@ -144,8 +169,18 @@ export async function toolRoutes(app: FastifyInstance) {
           data = await prepareSwapTx(params, walletAddress);
           break;
         case "celo_send": {
-          const to = (params.to as string) ?? "";
-          const prepared = await prepareTransfer(to, String(params.amount ?? ""), String(params.tokenSymbolOrAddress ?? params.token ?? "CELO"), net);
+          const parsedTransfer = CeloTransferParamsSchema.safeParse({
+            to: params.to,
+            amount: params.amount,
+            tokenSymbolOrAddress: params.tokenSymbolOrAddress ?? params.token ?? "CELO",
+            network: net,
+          });
+          if (!parsedTransfer.success) {
+            data = { status: "invalid_params", message: parsedTransfer.error.issues[0]?.message ?? "Invalid transfer request." };
+            break;
+          }
+          const transfer = parsedTransfer.data;
+          const prepared = await prepareTransfer(transfer.to, transfer.amount, transfer.tokenSymbolOrAddress, transfer.network);
           data = "error" in prepared ? { status: "no_quote", message: prepared.error } : prepared;
           break;
         }
@@ -156,9 +191,25 @@ export async function toolRoutes(app: FastifyInstance) {
           data = "error" in prepared ? { status: "no_quote", message: prepared.error } : prepared;
           break;
         }
-        case "celo_swap_execute":
-          data = confirmationData(tool, params);
+        case "celo_swap_execute": {
+          const owner = (params.walletAddress as string) ?? walletAddress;
+          if (!owner) {
+            data = { status: "needs_wallet", message: "Provide walletAddress to prepare a signable swap." };
+            break;
+          }
+          const parsedSwap = CeloPreparedSwapParamsSchema.safeParse({
+            fromToken: params.fromToken,
+            toToken: params.toToken,
+            amount: params.amount,
+            walletAddress: owner,
+            slippageBps: params.slippageBps,
+            network: net,
+          });
+          data = parsedSwap.success
+            ? confirmationData(tool, parsedSwap.data)
+            : { status: "invalid_params", message: parsedSwap.error.issues[0]?.message ?? "Invalid swap request." };
           break;
+        }
         case "celo_aave_position": {
           const addr = (params.walletAddress as string) ?? walletAddress;
           if (!addr) { data = aavePositionData(undefined); break; }

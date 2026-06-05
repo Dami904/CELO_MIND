@@ -10,7 +10,7 @@
  * Execute (agent/MCP mode only): sends the prepared txs with CELO_PRIVATE_KEY.
  */
 import { encodeFunctionData, parseUnits, formatUnits, type Address } from "viem";
-import { findTokenAsync, type Network } from "@celomind/shared";
+import { CeloPreparedSwapParamsSchema, CeloSwapQuoteParamsSchema, findTokenAsync, type Network } from "@celomind/shared";
 import { getPublicClient, getWalletClient } from "./celo-client.js";
 import { getMentoQuote, encodeMentoSwap, MENTO_BROKER, type MentoQuote } from "./mento.js";
 import { getCeloTokenPrice } from "./market.js";
@@ -176,23 +176,27 @@ async function priceImpact(
 
 /** Best-execution quote across Uniswap V3 + Mento, with a price-impact loss guard. */
 export async function getSwapQuote(fromSym: string, toSym: string, amount: string, network: Network = "celo"): Promise<SwapQuote | SwapError> {
-  const [fromTok, toTok] = await Promise.all([findTokenAsync(fromSym, network), findTokenAsync(toSym, network)]);
+  const parsed = CeloSwapQuoteParamsSchema.safeParse({ fromToken: fromSym, toToken: toSym, amount, network });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid swap quote request." };
+  const swap = parsed.data;
+
+  const [fromTok, toTok] = await Promise.all([findTokenAsync(swap.fromToken, swap.network), findTokenAsync(swap.toToken, swap.network)]);
   if (!fromTok) return { error: `Could not resolve token "${fromSym}".` };
   if (!toTok) return { error: `Could not resolve token "${toSym}".` };
   if (fromTok.address.toLowerCase() === toTok.address.toLowerCase()) return { error: "Cannot swap a token for itself." };
 
   let amountIn: bigint;
   try {
-    amountIn = parseUnits(amount, fromTok.decimals);
+    amountIn = parseUnits(swap.amount, fromTok.decimals);
   } catch {
-    return { error: `Invalid amount "${amount}".` };
+    return { error: `Invalid amount "${swap.amount}".` };
   }
   if (amountIn <= 0n) return { error: "Amount must be greater than 0." };
 
   // Quote both venues in parallel.
   const [uni, mento] = await Promise.all([
-    bestUniswap(fromTok.address, toTok.address, amountIn, network),
-    getMentoQuote(fromTok.address, toTok.address, amountIn, network),
+    bestUniswap(fromTok.address, toTok.address, amountIn, swap.network),
+    getMentoQuote(fromTok.address, toTok.address, amountIn, swap.network),
   ]);
 
   // Pick the venue with the higher output.
@@ -212,7 +216,7 @@ export async function getSwapQuote(fromSym: string, toSym: string, amount: strin
     return { error: `No swap route found for ${fromTok.symbol} → ${toTok.symbol} on Uniswap V3 or Mento.` };
   }
 
-  const impact = await priceImpact(route, fromTok.address, toTok.address, amountIn, amountOut, fromTok.decimals, toTok.decimals, network, uniFee);
+  const impact = await priceImpact(route, fromTok.address, toTok.address, amountIn, amountOut, fromTok.decimals, toTok.decimals, swap.network, uniFee);
   if (impact > HARD_IMPACT) {
     return {
       error: `Refusing to quote ${fromTok.symbol} → ${toTok.symbol}: price impact ~${(impact * 100).toFixed(1)}% (limit ${(HARD_IMPACT * 100).toFixed(0)}%). Liquidity is too thin — you'd swap at a significant loss.`,
@@ -220,7 +224,7 @@ export async function getSwapQuote(fromSym: string, toSym: string, amount: strin
   }
 
   const amountOutStr = formatUnits(amountOut, toTok.decimals);
-  const execRate = Number(amountOutStr) / Number(amount);
+  const execRate = Number(amountOutStr) / Number(swap.amount);
 
   // Reference-price cross-check (CoinGecko) — catches a venue that's uniformly mispriced, which the
   // within-venue impact check can't see. Only possible when both tokens have a known price feed.
@@ -246,7 +250,7 @@ export async function getSwapQuote(fromSym: string, toSym: string, amount: strin
     toAddress: toTok.address,
     fromDecimals: fromTok.decimals,
     toDecimals: toTok.decimals,
-    amountIn: amount,
+    amountIn: swap.amount,
     amountInRaw: amountIn.toString(),
     amountOut: amountOutStr,
     amountOutRaw: amountOut.toString(),
@@ -274,30 +278,34 @@ export async function prepareSwap(
   slippageBps = 50,
   network: Network = "celo"
 ): Promise<PreparedSwap | SwapError> {
-  const quote = await getSwapQuote(fromSym, toSym, amount, network);
+  const parsed = CeloPreparedSwapParamsSchema.safeParse({ fromToken: fromSym, toToken: toSym, amount, walletAddress, slippageBps, network });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid swap request." };
+  const swap = parsed.data;
+
+  const quote = await getSwapQuote(swap.fromToken, swap.toToken, swap.amount, swap.network);
   if ("error" in quote) return quote;
 
   // Output-token risk screen — don't let a user unknowingly swap INTO a scam/honeypot token.
-  const risk = await checkTokenRisk(quote.toAddress, network).catch(() => null);
+  const risk = await checkTokenRisk(quote.toAddress, swap.network).catch(() => null);
   const outputTokenRisk = risk ? { level: risk.riskLevel, score: risk.riskScore, flags: risk.flags } : undefined;
   const riskWarning = risk && (risk.riskLevel === "high" || risk.riskLevel === "critical")
     ? `⚠ Destination token ${quote.toToken} looks ${risk.riskLevel} risk: ${risk.flags.slice(0, 2).join("; ")}.`
     : undefined;
 
   const amountInRaw = BigInt(quote.amountInRaw);
-  const minOut = (BigInt(quote.amountOutRaw) * BigInt(10000 - slippageBps)) / 10000n;
+  const minOut = (BigInt(quote.amountOutRaw) * BigInt(10000 - swap.slippageBps)) / 10000n;
   const spender = (quote.route === "Mento" ? MENTO_BROKER : UNISWAP_V3.swapRouter02) as Address;
   const transactions: PreparedTx[] = [];
 
   // Approval only if allowance is short.
   let needsApproval = true;
   try {
-    const client = getPublicClient(network);
+    const client = getPublicClient(swap.network);
     const allowance = (await client.readContract({
       address: quote.fromAddress as Address,
       abi: ERC20_ABI,
       functionName: "allowance",
-      args: [walletAddress as Address, spender],
+      args: [swap.walletAddress as Address, spender],
     })) as bigint;
     needsApproval = allowance < amountInRaw;
   } catch {
@@ -309,7 +317,7 @@ export async function prepareSwap(
       to: quote.fromAddress,
       data: encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [spender, amountInRaw] }),
       value: "0",
-      description: `Approve ${quote.route} to spend ${amount} ${quote.fromToken}`,
+      description: `Approve ${quote.route} to spend ${swap.amount} ${quote.fromToken}`,
     });
   }
 
@@ -335,7 +343,7 @@ export async function prepareSwap(
           tokenIn: quote.fromAddress as Address,
           tokenOut: quote.toAddress as Address,
           fee: quote.feeTier!,
-          recipient: walletAddress as Address,
+          recipient: swap.walletAddress as Address,
           amountIn: amountInRaw,
           amountOutMinimum: minOut,
           sqrtPriceLimitX96: 0n,
@@ -348,12 +356,12 @@ export async function prepareSwap(
     to: swapTo,
     data: swapData,
     value: "0",
-    description: `Swap ${amount} ${quote.fromToken} → ~${quote.amountOut} ${quote.toToken} via ${quote.route} (min ${formatUnits(minOut, quote.toDecimals)})`,
+    description: `Swap ${swap.amount} ${quote.fromToken} → ~${quote.amountOut} ${quote.toToken} via ${quote.route} (min ${formatUnits(minOut, quote.toDecimals)})`,
   });
 
   return {
     quote,
-    slippageBps,
+    slippageBps: swap.slippageBps,
     minAmountOut: formatUnits(minOut, quote.toDecimals),
     transactions,
     status: "prepared_for_review",

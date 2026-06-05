@@ -7,11 +7,11 @@
  */
 import type { FastifyInstance } from "fastify";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "@celomind/mcp-server/tools";
 
-type Session = { server: Server; transport: StreamableHTTPServerTransport };
+type Session = { server: McpServer; transport: StreamableHTTPServerTransport };
 
 // Session map — lives for the lifetime of this process.
 const sessions = new Map<string, Session>();

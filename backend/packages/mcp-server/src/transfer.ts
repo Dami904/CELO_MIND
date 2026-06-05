@@ -3,7 +3,7 @@
  * "send 5 cUSD to 0x…" → a signable transaction. The backend never holds the key (dashboard mode).
  */
 import { encodeFunctionData, parseEther, parseUnits, type Address } from "viem";
-import { findTokenAsync, type Network } from "@celomind/shared";
+import { CeloTransferParamsSchema, findTokenAsync, type Network } from "@celomind/shared";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -32,31 +32,34 @@ export async function prepareTransfer(
   tokenSymbolOrAddress: string,
   network: Network = "celo"
 ): Promise<PreparedTransfer | TransferError> {
-  if (!ADDRESS_RE.test(toAddress)) return { error: "Invalid recipient address (must be 0x + 40 hex)." };
+  const parsed = CeloTransferParamsSchema.safeParse({ to: toAddress, amount, tokenSymbolOrAddress, network });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid transfer request." };
+  const transfer = parsed.data;
+  if (!ADDRESS_RE.test(transfer.to)) return { error: "Invalid recipient address (must be 0x + 40 hex)." };
 
   const base = {
-    to: toAddress,
-    amount,
+    to: transfer.to,
+    amount: transfer.amount,
     status: "prepared_for_review" as const,
     warning: "Review and sign this in your wallet. The backend does not move funds.",
     source: "Celo RPC",
   };
 
   // Native CELO transfer
-  if (tokenSymbolOrAddress.toUpperCase() === "CELO") {
+  if (transfer.tokenSymbolOrAddress === "CELO") {
     let value: bigint;
-    try { value = parseEther(amount); } catch { return { error: `Invalid amount "${amount}".` }; }
+    try { value = parseEther(transfer.amount); } catch { return { error: `Invalid amount "${transfer.amount}".` }; }
     if (value <= 0n) return { error: "Amount must be greater than 0." };
-    return { type: "transfer", token: "CELO", tokenAddress: "native", isNative: true, transaction: { to: toAddress, data: "0x", value: value.toString() }, ...base };
+    return { type: "transfer", token: "CELO", tokenAddress: "native", isNative: true, transaction: { to: transfer.to, data: "0x", value: value.toString() }, ...base };
   }
 
   // ERC-20 transfer
-  const token = await findTokenAsync(tokenSymbolOrAddress, network);
-  if (!token) return { error: `Unknown token "${tokenSymbolOrAddress}".` };
+  const token = await findTokenAsync(transfer.tokenSymbolOrAddress, transfer.network);
+  if (!token) return { error: `Unknown token "${transfer.tokenSymbolOrAddress}".` };
   let raw: bigint;
-  try { raw = parseUnits(amount, token.decimals); } catch { return { error: `Invalid amount "${amount}".` }; }
+  try { raw = parseUnits(transfer.amount, token.decimals); } catch { return { error: `Invalid amount "${transfer.amount}".` }; }
   if (raw <= 0n) return { error: "Amount must be greater than 0." };
-  const data = encodeFunctionData({ abi: ERC20_TRANSFER_ABI, functionName: "transfer", args: [toAddress as Address, raw] });
+  const data = encodeFunctionData({ abi: ERC20_TRANSFER_ABI, functionName: "transfer", args: [transfer.to as Address, raw] });
   return { type: "transfer", token: token.symbol, tokenAddress: token.address, isNative: false, transaction: { to: token.address, data, value: "0" }, ...base };
 }
 

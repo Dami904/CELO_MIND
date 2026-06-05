@@ -1,7 +1,17 @@
 import type { FastifyInstance } from "fastify";
-import { makeOk, makeErr, ChatRequestSchema, type Intent, getTokenList, resolveNetwork } from "@celomind/shared";
+import {
+  CeloPreparedSwapParamsSchema,
+  CeloSwapQuoteParamsSchema,
+  CeloTransferParamsSchema,
+  makeOk,
+  makeErr,
+  ChatRequestSchema,
+  type Intent,
+  getTokenList,
+  resolveNetwork,
+} from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
-import { resolveIntent } from "../ai/intent-router.js";
+import { planChatTool } from "../ai/tool-planner.js";
 import { aiComplete, routeForIntent, type AIMessage } from "../ai/providers.js";
 import {
   getChatMessages,
@@ -68,6 +78,24 @@ function resolveMentionedToken(message: string, network = NETWORK) {
   });
 }
 
+function resolveTokenInput(input: unknown, message: string, network = NETWORK) {
+  if (typeof input === "string" && input.trim()) {
+    const wanted = input.trim().toLowerCase();
+    const tokens = Object.values(getTokenList(network));
+    const found = tokens.find((token) =>
+      token.symbol.toLowerCase() === wanted ||
+      token.name.toLowerCase() === wanted ||
+      token.address.toLowerCase() === wanted
+    );
+    if (found) return found;
+  }
+  return resolveMentionedToken(message, network);
+}
+
+function plannedTokenArg(args?: Record<string, unknown>) {
+  return args?.tokenSymbolOrAddress ?? args?.tokenSymbol ?? args?.token;
+}
+
 /** Loosely extract a payment "{amount} {TOKEN} ... 0x{recipient}" from free text (used by x402). */
 function parsePayment(message: string): { amount: string; token: string; to: string } | null {
   const to = message.match(ADDRESS_RE)?.[0];
@@ -79,7 +107,9 @@ function parsePayment(message: string): { amount: string; token: string; to: str
 async function swapQuoteData(message: string) {
   const parsed = parseSwapRequest(message);
   if (!parsed) return { note: "Tell me the amount and tokens, e.g. \"swap 3 USDT to CELO\"." };
-  const quote = await getSwapQuote(parsed.fromToken, parsed.toToken, parsed.amount);
+  const strict = CeloSwapQuoteParamsSchema.safeParse({ ...parsed, network: marketNetwork() });
+  if (!strict.success) return { note: strict.error.issues[0]?.message ?? "Invalid swap quote request." };
+  const quote = await getSwapQuote(strict.data.fromToken, strict.data.toToken, strict.data.amount, strict.data.network);
   if ("error" in quote) return { note: quote.error };
   return { result: quote, source: quote.source };
 }
@@ -511,7 +541,7 @@ When "Live Celo data for this request" is provided below, treat it as current an
 }
 
 // ─── Intent data fetcher ──────────────────────────────────────────────────────
-async function fetchIntentData(intent: Intent, req: { message: string; walletAddress?: string; selectedTool?: string }) {
+async function fetchIntentData(intent: Intent, req: { message: string; walletAddress?: string; selectedTool?: string; toolArgs?: Record<string, unknown> }) {
   const net = NETWORK;
   const wa = req.walletAddress;
 
@@ -523,6 +553,12 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
 
       case "token_balance": {
         if (!wa) return { note: "No wallet address provided." };
+        const requestedToken = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
+        if (requestedToken) {
+          if (requestedToken.symbol === "CELO") return await getNativeBalance(wa, net);
+          const balance = await getTokenBalance(wa, requestedToken.address, net);
+          return { items: [{ ...requestedToken, ...balance }], source: "Celo RPC", requestedToken: requestedToken.symbol };
+        }
         const tokenSymbols = Object.values(getTokenList(net));
         const balances = await Promise.allSettled(
           tokenSymbols.map((t) => getTokenBalance(wa, t.address, net).then((b) => ({ ...t, ...b })))
@@ -532,7 +568,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_price": {
-        const mentioned = resolveMentionedToken(req.message, net);
+        const mentioned = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
         if (mentioned?.coingeckoId) {
           const price = await getCeloTokenPrice(mentioned.coingeckoId);
           return {
@@ -574,7 +610,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_info": {
-        const address = extractAddress(req.message, req.selectedTool);
+        const address = String(req.toolArgs?.address ?? req.toolArgs?.tokenAddress ?? req.selectedTool ?? extractAddress(req.message) ?? "");
         if (!address) return { note: "Provide a Celo token contract address to fetch token info." };
         const r = await getCeloTokenInfo(address, marketNetwork());
         return r ? { result: r.data, source: r.source } : { note: "No token info found for that address." };
@@ -607,6 +643,15 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return { context: await buildDocsContextAsync("Claude Desktop MCP server setup") };
 
       case "swap_quote":
+        const fromToken = req.toolArgs?.fromToken ?? req.toolArgs?.tokenIn;
+        const toToken = req.toolArgs?.toToken ?? req.toolArgs?.tokenOut;
+        const amount = req.toolArgs?.amount ?? req.toolArgs?.amountIn;
+        if (fromToken && toToken && amount) {
+          const strict = CeloSwapQuoteParamsSchema.safeParse({ fromToken, toToken, amount });
+          if (!strict.success) return { note: strict.error.issues[0]?.message ?? "Invalid swap quote request." };
+          const quote = await getSwapQuote(strict.data.fromToken, strict.data.toToken, strict.data.amount, strict.data.network);
+          return "error" in quote ? { note: quote.error } : { result: quote, source: quote.source };
+        }
         return await swapQuoteData(req.message);
 
       case "aave_position": {
@@ -630,7 +675,15 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         // amount + token + recipient, prepare it; otherwise explain the flow.
         const pay = parsePayment(req.message);
         if (pay) {
-          const prepared = await prepareTransfer(pay.to, pay.amount, pay.token, marketNetwork());
+          const strict = CeloTransferParamsSchema.safeParse({
+            to: pay.to,
+            amount: pay.amount,
+            tokenSymbolOrAddress: pay.token,
+            network: marketNetwork(),
+          });
+          if (!strict.success) return { note: strict.error.issues[0]?.message ?? "Invalid x402 payment request." };
+          const transfer = strict.data;
+          const prepared = await prepareTransfer(transfer.to, transfer.amount, transfer.tokenSymbolOrAddress, transfer.network);
           if (!("error" in prepared)) return { ...prepared, protocol: "x402", requires_confirmation: true };
         }
         return getX402Info(req.message);
@@ -642,22 +695,22 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "whale_activity": {
-        const address = extractAddress(req.message, wa);
+        const address = String(req.toolArgs?.address ?? extractAddress(req.message, wa) ?? "");
         if (!address) return { note: "Send the whale wallet address you want me to inspect, or ask for top whale wallets instead." };
         return await getWhaleWalletActivity(address, marketNetwork());
       }
 
       case "contract_risk": {
         // Try to extract address from message
-        const match = req.message.match(/0x[0-9a-fA-F]{40}/);
-        if (!match) return { note: "Provide a contract address (0x...) in your message." };
-        return await checkContractRisk(match[0], marketNetwork());
+        const address = String(req.toolArgs?.contractAddress ?? req.toolArgs?.address ?? extractAddress(req.message) ?? "");
+        if (!address) return { note: "Provide a contract address (0x...) in your message." };
+        return await checkContractRisk(address, marketNetwork());
       }
 
       case "token_risk": {
-        const match = req.message.match(/0x[0-9a-fA-F]{40}/);
-        if (!match) return { note: "Provide a token address (0x...) in your message." };
-        return await checkTokenRisk(match[0], marketNetwork());
+        const address = String(req.toolArgs?.tokenAddress ?? req.toolArgs?.address ?? extractAddress(req.message) ?? "");
+        if (!address) return { note: "Provide a token address (0x...) in your message." };
+        return await checkTokenRisk(address, marketNetwork());
       }
 
       case "malicious_tx_check":
@@ -715,7 +768,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         const days = /(\d+)\s*day/i.test(msg)
           ? parseInt(msg.match(/(\d+)\s*day/i)?.[1] ?? "7", 10)
           : /month/i.test(msg) ? 30 : /year/i.test(msg) ? 365 : /week/i.test(msg) ? 7 : 7;
-        const token = resolveMentionedToken(req.message, net);
+        const token = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
         if (!token?.coingeckoId) {
           return {
             note: token
@@ -743,7 +796,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_holders": {
-        const address = extractAddress(req.message);
+        const address = String(req.toolArgs?.tokenAddress ?? req.toolArgs?.address ?? extractAddress(req.message) ?? "");
         if (!address) return { note: "Provide a token contract address (0x…) to see its top holders." };
         const [info, holders] = await Promise.allSettled([
           getCeloTokenInfo(address, marketNetwork()),
@@ -776,18 +829,47 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "swap_execute": {
-        const parsed = parseSwapRequest(req.message);
+        const fromToken = req.toolArgs?.fromToken ?? req.toolArgs?.tokenIn;
+        const toToken = req.toolArgs?.toToken ?? req.toolArgs?.tokenOut;
+        const amount = req.toolArgs?.amount ?? req.toolArgs?.amountIn;
+        const parsed = fromToken && toToken && amount
+          ? { fromToken: String(fromToken), toToken: String(toToken), amount: String(amount) }
+          : parseSwapRequest(req.message);
         if (!parsed) return { note: "Tell me the amount and tokens, e.g. \"swap 3 USDT to CELO\"." };
         if (!wa) return { note: "Connect your wallet first — I prepare the swap, your wallet signs it." };
-        const prepared = await prepareSwap(parsed.fromToken, parsed.toToken, parsed.amount, wa);
+        const strict = CeloPreparedSwapParamsSchema.safeParse({
+          fromToken: parsed.fromToken,
+          toToken: parsed.toToken,
+          amount: parsed.amount,
+          walletAddress: wa,
+          network: marketNetwork(),
+        });
+        if (!strict.success) return { note: strict.error.issues[0]?.message ?? "Invalid swap request." };
+        const swap = strict.data;
+        const prepared = await prepareSwap(swap.fromToken, swap.toToken, swap.amount, swap.walletAddress, swap.slippageBps, swap.network);
         if ("error" in prepared) return { note: prepared.error };
         return { ...prepared, requires_confirmation: true };
       }
 
       case "send": {
-        const parsed = parseSendRequest(req.message);
+        const to = req.toolArgs?.to ?? req.toolArgs?.recipientAddress;
+        const parsed = to && req.toolArgs?.amount
+          ? {
+              to: String(to),
+              amount: String(req.toolArgs.amount),
+              token: String(plannedTokenArg(req.toolArgs) ?? "CELO"),
+            }
+          : parseSendRequest(req.message);
         if (!parsed) return { note: "Tell me the amount, token, and recipient, e.g. \"send 5 cUSD to 0x…\"." };
-        const prepared = await prepareTransfer(parsed.to, parsed.amount, parsed.token, marketNetwork());
+        const strict = CeloTransferParamsSchema.safeParse({
+          to: parsed.to,
+          amount: parsed.amount,
+          tokenSymbolOrAddress: parsed.token,
+          network: marketNetwork(),
+        });
+        if (!strict.success) return { note: strict.error.issues[0]?.message ?? "Invalid transfer request." };
+        const transfer = strict.data;
+        const prepared = await prepareTransfer(transfer.to, transfer.amount, transfer.tokenSymbolOrAddress, transfer.network);
         if ("error" in prepared) return { note: prepared.error };
         return { ...prepared, requires_confirmation: true };
       }
@@ -821,8 +903,18 @@ export async function chatRoutes(app: FastifyInstance) {
     }
 
     const chatReq = parsed.data;
-    const resolved = resolveIntent(chatReq.message, chatReq.chatbotType);
-    const intent = resolved.intent;
+    const [conversationMemory, conversationSummary] = await Promise.all([
+      buildChatMemory(chatReq),
+      getChatConversationSummary(chatReq),
+    ]);
+    const planned = await planChatTool({
+      message: chatReq.message,
+      chatbotType: chatReq.chatbotType,
+      walletAddress: chatReq.walletAddress,
+      conversationSummary,
+      conversationMemory,
+    });
+    const intent = planned.intent;
 
     // Log user message (fire-and-forget — non-fatal)
     void logChatMessage({
@@ -834,14 +926,14 @@ export async function chatRoutes(app: FastifyInstance) {
       walletAddress: chatReq.walletAddress,
     });
 
-    if (resolved.clarification) {
-      const reply = resolved.clarification;
+    if (planned.clarification) {
+      const reply = planned.clarification;
       void recordChatRequest({
         chatbotType: chatReq.chatbotType,
         intent,
-        provider: "fallback",
-        model: "clarification-rule",
-        fallback: true,
+        provider: (planned.plannerProvider as MetricsProvider | undefined) ?? "fallback",
+        model: planned.plannerModel ?? "clarification-rule",
+        fallback: planned.source !== "ai_tool_planner",
         latencyMs: 0,
         walletAddress: chatReq.walletAddress,
         conversationId: chatReq.conversationId,
@@ -858,21 +950,19 @@ export async function chatRoutes(app: FastifyInstance) {
       return makeOk("chat", NETWORK, {
         reply,
         intent,
-        aiProvider: "fallback",
-        intentData: { clarification: reply },
+        aiProvider: planned.plannerProvider ?? "fallback",
+        plannerSource: planned.source,
+        intentData: { clarification: reply, toolArgs: planned.args },
         conversationId: chatReq.conversationId,
       }, { type: "result_card" });
     }
 
-    const [conversationMemory, conversationSummary, intentData] = await Promise.all([
-      buildChatMemory(chatReq),
-      getChatConversationSummary(chatReq),
-      fetchIntentData(intent, {
-        message: chatReq.message,
-        walletAddress: chatReq.walletAddress,
-        selectedTool: chatReq.selectedTool,
-      }),
-    ]);
+    const intentData = await fetchIntentData(intent, {
+      message: chatReq.message,
+      walletAddress: chatReq.walletAddress,
+      selectedTool: chatReq.selectedTool,
+      toolArgs: planned.args,
+    });
 
     // Build AI messages
     const systemPrompt = getSystemPrompt(chatReq.chatbotType, NETWORK);
@@ -979,6 +1069,8 @@ export async function chatRoutes(app: FastifyInstance) {
       reply: aiResponse,
       intent,
       aiProvider,
+      plannerSource: planned.source,
+      toolArgs: planned.args,
       intentData,
       conversationId: chatReq.conversationId,
     }, uiHintMap[intent] ?? { type: "result_card" });

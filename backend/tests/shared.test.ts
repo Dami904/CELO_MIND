@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { ChatRequestSchema, RiskCheckRequestSchema, WalletAddressSchema, makeOk, makeErr, findToken, getTokenList, NETWORKS } from "../packages/shared/src/index.js";
+import {
+  CeloPreparedSwapParamsSchema,
+  CeloSwapQuoteParamsSchema,
+  CeloTransferParamsSchema,
+  ChatRequestSchema,
+  RiskCheckRequestSchema,
+  WalletAddressSchema,
+  makeOk,
+  makeErr,
+  findToken,
+  getTokenList,
+  NETWORKS,
+} from "../packages/shared/src/index.js";
 
 describe("WalletAddressSchema", () => {
   it("accepts a valid address", () => {
@@ -64,6 +76,89 @@ describe("RiskCheckRequestSchema", () => {
     const result = RiskCheckRequestSchema.safeParse({ type: "token", target: "0x123" });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.network).toBe("celo");
+  });
+});
+
+describe("Celo action schemas", () => {
+  it("canonicalizes transfer token symbols and numeric amounts", () => {
+    const result = CeloTransferParamsSchema.safeParse({
+      to: "0x1234567890123456789012345678901234567890",
+      amount: 1.5,
+      tokenSymbolOrAddress: "cusd",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.amount).toBe("1.5");
+      expect(result.data.tokenSymbolOrAddress).toBe("cUSD");
+      expect(result.data.network).toBe("celo");
+    }
+  });
+
+  it("rejects placeholder or malformed transfer recipients", () => {
+    const result = CeloTransferParamsSchema.safeParse({
+      to: "0xRecipientAddress",
+      amount: "1",
+      tokenSymbolOrAddress: "CELO",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsupported transfer tokens", () => {
+    const result = CeloTransferParamsSchema.safeParse({
+      to: "0x1234567890123456789012345678901234567890",
+      amount: "1",
+      tokenSymbolOrAddress: "DOGE",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("validates and canonicalizes swap quote parameters", () => {
+    const result = CeloSwapQuoteParamsSchema.safeParse({
+      fromToken: "celo",
+      toToken: "CUSD",
+      amount: "10",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.fromToken).toBe("CELO");
+      expect(result.data.toToken).toBe("cUSD");
+    }
+  });
+
+  it("defaults prepared swap slippage to 50 bps", () => {
+    const result = CeloPreparedSwapParamsSchema.safeParse({
+      fromToken: "CELO",
+      toToken: "cUSD",
+      amount: "10",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slippageBps).toBe(50);
+  });
+
+  it("rejects unsafe swap slippage", () => {
+    const tooLow = CeloPreparedSwapParamsSchema.safeParse({
+      fromToken: "CELO",
+      toToken: "cUSD",
+      amount: "10",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      slippageBps: 0,
+    });
+    const tooHigh = CeloPreparedSwapParamsSchema.safeParse({
+      fromToken: "CELO",
+      toToken: "cUSD",
+      amount: "10",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      slippageBps: 501,
+    });
+
+    expect(tooLow.success).toBe(false);
+    expect(tooHigh.success).toBe(false);
   });
 });
 

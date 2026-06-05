@@ -81,6 +81,73 @@ export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
 // ─── Wallet / Balance ─────────────────────────────────────────────────────────
 export const WalletAddressSchema = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Invalid EVM address");
+export const CeloNetworkSchema = z.literal("celo");
+
+const SUPPORTED_CELO_TOKEN_SYMBOLS = ["CELO", "cUSD", "cEUR", "cREAL", "USDC", "USDT", "WBTC"] as const;
+
+function canonicalCeloTokenSymbol(value: string): (typeof SUPPORTED_CELO_TOKEN_SYMBOLS)[number] | null {
+  const normalized = value.trim().toLowerCase();
+  return SUPPORTED_CELO_TOKEN_SYMBOLS.find((symbol) => symbol.toLowerCase() === normalized) ?? null;
+}
+
+export const SupportedCeloTokenSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : value),
+  z.string().min(1, "Token is required")
+).transform((value, ctx) => {
+  const canonical = canonicalCeloTokenSymbol(value);
+  if (!canonical) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Unsupported token. Use one of: ${SUPPORTED_CELO_TOKEN_SYMBOLS.join(", ")}`,
+    });
+    return z.NEVER;
+  }
+  return canonical;
+});
+
+export const HumanAmountSchema = z.preprocess(
+  (value) => (typeof value === "number" && Number.isFinite(value) ? String(value) : value),
+  z.string()
+    .trim()
+    .regex(/^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/, "Amount must be a positive decimal number")
+    .refine((value) => Number(value) > 0, "Amount must be greater than zero")
+    .refine((value) => Number(value) <= 1_000_000_000_000, "Amount is above the safety maximum")
+);
+
+export const SwapSlippageBpsSchema = z.preprocess(
+  (value) => (value == null ? undefined : Number(value)),
+  z.number().int().min(10, "Slippage cannot be lower than 0.1%").max(500, "Slippage exceeds safety maximum of 5.0%").default(50)
+);
+
+export const CeloTransferParamsSchema = z.object({
+  to: WalletAddressSchema,
+  amount: HumanAmountSchema,
+  tokenSymbolOrAddress: SupportedCeloTokenSchema.optional(),
+  token: SupportedCeloTokenSchema.optional(),
+  network: CeloNetworkSchema.default("celo"),
+  reference: z.string().trim().max(120).optional(),
+}).strict().transform((value) => ({
+  ...value,
+  tokenSymbolOrAddress: value.tokenSymbolOrAddress ?? value.token ?? "CELO",
+}));
+
+const CeloSwapQuoteParamsBaseSchema = z.object({
+  fromToken: SupportedCeloTokenSchema,
+  toToken: SupportedCeloTokenSchema,
+  amount: HumanAmountSchema,
+  network: CeloNetworkSchema.default("celo"),
+});
+
+export const CeloSwapQuoteParamsSchema = CeloSwapQuoteParamsBaseSchema.strict();
+
+export const CeloPreparedSwapParamsSchema = CeloSwapQuoteParamsBaseSchema.extend({
+  walletAddress: WalletAddressSchema,
+  slippageBps: SwapSlippageBpsSchema,
+}).strict();
+
+export type CeloTransferParams = z.infer<typeof CeloTransferParamsSchema>;
+export type CeloSwapQuoteParams = z.infer<typeof CeloSwapQuoteParamsSchema>;
+export type CeloPreparedSwapParams = z.infer<typeof CeloPreparedSwapParamsSchema>;
 
 export const BalanceSchema = z.object({
   symbol: z.string(),
