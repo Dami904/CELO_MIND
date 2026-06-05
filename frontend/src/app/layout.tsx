@@ -24,7 +24,7 @@ export default function RootLayout({
         <Web3ModalProvider>
           <div
             id="cm-root"
-            className="w-full h-full flex flex-col md:h-auto md:max-w-6xl md:min-h-[680px] bg-dark text-text border-0 md:border border-border rounded-none md:rounded-2xl overflow-hidden shadow-none md:shadow-[0_0_50px_rgba(0,0,0,0.85)]"
+            className="w-full h-full flex flex-col md:h-[calc(100vh-48px)] md:max-w-6xl md:min-h-[680px] bg-dark text-text border-0 md:border border-border rounded-none md:rounded-2xl overflow-hidden shadow-none md:shadow-[0_0_50px_rgba(0,0,0,0.85)]"
           >
             <Navbar />
             {/* overflow-y-auto (not overflow-hidden) so landing/dashboard can page-scroll

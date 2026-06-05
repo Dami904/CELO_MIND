@@ -372,6 +372,17 @@ export default function ChatPage() {
       ? "New Session"
       : `Restored ${activeConversationId.slice(0, 8)}`;
 
+  const handleNewSession = () => {
+    const newId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    setActiveConversationId(newId);
+    setMessages([WELCOME]);
+    setInputText("");
+    setIsTyping(false);
+    setIsConfirmOpen(false);
+    setPendingTxData(null);
+    try { localStorage.setItem("celomind:conversationId", newId); } catch { /* ignore */ }
+  };
+
   const restoreThread = (thread: HistoryThread) => {
     setSelectedThreadKey(thread.key);
     setActiveConversationId(thread.conversationId ?? initialConversationId);
@@ -601,8 +612,20 @@ export default function ChatPage() {
       )}
 
       {/* Left Sidebar (220px) — hidden on mobile; presets move to a scroll strip below the header */}
-      <aside className="hidden md:flex w-[220px] bg-surface border-r border-border flex-col overflow-y-auto shrink-0 select-none custom-scroll">
-        
+      <aside className="hidden md:flex w-[220px] bg-surface border-r border-border flex-col shrink-0 select-none overflow-hidden">
+        {/* New Chat button — always visible at the top of the sidebar */}
+        <div className="shrink-0 p-3 border-b border-border2">
+          <button
+            type="button"
+            onClick={handleNewSession}
+            className="w-full flex items-center justify-center gap-1.5 bg-cy/10 border border-cy/40 hover:bg-cy/20 hover:border-cy text-cy px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors press"
+          >
+            <span className="text-sm leading-none">+</span> New Chat
+          </button>
+        </div>
+
+        {/* Scrollable preset area — only this scrolls, not the new-chat button */}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scroll">
         {/* Wallet & Balances preset */}
         <div className="p-4 border-b border-border2">
           <span className="block text-[10px] text-muted font-mono uppercase tracking-wider mb-2.5 font-bold">Wallet & Balances</span>
@@ -650,6 +673,7 @@ export default function ChatPage() {
             ))}
           </div>
         </div>
+        </div> {/* end scrollable preset area */}
 
       </aside>
 
@@ -677,14 +701,28 @@ export default function ChatPage() {
               <span className="pulse-green"></span>
               Agent Ready
             </div>
-            <div className="hidden sm:flex items-center border border-border2 bg-dark/40 px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-cy">
-              {activeConversationLabel}
-            </div>
+            <button
+              type="button"
+              onClick={handleNewSession}
+              title="Start a new chat session"
+              className="hidden sm:flex items-center gap-1 border border-cy/40 bg-cy/10 hover:bg-cy/20 hover:border-cy px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-cy transition-colors press"
+            >
+              <span className="text-base leading-none font-bold">+</span>
+              {activeConversationLabel === "New Session" ? "New Chat" : "New Chat"}
+            </button>
           </div>
         </div>
 
         {/* Mobile quick actions (the sidebar is hidden on small screens) */}
         <div className="md:hidden flex gap-1.5 overflow-x-auto px-4 py-2 border-b border-border2 bg-surface/30 shrink-0 custom-scroll">
+          {/* New Chat — always first on mobile */}
+          <button
+            type="button"
+            onClick={handleNewSession}
+            className="shrink-0 bg-cy/10 border border-cy/40 hover:border-cy text-cy px-2.5 py-1 text-[10px] font-mono font-bold whitespace-nowrap transition-colors press"
+          >
+            + New Chat
+          </button>
           {[...sidebarActions.wallet, ...sidebarActions.defi, ...sidebarActions.analysis].map((act) => (
             <button
               key={act.label}
