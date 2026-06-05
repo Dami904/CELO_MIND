@@ -20,8 +20,15 @@
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "^20.14.0",
     "typescript": "^5.4.5",
-    "vitest": "^1.6.0",
-    "@types/node": "^20.14.0"
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "@ai-sdk/cohere": "^3.0.36",
+    "@ai-sdk/google": "^3.0.80",
+    "@ai-sdk/groq": "^3.0.39",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
+    "ai": "^6.0.197"
   }
 }
