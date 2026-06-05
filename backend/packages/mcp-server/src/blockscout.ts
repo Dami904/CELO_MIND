@@ -110,8 +110,8 @@ function usdValue(raw: string, decimals: number, rate: string | null): string | 
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-export async function getTokenBalancesV2(address: string, network: Network): Promise<TokenBalanceV2[]> {
-  return cached(`bs:v2:balances:${network}:${address.toLowerCase()}`, 60, async () => {
+export async function getTokenBalancesV2(address: string, network: Network, forceRefresh = false): Promise<TokenBalanceV2[]> {
+  const fetcher = async () => {
     const items = await fetchJson<RawTokenBalance[]>(`${v2Base(network)}/addresses/${address}/token-balances`);
     if (!Array.isArray(items)) return [];
     return items
@@ -132,7 +132,10 @@ export async function getTokenBalancesV2(address: string, network: Network): Pro
           iconUrl: i.token.icon_url,
         };
       });
-  });
+  };
+
+  if (forceRefresh) return fetcher();
+  return cached(`bs:v2:balances:${network}:${address.toLowerCase()}`, 60, fetcher);
 }
 
 export async function getAddressV2(address: string, network: Network): Promise<AddressInfoV2> {
