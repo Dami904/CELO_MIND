@@ -108,22 +108,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
 
-    Promise.all([
-      apiGet<DashboardMetrics>("/api/dashboard/metrics"),
-      apiGet<MetricsOverview>("/api/metrics/overview"),
-      apiGet<MetricsTools>("/api/metrics/tools"),
-    ]).then(([nextMetrics, nextOverview, nextTools]) => {
-      if (!active) return;
-      setMetrics(nextMetrics);
-      setOverview(nextOverview);
-      setTools(nextTools);
-      setLoading(false);
-    });
+    function fetchMetrics() {
+      setLoading(true);
+      Promise.all([
+        apiGet<DashboardMetrics>("/api/dashboard/metrics"),
+        apiGet<MetricsOverview>("/api/metrics/overview"),
+        apiGet<MetricsTools>("/api/metrics/tools"),
+      ]).then(([nextMetrics, nextOverview, nextTools]) => {
+        if (!active) return;
+        setMetrics(nextMetrics);
+        setOverview(nextOverview);
+        setTools(nextTools);
+        setLoading(false);
+      });
+    }
+
+    fetchMetrics();
+    // Refresh price/TVL/activity every 60 s while the dashboard is open.
+    const id = setInterval(fetchMetrics, 60_000);
 
     return () => {
       active = false;
+      clearInterval(id);
     };
   }, []);
 
