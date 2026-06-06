@@ -3,15 +3,6 @@
 import React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-export interface ConfirmModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  title: string;
-  data: { label: string; value: string }[];
-  isSubmitting?: boolean;
-}
-
 export default function ConfirmModal({
   isOpen,
   onClose,
@@ -19,7 +10,7 @@ export default function ConfirmModal({
   title,
   data,
   isSubmitting = false,
-}: ConfirmModalProps) {
+}) {
   const reduce = useReducedMotion();
 
   return (

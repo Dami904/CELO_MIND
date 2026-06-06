@@ -1,28 +1,32 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       colors: {
-        cy: 'var(--cy)',
-        cg: 'var(--cg)',
-        dark: 'var(--dark)',
-        surface: 'var(--surface)',
-        forest: 'var(--forest)',
-        text: 'var(--text)',
-        muted: 'var(--muted)',
-        error: 'var(--error)',
-        border: 'var(--border)',
-        border2: 'var(--border2)',
+        gold: {
+          DEFAULT: '#FCBE00',
+          deep:    '#C49200',
+          soft:    '#FFF8D6',
+        },
+        celo: {
+          green:      '#35D07F',
+          'green-deep': '#1A8C52',
+          'green-soft': '#D4F5E6',
+        },
       },
       fontFamily: {
-        syne: ['var(--font-syne)', 'Syne', 'sans-serif'],
-        mono: ['var(--font-mono)', 'DM Mono', 'monospace'],
-        sans: ['var(--font-sans)', 'DM Sans', 'sans-serif'],
+        display: ['Fraunces', 'Georgia', 'serif'],
+        body:    ['DM Sans', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        '2xl': '1rem',
+        '3xl': '1.5rem',
+        '4xl': '2rem',
       },
     },
   },

@@ -8,7 +8,7 @@ import { motion, useReducedMotion } from "framer-motion";
  * layout's flex behavior (`flex-1 flex flex-col`, NO min-h-0) so the chat page
  * still fills/pins its input and the long landing page still grows + scrolls.
  */
-export default function Template({ children }: { children: React.ReactNode }) {
+export default function Template({ children }) {
   const reduce = useReducedMotion();
 
   if (reduce) {

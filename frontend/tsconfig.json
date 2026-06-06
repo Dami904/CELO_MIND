@@ -34,7 +34,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
-  ],
+, "src/app/layout.jsx", "src/components/ui/Navbar.jsx", "src/app/chat/page.jsx", "src/app/dashboard/page.jsx", "src/app/page.jsx", "src/app/template.jsx", "src/components/ui/ConfirmModal.jsx", "src/components/ui/ResultCard.jsx"  ],
   "exclude": [
     "node_modules"
   ]
