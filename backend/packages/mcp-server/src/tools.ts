@@ -22,6 +22,7 @@ import {
   getCeloGasPrice, getCeloDefiProtocols, getCeloNetworkStats,
   getCeloPriceHistory, getCeloTopPools, searchCeloTokens,
   getCeloTokenHolders, getCeloWalletStats, getCeloNFTBalances, getCeloYieldOpportunities,
+  getTransactionByHash, getCeloFilteredTransactions,
 } from "./market.js";
 import { checkContractRisk, checkTokenRisk, explainTransaction } from "./risk.js";
 import { getAavePosition, prepareAaveSupply } from "./aave.js";
@@ -80,6 +81,8 @@ export const TOOLS = [
   { name: "get_celo_wallet_stats", description: "Get wallet stats: tx count, token transfer count, native balance (Blockscout)", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
   { name: "get_celo_nft_balances", description: "Get ERC-721 and ERC-1155 NFT holdings for a wallet on Celo (Blockscout)", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
   { name: "get_celo_recent_transactions", description: "Get recent transactions for a wallet address on Celo", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "get_celo_transaction", description: "Fetch a specific transaction by hash from Blockscout (retries for indexing lag)", inputSchema: { type: "object", properties: { txHash: { type: "string", pattern: "^0x[0-9a-fA-F]{64}$" } }, required: ["txHash"] } },
+  { name: "get_celo_filtered_transactions", description: "Get filtered transaction history for a wallet — filter by direction (in/out), minimum CELO value, or date", inputSchema: { type: "object", properties: { address: { type: "string" }, direction: { type: "string", enum: ["in", "out"] }, minValueCelo: { type: "number" }, afterDate: { type: "string" } }, required: ["address"] } },
   // ─── Security ──────────────────────────────────────────────────────────────
   { name: "check_malicious_transaction", description: "Analyze transaction calldata for malicious patterns", inputSchema: { type: "object", properties: { txData: { type: "string" } }, required: ["txData"] } },
   { name: "check_contract_risk", description: "Check risk level of a smart contract on Celo", inputSchema: { type: "object", properties: { contractAddress: { type: "string" } }, required: ["contractAddress"] } },
@@ -247,6 +250,19 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
       const r = await getCeloRecentTransactions(address, marketNetwork());
       return ok({ address, network: marketNetwork(), transactions: r.data, source: r.source });
     }
+    case "get_celo_transaction": {
+      const { txHash } = args as { txHash: string };
+      const r = await getTransactionByHash(txHash, NETWORK);
+      if (!r.data) return r.pending
+        ? ok({ txHash, status: "pending", message: "Transaction submitted but not yet indexed by Blockscout. Try again in a few seconds." })
+        : err(`Transaction ${txHash} not found on Blockscout. Verify the hash is correct.`);
+      return ok({ txHash, network: NETWORK, transaction: r.data, source: r.source });
+    }
+    case "get_celo_filtered_transactions": {
+      const { address, direction, minValueCelo, afterDate } = args as { address: string; direction?: "in" | "out"; minValueCelo?: number; afterDate?: string };
+      const r = await getCeloFilteredTransactions(address, marketNetwork(), { direction, minValueCelo, afterDate });
+      return ok({ address, network: marketNetwork(), filter: { direction, minValueCelo, afterDate }, transactions: r.data, source: r.source });
+    }
     case "check_malicious_transaction":
     case "explain_transaction_risk": {
       const { txData } = args as { txData: string };
@@ -387,6 +403,15 @@ export function createMcpServer(): McpServer {
   });
   registerCeloTool(server, "get_celo_recent_transactions", "Get recent transactions for a wallet address on Celo.", {
     address: ADDRESS_Z.describe("Wallet address."),
+  });
+  registerCeloTool(server, "get_celo_transaction", "Fetch a specific transaction by hash. Retries automatically for Blockscout indexing lag.", {
+    txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a valid 0x transaction hash (64 hex chars).").describe("Transaction hash."),
+  });
+  registerCeloTool(server, "get_celo_filtered_transactions", "Get filtered transaction history for a wallet — filter by direction, min CELO value, or date.", {
+    address: ADDRESS_Z.describe("Wallet address."),
+    direction: z.enum(["in", "out"]).optional().describe("Filter to incoming or outgoing transactions only."),
+    minValueCelo: z.number().positive().optional().describe("Minimum native CELO value to include."),
+    afterDate: z.string().optional().describe("ISO date string — only return transactions after this date."),
   });
   registerCeloTool(server, "check_malicious_transaction", "Analyze transaction calldata or hash for malicious patterns.", {
     txData: TX_DATA_Z.describe("Transaction calldata or hash."),

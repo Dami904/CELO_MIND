@@ -66,7 +66,7 @@ type MentoExchange = { provider: Address; exchangeId: `0x${string}`; assets: str
 
 /** All Mento exchanges (provider + exchangeId + assets), cached 1h — the list is near-static. */
 async function getMentoExchanges(network: Network): Promise<MentoExchange[]> {
-  return cached(`mento:exchanges:${network}`, 3600, async () => {
+  return cached(`mento:exchanges:${network}`, 300, async () => {
     const client = getPublicClient(network);
     const providers = (await client.readContract({
       address: MENTO_BROKER,

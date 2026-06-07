@@ -6,6 +6,7 @@ import {
   makeOk,
   makeErr,
   ChatRequestSchema,
+  INTENTS,
   type Intent,
   getTokenList,
   resolveNetwork,
@@ -29,6 +30,8 @@ import {
   getCeloTokenInfo,
   getCeloWalletPortfolio,
   getCeloRecentTransactions,
+  getCeloFilteredTransactions,
+  getTransactionByHash,
   getCeloTopTokensByHolders,
   getCeloTopTokensByMarketCap,
   getCeloGasPrice,
@@ -322,17 +325,41 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
         return `${i + 1}. ${token.symbol ?? token.name ?? "Token"}${token.balance ? `: ${token.balance}` : ""}${token.usdValue ? ` ($${token.usdValue})` : ""}${token.address ? ` (${token.address})` : ""}`;
       }), srcLine("Blockscout")].join("\n");
     }
-    case "recent_transactions": {
+    case "recent_transactions":
+    case "filtered_transactions": {
       const txs = Array.isArray(payload) ? payload.slice(0, 8) : [];
-      if (!txs.length) return "I checked Blockscout, but found no recent transactions for that wallet.";
-      return [`Recent wallet transactions (${source ?? "Blockscout"}):`, ...txs.map((tx, i) => {
-        const t = tx as { hash?: string; timestamp?: string; timeStamp?: string; from?: { hash?: string } | string; to?: { hash?: string } | string; status?: string; result?: string; isError?: string };
-        const from = typeof t.from === "object" ? t.from?.hash : t.from;
-        const to = typeof t.to === "object" ? t.to?.hash : t.to;
-        const ts = t.timestamp ?? (t.timeStamp ? new Date(Number(t.timeStamp) * 1000).toISOString() : undefined);
-        const okFlag = t.status === "ok" || t.result === "success" || t.isError === "0";
-        return `${i + 1}. ${t.hash ?? "Unknown hash"} ${okFlag ? "succeeded" : "failed/pending"}${from && to ? ` from ${from} to ${to}` : ""}${ts ? ` at ${ts}` : ""}`;
-      }), srcLine("Blockscout")].join("\n");
+      if (!txs.length) return "I checked Blockscout, but found no transactions matching those filters for that wallet.";
+      const filterInfo = (data as { filter?: { direction?: string; minValueCelo?: number; afterDate?: string } }).filter;
+      const filterDesc = filterInfo
+        ? [filterInfo.direction ? `direction: ${filterInfo.direction}` : "", filterInfo.minValueCelo ? `min ${filterInfo.minValueCelo} CELO` : "", filterInfo.afterDate ? `after ${filterInfo.afterDate}` : ""].filter(Boolean).join(", ")
+        : "";
+      return [
+        `${filterDesc ? `Filtered transactions (${filterDesc})` : "Recent wallet transactions"} (${source ?? "Blockscout"}):`,
+        ...txs.map((tx, i) => {
+          const t = tx as { hash?: string; timestamp?: string; timeStamp?: string; from?: { hash?: string } | string; to?: { hash?: string } | string; status?: string; result?: string; isError?: string; value?: string };
+          const from = typeof t.from === "object" ? t.from?.hash : t.from;
+          const to = typeof t.to === "object" ? t.to?.hash : t.to;
+          const ts = t.timestamp ?? (t.timeStamp ? new Date(Number(t.timeStamp) * 1000).toISOString() : undefined);
+          const okFlag = t.status === "ok" || t.result === "success" || t.isError === "0";
+          return `${i + 1}. ${t.hash ?? "Unknown hash"} ${okFlag ? "succeeded" : "failed/pending"}${from && to ? ` from ${from} to ${to}` : ""}${ts ? ` at ${ts}` : ""}`;
+        }),
+        srcLine("Blockscout"),
+      ].join("\n");
+    }
+    case "get_transaction": {
+      const tx = payload as { hash?: string; status?: string | null; method?: string | null; decodedCall?: string | null; from?: string | null; to?: string | null; value?: string; timestamp?: string | null };
+      if (!tx?.hash) return "Transaction not found on Blockscout. Check the hash is correct.";
+      const okFlag = tx.status === "ok";
+      return [
+        `Transaction ${tx.hash} (${source ?? "Blockscout"}):`,
+        `Status: ${okFlag ? "succeeded" : tx.status ?? "unknown"}`,
+        tx.decodedCall ? `Method: ${tx.decodedCall}` : tx.method ? `Method: ${tx.method}` : "",
+        tx.from ? `From: ${tx.from}` : "",
+        tx.to ? `To: ${tx.to}` : "",
+        tx.value && tx.value !== "0" ? `Value: ${tx.value} wei` : "",
+        tx.timestamp ? `Time: ${tx.timestamp}` : "",
+        srcLine("Blockscout"),
+      ].filter(Boolean).join("\n");
     }
     case "contract_risk":
     case "token_risk":
@@ -369,9 +396,28 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       return `Whale Wallet Activity from Blockscout:\nWallet: ${whale.address ?? "unknown"}${whale.label ? ` (${whale.label})` : ""}\nNative balance: ${whale.nativeBalance ?? "0"} CELO\nRecent transaction count fetched: ${whale.txCount ?? 0}`;
     }
     case "copy_wallet_analyze":
-    case "copy_wallet_prepare": {
-      const copy = data as { sourceWallet?: string; myWallet?: string; tokensToAdd?: string[]; tokensToRemove?: string[]; warning?: string };
-      return `Copy-wallet analysis only, no trade executed.\nSource wallet: ${copy.sourceWallet ?? "unknown"}\nYour wallet: ${copy.myWallet ?? "unknown"}\nTokens to research/add: ${(copy.tokensToAdd ?? []).join(", ") || "none"}\nTokens to review/remove: ${(copy.tokensToRemove ?? []).join(", ") || "none"}\n${copy.warning ?? "Prepared actions require review and wallet confirmation."}`;
+    case "copy_wallet_prepare":
+    case "compare_wallets": {
+      const copy = data as { sourceWallet?: string; myWallet?: string; tokensToAdd?: string[]; tokensToRemove?: string[]; inCommon?: string[]; warning?: string };
+      return [
+        intent === "compare_wallets" ? "Wallet comparison (read-only):" : "Copy-wallet analysis only, no trade executed.",
+        `Wallet A: ${copy.sourceWallet ?? "unknown"}`,
+        `Wallet B: ${copy.myWallet ?? "unknown"}`,
+        copy.inCommon?.length ? `Tokens in common: ${copy.inCommon.join(", ")}` : "",
+        `Tokens only in A (to add to B): ${(copy.tokensToAdd ?? []).join(", ") || "none"}`,
+        `Tokens only in B (to remove from B): ${(copy.tokensToRemove ?? []).join(", ") || "none"}`,
+        copy.warning ?? "",
+      ].filter(Boolean).join("\n");
+    }
+    case "portfolio_risk_score": {
+      const risk = data as { address?: string; tokenCount?: number; portfolioRiskScore?: number; riskLevel?: string; tokenBreakdown?: { symbol: string; risk: number; reason: string }[] };
+      if (!risk?.portfolioRiskScore && risk?.portfolioRiskScore !== 0) return "Could not score portfolio risk. Make sure a valid wallet address is provided.";
+      return [
+        `Portfolio risk score for ${risk.address ?? "wallet"}: ${risk.portfolioRiskScore}/100 (${risk.riskLevel ?? "unknown"})`,
+        `Token count: ${risk.tokenCount ?? 0}`,
+        ...(risk.tokenBreakdown ?? []).map((t) => `  • ${t.symbol}: ${t.risk}/100 (${t.reason})`),
+        `Source: Blockscout + heuristics.`,
+      ].join("\n");
     }
     case "gas_price": {
       const gp = payload as { gasPriceGwei?: string; gasPriceWei?: string };
@@ -527,7 +573,15 @@ function getSystemPrompt(chatbotType: string, network: string): string {
 
 SCOPE (important): Only answer questions within this Celo / blockchain / crypto / DeFi / wallet scope. If the user asks about anything unrelated — general trivia, recipes, geography, entertainment, math, coding help, etc. — do NOT answer it. Politely decline in one short sentence and invite a Celo-related question instead.
 
-When "Live Celo data for this request" is provided below, treat it as current and authoritative and base your answer on it (do not contradict it or rely on stale memory). Be clear, concise, and honest about uncertainty. Current network: ${network}.`;
+CONVERSATION RULES (follow strictly):
+- Bias toward action: if you have enough data to give a useful answer, give it — do not ask follow-up questions first.
+- When the user replies "Yes", "Ok", "Sure", "Go ahead", "Yh", or any affirmative — answer immediately. Never re-ask the same question.
+- Never ask the same clarifying question twice. If the user confirmed, proceed with your best answer.
+- Never offer multiple-choice follow-ups. Pick the most likely interpretation and answer it directly.
+- Only ask a clarifying question when a critical piece of information (wallet address, tx hash, token, amount) is completely absent and cannot be inferred.
+- One question maximum per response, never a list of options.
+
+When "Live Celo data for this request" is provided below, treat it as current and authoritative. Current network: ${network}.`;
 
   const extras: Record<string, string> = {
     landing: `${base} You are the landing page assistant — be welcoming and informative. Do NOT execute any write operations.`,
@@ -547,21 +601,25 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
 
   try {
     switch (intent) {
-      case "balance":
-        if (!wa) return { note: "No wallet address provided. Please connect your wallet." };
-        return await getNativeBalance(wa, net);
+      case "balance": {
+        const balAddr = extractAddress(req.message, wa);
+        if (!balAddr) return { note: "No wallet address provided. Connect your wallet or paste an address." };
+        return await getNativeBalance(balAddr, net);
+      }
 
       case "token_balance": {
-        if (!wa) return { note: "No wallet address provided." };
+        const tokenBalAddr = extractAddress(req.message, wa);
+        if (!tokenBalAddr) return { note: "No wallet address provided. Connect your wallet or paste an address." };
+        const wa_resolved = tokenBalAddr;
         const requestedToken = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
         if (requestedToken) {
-          if (requestedToken.symbol === "CELO") return await getNativeBalance(wa, net);
-          const balance = await getTokenBalance(wa, requestedToken.address, net);
+          if (requestedToken.symbol === "CELO") return await getNativeBalance(wa_resolved, net);
+          const balance = await getTokenBalance(wa_resolved, requestedToken.address, net);
           return { items: [{ ...requestedToken, ...balance }], source: "Celo RPC", requestedToken: requestedToken.symbol };
         }
         const tokenSymbols = Object.values(getTokenList(net));
         const balances = await Promise.allSettled(
-          tokenSymbols.map((t) => getTokenBalance(wa, t.address, net).then((b) => ({ ...t, ...b })))
+          tokenSymbols.map((t) => getTokenBalance(wa_resolved, t.address, net).then((b) => ({ ...t, ...b })))
         );
         const items = balances.filter((r) => r.status === "fulfilled").map((r) => (r as PromiseFulfilledResult<unknown>).value);
         return { items, source: "Celo RPC" };
@@ -622,8 +680,9 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "wallet_portfolio": {
-        if (!wa) return { note: "No wallet address provided." };
-        const r = await getCeloWalletPortfolio(wa, net);
+        const portfolioAddr = extractAddress(req.message, wa);
+        if (!portfolioAddr) return { note: "No wallet address provided. Connect your wallet or paste an address." };
+        const r = await getCeloWalletPortfolio(portfolioAddr, net);
         return { items: r.data, source: r.source };
       }
 
@@ -631,6 +690,29 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         if (!wa) return { note: "No wallet address provided." };
         const r = await getCeloRecentTransactions(wa, net);
         return { items: r.data, source: r.source };
+      }
+
+      case "get_transaction": {
+        const hash = String(
+          req.toolArgs?.txHash ?? req.toolArgs?.hash ?? req.toolArgs?.transactionHash ??
+          req.message.match(/0x[0-9a-fA-F]{64}/)?.[0] ?? ""
+        );
+        if (!hash) return { note: "Provide a transaction hash (0x… 64 hex chars) to look up." };
+        const r = await getTransactionByHash(hash, net);
+        if (!r.data) return r.pending
+          ? { note: `Transaction ${hash} was submitted but hasn't been indexed by Blockscout yet. Wait a few seconds and try again — it should appear shortly.` }
+          : { note: `Transaction ${hash} was not found on Blockscout. Double-check the hash is correct.` };
+        return { result: r.data, source: r.source, txHash: hash };
+      }
+
+      case "filtered_transactions": {
+        const address = extractAddress(req.message, wa);
+        if (!address) return { note: "Connect your wallet or provide an address to filter transactions." };
+        const direction = req.toolArgs?.direction as "in" | "out" | undefined;
+        const minValueCelo = req.toolArgs?.minValueCelo ? Number(req.toolArgs.minValueCelo) : undefined;
+        const afterDate = req.toolArgs?.afterDate as string | undefined;
+        const r = await getCeloFilteredTransactions(address, net, { direction, minValueCelo, afterDate });
+        return { items: r.data, source: r.source, filter: { direction, minValueCelo, afterDate }, address };
       }
 
       case "docs_explain":
@@ -713,8 +795,13 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return await checkTokenRisk(address, marketNetwork());
       }
 
-      case "malicious_tx_check":
-        return { result: await explainTransaction(req.message, marketNetwork()), source: "Blockscout + heuristics" };
+      case "malicious_tx_check": {
+        const txHash =
+          req.toolArgs?.txHash ?? req.toolArgs?.hash ??
+          req.message.match(/0x[0-9a-fA-F]{64}/)?.[0];
+        if (!txHash) return { note: "Paste the transaction hash (0x… 64 hex chars) to check it for malicious patterns." };
+        return { result: await explainTransaction(String(txHash), marketNetwork()), source: "Blockscout + heuristics" };
+      }
 
       case "copy_wallet_analyze": {
         const [source, mine] = extractTwoAddresses(req.message, wa);
@@ -745,8 +832,18 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         };
       }
 
-      case "transaction_explain":
-        return { result: await explainTransaction(req.message, marketNetwork()), source: "Blockscout" };
+      case "transaction_explain": {
+        const txHash =
+          req.toolArgs?.txHash ?? req.toolArgs?.hash ?? req.toolArgs?.transactionHash ??
+          req.message.match(/0x[0-9a-fA-F]{64}/)?.[0];
+        if (!txHash) return { note: "Paste the transaction hash (0x… 64 hex chars) and I'll explain exactly what happened on-chain." };
+        const r = await getTransactionByHash(String(txHash), net);
+        if (!r.data) return r.pending
+          ? { note: `Transaction ${txHash} was submitted but Blockscout hasn't indexed it yet. Wait a few seconds and ask again.` }
+          : { note: `Transaction ${txHash} was not found on Blockscout. Double-check the hash is correct.` };
+        const risk = await explainTransaction(String(txHash), marketNetwork());
+        return { result: { ...r.data, ...risk }, source: "Blockscout", txHash };
+      }
 
       case "gas_price": {
         const gp = await getCeloGasPrice();
@@ -821,6 +918,61 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         if (!address) return { note: "Connect your wallet or provide an address to see its NFTs." };
         const r = await getCeloNFTBalances(address);
         return { items: r.data, source: r.source };
+      }
+
+      case "compare_wallets": {
+        const addresses = (req.message.match(/0x[0-9a-fA-F]{40}/g) ?? []);
+        const w1 = String(req.toolArgs?.wallet1 ?? addresses[0] ?? wa ?? "");
+        const w2 = String(req.toolArgs?.wallet2 ?? addresses[1] ?? "");
+        if (!w1 || !w2 || w1 === w2) return { note: "Provide two different wallet addresses to compare." };
+        return await analyzeCopyWallet(w1, w2, marketNetwork());
+      }
+
+      case "portfolio_risk_score": {
+        const address = extractAddress(req.message, wa);
+        if (!address) return { note: "Provide or connect a wallet address to score its portfolio risk." };
+        const portfolio = await getCeloWalletPortfolio(address, marketNetwork());
+        const tokens = Array.isArray(portfolio.data) ? portfolio.data : [];
+        // Score each token: check risk for tokens that look like contract addresses,
+        // otherwise apply heuristics based on whether the token is a known-safe asset.
+        const SAFE_SYMBOLS = new Set(["CELO", "cUSD", "cEUR", "cREAL", "USDC", "USDT", "WBTC", "WETH", "DAI"]);
+        const tokenScores: { symbol: string; risk: number; reason: string }[] = [];
+        let totalScore = 0;
+        for (const t of tokens.slice(0, 10)) {
+          const tok = t as { symbol?: string; address?: string; usdValue?: string | null };
+          const sym = (tok.symbol ?? "UNKNOWN").toUpperCase();
+          let score = 0;
+          let reason = "";
+          if (SAFE_SYMBOLS.has(sym)) {
+            score = 5;
+            reason = "established stable/native token";
+          } else if (tok.address && /^0x[0-9a-fA-F]{40}$/.test(tok.address)) {
+            // Run a lightweight risk check on unrecognized tokens
+            try {
+              const risk = await checkTokenRisk(tok.address, marketNetwork());
+              score = typeof risk.riskScore === "number" ? risk.riskScore : 40;
+              reason = risk.riskLevel ?? "unknown";
+            } catch {
+              score = 35;
+              reason = "unverified token";
+            }
+          } else {
+            score = 20;
+            reason = "unrecognised symbol";
+          }
+          tokenScores.push({ symbol: sym, risk: score, reason });
+          totalScore += score;
+        }
+        const avgScore = tokens.length ? Math.round(totalScore / Math.min(tokens.length, 10)) : 0;
+        const level = avgScore < 20 ? "low" : avgScore < 50 ? "medium" : "high";
+        return {
+          address,
+          tokenCount: tokens.length,
+          portfolioRiskScore: avgScore,
+          riskLevel: level,
+          tokenBreakdown: tokenScores,
+          source: "Blockscout + heuristics",
+        };
       }
 
       case "yield_info": {
@@ -957,48 +1109,103 @@ export async function chatRoutes(app: FastifyInstance) {
       }, { type: "result_card" });
     }
 
-    const intentData = await fetchIntentData(intent, {
-      message: chatReq.message,
-      walletAddress: chatReq.walletAddress,
-      selectedTool: chatReq.selectedTool,
-      toolArgs: planned.args,
-    });
+    // ── Agentic loop (max 5 iterations) ────────────────────────────────────────
+    // Each iteration: fetch tool data → ask AI → if AI signals it needs another
+    // tool, re-plan and loop; otherwise return final answer.
+    const MAX_ITERATIONS = 5;
+    // Regex the AI uses to request another tool call mid-reasoning.
+    const TOOL_CALL_RE = /\[\[TOOL:([a-z_]+)(?::([^\]]+))?\]\]/i;
 
-    // Build AI messages
     const systemPrompt = getSystemPrompt(chatReq.chatbotType, NETWORK);
     const summaryBlock = conversationSummary
       ? `\n\nLong-term conversation summary:\n${conversationSummary}\n\nUse this summary as durable context for the thread.`
       : "";
-    const contextBlock = intentData
-      ? `\n\nLive Celo data for this request:\n${JSON.stringify(intentData, null, 2)}\n\nUse this data to answer the user's question accurately.`
-      : "";
     const pageContext = chatReq.pageContext ? `\nUser is on page: ${chatReq.pageContext}` : "";
-    let aiResponse: string;
-    let aiProvider: string;
+
+    // Accumulated tool results injected into each iteration's context block.
+    const accumulatedData: { intent: Intent; data: unknown }[] = [];
+    let currentIntent: Intent = intent;
+    let currentArgs: Record<string, unknown> = planned.args;
+    let intentData: unknown = null;
+
+    let aiResponse = "";
+    let aiProvider = "fallback";
     let aiModel = "fallback";
     let fallback = false;
     const aiStartedAt = Date.now();
 
-    try {
-      const route = routeForIntent(intent);
-      const result = await aiComplete({
-        messages: [
-          { role: "system", content: systemPrompt + summaryBlock + contextBlock + pageContext },
-          ...conversationMemory,
-          { role: "user", content: chatReq.message },
-        ],
-        maxTokens: 1024,
-        temperature: 0.7,
-        provider: route.provider,
-        model: route.model,
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      // 1. Fetch data for the current intent.
+      const fetched = await fetchIntentData(currentIntent, {
+        message: chatReq.message,
+        walletAddress: chatReq.walletAddress,
+        selectedTool: chatReq.selectedTool,
+        toolArgs: currentArgs,
       });
-      aiResponse = result.text;
-      aiProvider = result.provider;
-      aiModel = result.model;
-    } catch (e: unknown) {
-      aiResponse = formatFallbackAnswer(intent, intentData);
-      aiProvider = "fallback";
-      fallback = true;
+      intentData = fetched;
+      accumulatedData.push({ intent: currentIntent, data: fetched });
+
+      // 2. Build context from all data gathered so far.
+      const dataBlock = accumulatedData
+        .map(({ intent: i, data: d }) => `[${i}]:\n${JSON.stringify(d, null, 2)}`)
+        .join("\n\n");
+      const contextBlock = `\n\nLive Celo data gathered so far:\n${dataBlock}\n\nUse this data to answer the user accurately.`;
+
+      const agentInstruction = iteration < MAX_ITERATIONS - 1
+        ? "\n\nIf you need one more piece of data before answering, emit exactly: [[TOOL:<intent_name>]] on its own line (e.g. [[TOOL:token_risk]] or [[TOOL:swap_quote:fromToken=CELO,toToken=cUSD,amount=10]]). Otherwise give your final answer directly."
+        : "\n\nThis is your final iteration — give your best answer now with the data you have.";
+
+      // 3. Ask the AI.
+      try {
+        const route = routeForIntent(currentIntent);
+        const result = await aiComplete({
+          messages: [
+            { role: "system", content: systemPrompt + summaryBlock + contextBlock + pageContext + agentInstruction },
+            ...conversationMemory,
+            { role: "user", content: chatReq.message },
+          ],
+          maxTokens: 1024,
+          temperature: 0.7,
+          provider: route.provider,
+          model: route.model,
+        });
+        aiResponse = result.text;
+        aiProvider = result.provider;
+        aiModel = result.model;
+      } catch {
+        aiResponse = formatFallbackAnswer(currentIntent, intentData);
+        aiProvider = "fallback";
+        fallback = true;
+        break;
+      }
+
+      // 4. Check if the AI requested another tool call.
+      const toolCallMatch = aiResponse.match(TOOL_CALL_RE);
+      if (!toolCallMatch) break; // Final answer — exit loop.
+
+      const nextIntentRaw = toolCallMatch[1].toLowerCase() as Intent;
+      const nextArgsRaw = toolCallMatch[2] ?? "";
+
+      // Parse key=value pairs from the optional args segment.
+      const nextArgs: Record<string, unknown> = {};
+      for (const pair of nextArgsRaw.split(",")) {
+        const [k, v] = pair.split("=");
+        if (k?.trim() && v?.trim()) nextArgs[k.trim()] = v.trim();
+      }
+
+      // Strip the [[TOOL:...]] signal from the response text.
+      aiResponse = aiResponse.replace(TOOL_CALL_RE, "").trim();
+
+      // Validate the requested intent exists; bail if unknown.
+      const knownIntents = new Set(INTENTS as unknown as string[]);
+      if (!knownIntents.has(nextIntentRaw)) break;
+
+      // Avoid re-fetching the same intent+args twice.
+      const alreadyFetched = accumulatedData.some((d) => d.intent === nextIntentRaw);
+      if (alreadyFetched) break;
+
+      currentIntent = nextIntentRaw;
+      currentArgs = nextArgs;
     }
 
     void recordChatRequest({
@@ -1063,6 +1270,10 @@ export async function chatRoutes(app: FastifyInstance) {
       yield_info: { type: "result_card" },
       copy_wallet_analyze: { type: "result_card" },
       copy_wallet_prepare: { type: "confirmation_required" },
+      get_transaction: { type: "transaction_card" },
+      filtered_transactions: { type: "transaction_card" },
+      compare_wallets: { type: "result_card" },
+      portfolio_risk_score: { type: "risk_card" },
     };
 
     return makeOk("chat", NETWORK, {

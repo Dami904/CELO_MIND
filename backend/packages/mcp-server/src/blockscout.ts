@@ -135,11 +135,11 @@ export async function getTokenBalancesV2(address: string, network: Network, forc
   };
 
   if (forceRefresh) return fetcher();
-  return cached(`bs:v2:balances:${network}:${address.toLowerCase()}`, 60, fetcher);
+  return cached(`bs:v2:balances:${network}:${address.toLowerCase()}`, 10, fetcher);
 }
 
 export async function getAddressV2(address: string, network: Network): Promise<AddressInfoV2> {
-  return cached(`bs:v2:address:${network}:${address.toLowerCase()}`, 60, async () => {
+  return cached(`bs:v2:address:${network}:${address.toLowerCase()}`, 10, async () => {
     const raw = await fetchJson<{
       coin_balance: string | null;
       exchange_rate: string | null;

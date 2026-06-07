@@ -2,7 +2,7 @@ import { marketNetwork, cached, type Network } from "@celomind/shared";
 import {
   getTokenBalancesV2, getAddressTxsV2, getTokenInfoV2,
   getTokenHoldersV2, getAddressNFTsV2, getNetworkStatsV2,
-  getAddressStatsV2, searchTokensV2,
+  getAddressStatsV2, searchTokensV2, getTransactionV2,
 } from "./blockscout.js";
 import { getDuneTrendingTokens } from "./dune.js";
 
@@ -136,6 +136,78 @@ export async function getCeloRecentTransactions(address: string, network: Networ
   } catch {
     return { data: [], source: "unavailable" };
   }
+}
+
+export type TxFilter = {
+  direction?: "in" | "out";
+  minValueCelo?: number;
+  afterDate?: string; // ISO date string
+  limit?: number;
+};
+
+export async function getCeloFilteredTransactions(
+  address: string,
+  network: Network,
+  filter: TxFilter = {}
+): Promise<Sourced<unknown[]>> {
+  try {
+    const raw = await getAddressTxsV2(address, network, 50);
+    const addrLow = address.toLowerCase();
+    let txs = raw as {
+      hash?: string; from?: { hash?: string } | string; to?: { hash?: string } | string;
+      value?: string; timestamp?: string; status?: string; result?: string;
+    }[];
+
+    if (filter.direction) {
+      txs = txs.filter((tx) => {
+        const from = typeof tx.from === "object" ? tx.from?.hash : tx.from;
+        const to = typeof tx.to === "object" ? tx.to?.hash : tx.to;
+        return filter.direction === "in"
+          ? to?.toLowerCase() === addrLow
+          : from?.toLowerCase() === addrLow;
+      });
+    }
+
+    if (filter.minValueCelo) {
+      const minWei = BigInt(Math.floor(filter.minValueCelo * 1e18));
+      txs = txs.filter((tx) => {
+        try { return BigInt(tx.value ?? "0") >= minWei; } catch { return false; }
+      });
+    }
+
+    if (filter.afterDate) {
+      const after = new Date(filter.afterDate).getTime();
+      txs = txs.filter((tx) => tx.timestamp && new Date(tx.timestamp).getTime() >= after);
+    }
+
+    return { data: txs.slice(0, filter.limit ?? 10), source: "Blockscout" };
+  } catch {
+    return { data: [], source: "unavailable" };
+  }
+}
+
+// Retry delays in ms — total wait up to ~30s for Blockscout indexing lag
+const TX_RETRY_DELAYS = [2000, 4000, 6000, 8000, 10000];
+
+export async function getTransactionByHash(
+  hash: string,
+  network: Network
+): Promise<Sourced<unknown> & { pending?: boolean }> {
+  for (let attempt = 0; attempt <= TX_RETRY_DELAYS.length; attempt++) {
+    try {
+      const tx = await getTransactionV2(hash, network);
+      if (tx.exists) return { data: tx, source: "Blockscout" };
+    } catch {
+      // network error — keep retrying
+    }
+
+    if (attempt < TX_RETRY_DELAYS.length) {
+      await new Promise((r) => setTimeout(r, TX_RETRY_DELAYS[attempt]));
+    }
+  }
+
+  // Still not indexed after all retries — tell the caller it's pending
+  return { data: null, source: "Blockscout", pending: true };
 }
 
 /** Top Celo ERC-20 tokens ranked by on-chain holder count (Blockscout). */

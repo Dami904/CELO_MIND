@@ -3,6 +3,63 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+// Matches full 0x hashes (66 chars = tx hash) and 0x addresses (42 chars).
+const HEX_RE = /(0x[0-9a-fA-F]{64}|0x[0-9a-fA-F]{40})/g;
+const isHex = (s) => /^0x[0-9a-fA-F]{40,64}$/.test(s);
+
+function CopyableHex({ value }) {
+  const [copied, setCopied] = useState(false);
+  const isTx = value.length === 66;
+  const display = `${value.slice(0, 8)}…${value.slice(-6)}`;
+
+  const copy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <span
+        className="font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 text-[11px] cursor-pointer select-all"
+        title={value}
+        onClick={copy}
+      >
+        {display}
+      </span>
+      <button
+        onClick={copy}
+        title={`Copy full ${isTx ? 'transaction hash' : 'address'}`}
+        className="text-slate-400 hover:text-slate-700 transition-colors"
+        style={{ lineHeight: 1 }}
+      >
+        {copied ? (
+          <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        ) : (
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+        )}
+      </button>
+    </span>
+  );
+}
+
+function MessageText({ content }) {
+  const parts = content.split(HEX_RE);
+  return (
+    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+      {parts.map((part, i) =>
+        isHex(part) ? <CopyableHex key={i} value={part} /> : part
+      )}
+    </p>
+  );
+}
+
 const suggestions = {
   'My wallet': [
     'Check my CELO balance',
@@ -202,7 +259,7 @@ function ChatInner() {
                     : 'bg-white border border-slate-200 shadow-sm text-slate-600 rounded-bl-md'
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                <MessageText content={msg.content} />
                 <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/40' : 'text-slate-300'}`}>
                   {fmtTime(msg.ts)}
                 </span>

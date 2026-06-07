@@ -179,6 +179,10 @@ const INTENT_ROUTES: Record<string, () => Route> = {
   gas_price: FAST, defi_protocols: FAST, network_stats: FAST, price_history: FAST,
   top_pools: FAST, token_search: FAST, token_holders: FAST,
   wallet_stats: FAST, nft_balances: FAST, yield_info: FAST,
+  // Transaction lookup and filtering
+  get_transaction: REASON, filtered_transactions: FAST,
+  // Wallet comparison and risk
+  compare_wallets: REASON, portfolio_risk_score: REASON,
 };
 
 /** The provider+model best suited to a given intent. */

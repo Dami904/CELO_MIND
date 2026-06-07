@@ -101,6 +101,45 @@ const TOOL_CATALOG = [
     description: "Recent transaction history for a wallet.",
   },
   {
+    intent: "get_transaction",
+    description: "Fetch and explain a single transaction by its hash. Use for any request to analyse, explain, decode, or check a specific transaction. Requires a real tx hash (0x + 64 hex chars) — if absent, set clarification asking for it.",
+    args: { txHash: "0x transaction hash (64 hex chars)" },
+  },
+  {
+    intent: "transaction_explain",
+    description: "Alias for get_transaction — explain or analyse a specific on-chain transaction. Always requires a tx hash (0x + 64 hex chars).",
+    args: { txHash: "0x transaction hash (64 hex chars)" },
+  },
+  {
+    intent: "filtered_transactions",
+    description: "Filtered transaction history. Use when user asks to narrow transactions by direction (in/out), amount threshold, or time period.",
+    args: {
+      direction: "optional: 'in' or 'out'",
+      minValueCelo: "optional: minimum CELO value as number",
+      afterDate: "optional: ISO date string (e.g. '2024-01-01')",
+    },
+  },
+  {
+    intent: "wallet_stats",
+    description: "Wallet stats: transaction count, token transfer count, native CELO balance, account type. Use when user asks for tx count, activity stats, or 'how active is this wallet'.",
+    args: { address: "optional 0x wallet address" },
+  },
+  {
+    intent: "nft_balances",
+    description: "ERC-721 and ERC-1155 NFT holdings for a wallet. Use for 'show my NFTs', 'do I have any NFTs', 'what NFTs does this wallet hold'.",
+    args: { address: "optional 0x wallet address" },
+  },
+  {
+    intent: "compare_wallets",
+    description: "Side-by-side token portfolio comparison of two wallets. Use when user asks to compare two wallets, see differences, or mirror a wallet.",
+    args: { wallet1: "first 0x wallet address", wallet2: "second 0x wallet address" },
+  },
+  {
+    intent: "portfolio_risk_score",
+    description: "Portfolio-level risk score for a wallet — scores each token for risk and aggregates. Use for 'how risky is my portfolio', 'portfolio risk check'.",
+    args: { address: "optional 0x wallet address" },
+  },
+  {
     intent: "docs_explain",
     description: "General Celo/Mento/Aave/MCP/Self/x402/docs/concept questions that are not asking for live wallet or market data.",
   },
@@ -146,6 +185,8 @@ function validationClarification(intent: Intent, message: string): string {
       return "Send the token contract address (0x...) and I’ll check it for risk.";
     case "price_history":
       return "Which supported Celo token's price history do you want?";
+    case "get_transaction":
+      return "Send me the transaction hash (0x… 64-character hex) you'd like me to look up.";
     default:
       return "I need one more detail before I can do that.";
   }
@@ -195,16 +236,47 @@ function validatePlan(plan: ChatToolPlan, input: PlannerInput): ChatToolPlan {
         : { ...plan, clarification: validationClarification(plan.intent, input.message) };
     }
     case "whale_activity":
-      if (!plan.args.address && !input.walletAddress) return { ...plan, clarification: validationClarification(plan.intent, input.message) };
+      // Only ask if no address anywhere — connected wallet is enough to proceed
+      if (!plan.args.address && !input.walletAddress && !/0x[0-9a-fA-F]{40}/.test(input.message)) {
+        return { ...plan, clarification: validationClarification(plan.intent, input.message) };
+      }
       return plan;
     case "contract_risk":
     case "token_risk":
-      if (!plan.args.contractAddress && !plan.args.tokenAddress && !plan.args.address) {
+      // Only block if there's genuinely no address to work with
+      if (!plan.args.contractAddress && !plan.args.tokenAddress && !plan.args.address && !/0x[0-9a-fA-F]{40}/.test(input.message)) {
         return { ...plan, clarification: validationClarification(plan.intent, input.message) };
       }
       return plan;
     case "price_history":
       if (!plan.args.tokenSymbolOrAddress && !plan.args.tokenSymbol && !plan.args.token) return { ...plan, clarification: validationClarification(plan.intent, input.message) };
+      return plan;
+    case "get_transaction":
+    case "transaction_explain": {
+      const hash = plan.args.txHash ?? plan.args.hash ?? plan.args.transactionHash;
+      if (!hash && !/0x[0-9a-fA-F]{64}/.test(input.message)) {
+        return { ...plan, clarification: validationClarification("get_transaction", input.message) };
+      }
+      return plan;
+    }
+    case "filtered_transactions":
+      if (!input.walletAddress && !plan.args.address) {
+        return { ...plan, clarification: "Connect your wallet so I can filter your transactions." };
+      }
+      return plan;
+    case "compare_wallets": {
+      const addresses = (input.message.match(/0x[0-9a-fA-F]{40}/g) ?? []);
+      const w1 = plan.args.wallet1 ?? addresses[0] ?? input.walletAddress;
+      const w2 = plan.args.wallet2 ?? addresses[1];
+      if (!w1 || !w2) {
+        return { ...plan, clarification: "Provide two wallet addresses to compare, e.g. \"compare 0xABC... with 0xDEF...\"." };
+      }
+      return { ...plan, args: { ...plan.args, wallet1: w1, wallet2: w2 } };
+    }
+    case "portfolio_risk_score":
+      if (!plan.args.address && !input.walletAddress && !/0x[0-9a-fA-F]{40}/.test(input.message)) {
+        return { ...plan, clarification: "Provide a wallet address to score, or connect your wallet." };
+      }
       return plan;
     default:
       return plan;
@@ -226,7 +298,7 @@ export async function planChatTool(input: PlannerInput): Promise<ChatToolPlan> {
             "Return only JSON with shape: {\"intent\":\"...\",\"args\":{},\"clarification\":\"optional short question\"}.",
             "Use conversation summary and recent turns only to resolve references like 'that token' or 'same wallet'.",
             "Do not answer the user. Do not invent addresses, tokens, amounts, hashes, or unsupported features.",
-            "For ambiguous or missing required fields, choose the closest intent and include clarification.",
+            "IMPORTANT: Only set clarification when a required arg (address, amount, token) is truly missing AND cannot be inferred. Never ask follow-up questions for open-ended requests like docs, market data, whale watch, or network stats — just pick the intent and return it. Prefer action over asking.",
             "Supported Celo action tokens: CELO, cUSD, cEUR, cREAL, USDC, USDT, WBTC.",
             `Connected wallet: ${input.walletAddress ?? "none"}.`,
             `Tool catalog:\n${JSON.stringify(TOOL_CATALOG, null, 2)}`,

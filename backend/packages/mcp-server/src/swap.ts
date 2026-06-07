@@ -20,7 +20,7 @@ export const UNISWAP_V3 = {
   quoterV2: "0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8" as Address,
   swapRouter02: "0x5615CDAb10dc425a742d643d949a7F474C01abc4" as Address,
 };
-const FEE_TIERS = [500, 3000, 10000] as const;
+const FEE_TIERS = [100, 500, 3000, 10000] as const;
 
 // Loss guards (env-overridable). Price impact = how far the trade moves the price vs ~spot.
 const WARN_IMPACT = Number(process.env.SWAP_WARN_PRICE_IMPACT) || 0.03; // 3% → warn

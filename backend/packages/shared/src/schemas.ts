@@ -223,6 +223,10 @@ export const INTENTS = [
   "wallet_stats",
   "nft_balances",
   "yield_info",
+  "get_transaction",
+  "filtered_transactions",
+  "compare_wallets",
+  "portfolio_risk_score",
   "unsupported",
 ] as const;
 
