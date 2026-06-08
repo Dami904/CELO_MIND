@@ -1,5 +1,6 @@
 import './globals.css';
 import Navbar from '../components/ui/Navbar';
+import Web3ModalProvider from '../components/Web3ModalProvider';
 
 export const metadata = {
   title: 'CeloMind — AI assistant for the Celo network',
@@ -18,10 +19,11 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body className="bg-stone-50 text-slate-900 antialiased">
-        {/* Wire onConnect + walletAddress from your existing wallet context/provider */}
-        <Navbar />
-        {children}
+      <body className="bg-stone-50 text-slate-900 antialiased flex flex-col min-h-screen">
+        <Web3ModalProvider>
+          <Navbar />
+          {children}
+        </Web3ModalProvider>
       </body>
     </html>
   );

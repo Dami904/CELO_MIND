@@ -19,8 +19,19 @@ async function main() {
   await initDb();
   const app = Fastify({ logger: { level: "info" } });
 
+  const ALLOWED_ORIGINS = [
+    "https://celomind.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    ...(process.env.EXTRA_CORS_ORIGINS ? process.env.EXTRA_CORS_ORIGINS.split(",") : []),
+  ];
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      // Allow requests with no origin (server-to-server, curl, MCP clients)
+      if (!origin) return cb(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`), false);
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   });
 

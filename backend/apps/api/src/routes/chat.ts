@@ -13,6 +13,7 @@ import {
 } from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
 import { planChatTool } from "../ai/tool-planner.js";
+import { resolveIntent } from "../ai/intent-router.js";
 import { aiComplete, routeForIntent, type AIMessage } from "../ai/providers.js";
 import {
   getChatMessages,
@@ -1055,17 +1056,33 @@ export async function chatRoutes(app: FastifyInstance) {
     }
 
     const chatReq = parsed.data;
+
+    // Load memory + summary in parallel (already the case).
     const [conversationMemory, conversationSummary] = await Promise.all([
       buildChatMemory(chatReq),
       getChatConversationSummary(chatReq),
     ]);
-    const planned = await planChatTool({
-      message: chatReq.message,
-      chatbotType: chatReq.chatbotType,
-      walletAddress: chatReq.walletAddress,
-      conversationSummary,
-      conversationMemory,
-    });
+
+    // Run AI planner and deterministic pre-fetch in parallel.
+    // The deterministic router gives an immediate (regex-only) intent guess so we can
+    // start fetching data while the AI planner is still thinking. When both settle we
+    // use the AI planner's (more accurate) intent but the data is already in flight.
+    const deterministicIntent = resolveIntent(chatReq.message, chatReq.chatbotType).intent;
+    const [planned, prefetchedData] = await Promise.all([
+      planChatTool({
+        message: chatReq.message,
+        chatbotType: chatReq.chatbotType,
+        walletAddress: chatReq.walletAddress,
+        conversationSummary,
+        conversationMemory,
+      }),
+      fetchIntentData(deterministicIntent, {
+        message: chatReq.message,
+        walletAddress: chatReq.walletAddress,
+        selectedTool: chatReq.selectedTool,
+        toolArgs: {},
+      }).catch(() => null),
+    ]);
     const intent = planned.intent;
 
     // Log user message (fire-and-forget — non-fatal)
@@ -1136,12 +1153,20 @@ export async function chatRoutes(app: FastifyInstance) {
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       // 1. Fetch data for the current intent.
-      const fetched = await fetchIntentData(currentIntent, {
-        message: chatReq.message,
-        walletAddress: chatReq.walletAddress,
-        selectedTool: chatReq.selectedTool,
-        toolArgs: currentArgs,
-      });
+      // On the first iteration reuse the prefetch if the planner agreed with the
+      // deterministic router — saves a full round-trip to Blockscout/RPC.
+      const canReusePrefetch =
+        iteration === 0 &&
+        prefetchedData !== null &&
+        currentIntent === deterministicIntent;
+      const fetched = canReusePrefetch
+        ? prefetchedData
+        : await fetchIntentData(currentIntent, {
+            message: chatReq.message,
+            walletAddress: chatReq.walletAddress,
+            selectedTool: chatReq.selectedTool,
+            toolArgs: currentArgs,
+          });
       intentData = fetched;
       accumulatedData.push({ intent: currentIntent, data: fetched });
 
@@ -1158,13 +1183,22 @@ export async function chatRoutes(app: FastifyInstance) {
       // 3. Ask the AI.
       try {
         const route = routeForIntent(currentIntent);
+        // Structured data intents rarely need more than 400 tokens; capping saves
+        // 200-400ms on fast models. Analysis/docs intents keep the full 1024.
+        const LONG_INTENTS = new Set([
+          "docs_explain", "mcp_setup", "claude_setup", "transaction_explain",
+          "contract_risk", "token_risk", "malicious_tx_check", "compare_wallets",
+          "portfolio_risk_score", "copy_wallet_analyze", "copy_wallet_prepare",
+          "whale_activity", "get_transaction",
+        ]);
+        const maxTokens = LONG_INTENTS.has(currentIntent) ? 1024 : 480;
         const result = await aiComplete({
           messages: [
             { role: "system", content: systemPrompt + summaryBlock + contextBlock + pageContext + agentInstruction },
             ...conversationMemory,
             { role: "user", content: chatReq.message },
           ],
-          maxTokens: 1024,
+          maxTokens,
           temperature: 0.7,
           provider: route.provider,
           model: route.model,

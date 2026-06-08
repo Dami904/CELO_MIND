@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 const capabilities = [
@@ -8,9 +9,7 @@ const capabilities = [
     title: 'Check your wallet',
     desc: 'Ask in plain English — "What\'s in my wallet?" or "Show my recent transactions." No jargon needed.',
   },
-
   {
-  
     badge: 'DeFi actions',
     title: 'Swap & send tokens',
     desc: 'Move money on the Celo network. Swap CELO for cUSD, send to a friend — all through a simple chat.',
@@ -23,7 +22,7 @@ const capabilities = [
 ];
 
 const stats = [
-  { value: '38', label: 'AI tools' },
+  { value: '40', label: 'AI tools' },
   { value: '1.2s', label: 'Avg response' },
   { value: '3ms', label: 'Chain latency' },
   { value: '100%', label: 'Open source' },
@@ -49,31 +48,55 @@ export default function HomePage() {
     <main>
       {/* ── Hero ── */}
       <section className="relative overflow-hidden text-center px-4 pt-20 pb-16 md:pt-28 md:pb-24">
-        {/* Background glow */}
+        {/* Ambient glow */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.13) 0%, transparent 70%)' }}
+          className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.12) 0%, transparent 70%)' }}
         />
 
-        <div className="relative z-10 max-width-none mx-auto max-w-2xl">
+        {/* brain.png — floats on the right edge, adds AI/intelligence depth to the hero */}
+        <div className="pointer-events-none absolute right-0 top-0 w-[340px] md:w-[440px] h-full overflow-hidden hidden lg:block" aria-hidden>
+          <Image
+            src="/brain.png"
+            alt=""
+            width={440}
+            height={600}
+            className="object-cover object-left opacity-30 mix-blend-luminosity"
+            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.6) 0%, transparent 100%)' }}
+            priority
+          />
+        </div>
+        {/* mirror on left */}
+        <div className="pointer-events-none absolute left-0 top-0 w-[260px] h-full overflow-hidden hidden xl:block" aria-hidden>
+          <Image
+            src="/brain.png"
+            alt=""
+            width={320}
+            height={500}
+            className="object-cover object-right opacity-15 mix-blend-luminosity scale-x-[-1]"
+            style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.4) 0%, transparent 100%)' }}
+          />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-2xl">
           {/* Live badge */}
           <div className="inline-flex items-center gap-2 text-xs font-medium text-[#1A8C52] bg-[#D4F5E6] rounded-full px-4 py-1.5 mb-7 animate-fade-up">
             <span className="live-dot" />
             Live on Celo Mainnet
           </div>
 
-          <h1 className="font-display text-5xl md:text-6xl font-light tracking-tight leading-tight text-slate-900 mb-5 animate-fade-up animate-delay-100">
+          <h1 className="font-display text-5xl md:text-6xl font-light tracking-tight leading-tight text-slate-900 mb-5 animate-fade-up delay-1">
             Your AI assistant<br />
             <em className="not-italic text-amber-600">for the Celo network</em>
           </h1>
 
-          <p className="text-lg text-slate-500 max-w-lg mx-auto mb-9 leading-relaxed animate-fade-up animate-delay-200">
+          <p className="text-lg text-slate-500 max-w-lg mx-auto mb-9 leading-relaxed animate-fade-up delay-2">
             CeloMind lets you manage crypto, track tokens, and stay safe — all by having a normal conversation.
             No technical knowledge required.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-3 mb-12 animate-fade-up animate-delay-300">
+          <div className="flex flex-wrap justify-center gap-3 mb-12 animate-fade-up delay-3">
             <Link
               href="/chat"
               className="inline-flex items-center gap-2 bg-[#FCBE00] hover:bg-[#C49200] hover:text-white text-slate-900 font-medium text-base px-7 py-3 rounded-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
@@ -89,7 +112,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats row */}
-          <div className="flex flex-wrap justify-center gap-3 animate-fade-up animate-delay-300">
+          <div className="flex flex-wrap justify-center gap-3 animate-fade-up delay-3">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col items-center bg-stone-100 border border-stone-200 rounded-2xl px-5 py-3 min-w-[100px]">
                 <span className="font-display text-2xl font-medium text-slate-900 leading-none">{s.value}</span>
@@ -100,30 +123,44 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── What is this ── */}
-      <section className="bg-stone-100 border-y border-stone-200">
-        <div className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-          <p className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-3">What is CeloMind?</p>
-          <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 mb-5 leading-snug">
-            Crypto can be complex.<br />We made it conversational.
-          </h2>
-          <p className="text-base text-slate-500 max-w-xl leading-relaxed mb-10">
-            CeloMind connects an AI assistant to the Celo blockchain — a fast, low-cost network built for
-            everyday use. Instead of copying addresses or figuring out DeFi, you just type what you want.
-          </p>
+      {/* ── What is CeloMind ── */}
+      <section className="bg-stone-100 border-y border-stone-200 overflow-hidden">
+        <div className="max-w-5xl mx-auto px-4 py-16 md:py-20 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-center">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-3">What is CeloMind?</p>
+            <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 mb-5 leading-snug">
+              Crypto can be complex.<br />We made it conversational.
+            </h2>
+            <p className="text-base text-slate-500 max-w-xl leading-relaxed mb-10">
+              CeloMind connects an AI assistant to the Celo blockchain — a fast, low-cost network built for
+              everyday use. Instead of copying addresses or figuring out DeFi, you just type what you want.
+            </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {steps.map((s) => (
-              <div key={s.n} className="flex gap-4 items-start">
-                <div className="shrink-0 w-9 h-9 rounded-full bg-[#FCBE00] text-slate-900 font-display font-semibold text-sm flex items-center justify-center">
-                  {s.n}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {steps.map((s) => (
+                <div key={s.n} className="flex gap-4 items-start">
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-[#FCBE00] text-slate-900 font-display font-semibold text-sm flex items-center justify-center">
+                    {s.n}
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 text-sm mb-1">{s.title}</p>
+                    <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-slate-800 text-sm mb-1">{s.title}</p>
-                  <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* smiling.png — friendly face makes this section warm and approachable */}
+          <div className="hidden md:flex items-end justify-center shrink-0">
+            <Image
+              src="/smiling.png"
+              alt="CeloMind is friendly and easy to use"
+              width={220}
+              height={280}
+              className="rounded-3xl shadow-xl object-cover"
+              style={{ transform: 'rotate(2deg)' }}
+            />
           </div>
         </div>
       </section>
@@ -134,9 +171,8 @@ export default function HomePage() {
         <h2 className="font-display text-3xl font-light text-slate-900 mb-8">Three ways CeloMind helps you</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {capabilities.map((c) => (
+          {capabilities.map((c, i) => (
             <div key={c.title} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-              <span className="text-3xl mb-3 block">{c.emoji}</span>
               <span className="text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-3 py-0.5 mb-3 inline-block">{c.badge}</span>
               <h3 className="font-medium text-slate-800 text-base mb-2">{c.title}</h3>
               <p className="text-sm text-slate-500 leading-relaxed">{c.desc}</p>
@@ -168,26 +204,43 @@ export default function HomePage() {
 
       {/* ── CTA ── */}
       <section className="px-4 pb-20">
-        <div className="max-w-xl mx-auto bg-slate-900 rounded-3xl px-8 py-12 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-light text-white mb-4">Ready to try it?</h2>
-          <p className="text-slate-400 text-base mb-8 leading-relaxed">
-            Connect your wallet and start a conversation. It's free and open-source.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Link
-              href="/chat"
-              className="bg-[#FCBE00] hover:bg-[#C49200] hover:text-white text-slate-900 font-medium px-7 py-3 rounded-full text-sm transition-all duration-150"
-            >
-              Open AI chat
-            </Link>
-            <a
-              href="https://github.com/Dami904/CELO_MIND.git"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-medium px-7 py-3 rounded-full text-sm transition-all duration-150"
-            >
-              View source
-            </a>
+        <div className="max-w-2xl mx-auto bg-slate-900 rounded-3xl overflow-hidden">
+          <div className="flex flex-col md:flex-row items-center gap-0">
+
+            {/* superb.png — "OK / approved" hands reinforce the trust & approval message */}
+            <div className="md:w-56 shrink-0 self-stretch overflow-hidden hidden md:block">
+              <Image
+                src="/superb.png"
+                alt=""
+                width={224}
+                height={320}
+                className="w-full h-full object-cover opacity-80"
+                aria-hidden
+              />
+            </div>
+
+            <div className="flex-1 px-8 py-12 text-center md:text-left">
+              <h2 className="font-display text-3xl md:text-4xl font-light text-white mb-4">Ready to try it?</h2>
+              <p className="text-slate-400 text-base mb-8 leading-relaxed">
+                Connect your wallet and start a conversation. It's free and open-source.
+              </p>
+              <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                <Link
+                  href="/chat"
+                  className="bg-[#FCBE00] hover:bg-[#C49200] hover:text-white text-slate-900 font-medium px-7 py-3 rounded-full text-sm transition-all duration-150"
+                >
+                  Open AI chat
+                </Link>
+                <a
+                  href="https://github.com/Dami904/CELO_MIND.git"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-medium px-7 py-3 rounded-full text-sm transition-all duration-150"
+                >
+                  View source
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

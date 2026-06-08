@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Pin the workspace root to this app so Next doesn't infer it from a stray
-  // lockfile higher up the tree (this is a self-contained app, not a monorepo).
   turbopack: {
     root: __dirname,
+  },
+  images: {
+    // Local images in /public are served without any domain config.
+    // Add remote hostnames here if you ever pull images from external URLs.
+    formats: ['image/webp', 'image/avif'],
   },
 };
 

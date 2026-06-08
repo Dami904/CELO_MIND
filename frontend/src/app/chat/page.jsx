@@ -2,8 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import { BrowserProvider } from 'ethers';
+import { apiClient } from '@/lib/api';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import ResultCard from '@/components/ui/ResultCard';
 
-// Matches full 0x hashes (66 chars = tx hash) and 0x addresses (42 chars).
+// ── Hex rendering ──────────────────────────────────────────────────────────────
 const HEX_RE = /(0x[0-9a-fA-F]{64}|0x[0-9a-fA-F]{40})/g;
 const isHex = (s) => /^0x[0-9a-fA-F]{40,64}$/.test(s);
 
@@ -60,6 +65,7 @@ function MessageText({ content }) {
   );
 }
 
+// ── Sidebar suggestions ────────────────────────────────────────────────────────
 const suggestions = {
   'My wallet': [
     'Check my CELO balance',
@@ -101,8 +107,12 @@ function TypingDots() {
   );
 }
 
+// ── Main chat component ────────────────────────────────────────────────────────
 function ChatInner() {
   const searchParams = useSearchParams();
+  const { address, isConnected } = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -115,6 +125,12 @@ function ChatInner() {
   const [loading, setLoading] = useState(false);
   const [activeCat, setActiveCat] = useState('My wallet');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [conversationId] = useState(() => crypto.randomUUID());
+
+  // Confirmation modal state
+  const [pendingTx, setPendingTx] = useState(null);
+  const [isSigning, setIsSigning] = useState(false);
+
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -127,36 +143,82 @@ function ChatInner() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
+  const addMessage = (msg) => setMessages((prev) => [...prev, msg]);
+
   const sendMessage = useCallback(async (text) => {
     const content = (text || input).trim();
     if (!content || loading) return;
     setInput('');
 
     const userMsg = { role: 'user', content, ts: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
+    addMessage(userMsg);
     setLoading(true);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
-        }),
+      const response = await apiClient.sendMessage(
+        content,
+        isConnected && address ? address : undefined,
+        'full',
+        conversationId
+      );
+
+      if (!response.success) {
+        addMessage({ role: 'assistant', content: response.message, ts: new Date(), error: true });
+        return;
+      }
+
+      // If the backend returned a transaction to sign, show confirm modal.
+      if (response.data?.pendingTx) {
+        setPendingTx(response.data.pendingTx);
+      }
+
+      addMessage({
+        role: 'assistant',
+        content: response.message,
+        ts: new Date(),
+        resultCard: response.data?.resultCard ?? null,
+        pendingTx: response.data?.pendingTx ?? null,
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const reply = data?.message || data?.content || "Sorry, I couldn't process that.";
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply, ts: new Date() }]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.', ts: new Date(), error: true },
-      ]);
+      addMessage({ role: 'assistant', content: 'Something went wrong. Please try again.', ts: new Date(), error: true });
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages]);
+  }, [input, loading, address, isConnected, conversationId]);
+
+  // Sign and broadcast the pending transaction via the connected wallet.
+  const handleConfirm = async () => {
+    if (!pendingTx || !walletProvider) return;
+    setIsSigning(true);
+    try {
+      const provider = new BrowserProvider(walletProvider);
+      const signer = await provider.getSigner();
+
+      for (const tx of pendingTx.transactions) {
+        const sent = await signer.sendTransaction({
+          to: tx.to,
+          data: tx.data ?? '0x',
+          value: tx.value ? BigInt(tx.value) : 0n,
+        });
+        await sent.wait();
+        addMessage({
+          role: 'assistant',
+          content: `Transaction confirmed on Celo Mainnet.\nHash: ${sent.hash}`,
+          ts: new Date(),
+        });
+      }
+    } catch (err) {
+      addMessage({
+        role: 'assistant',
+        content: err?.code === 4001 ? 'Transaction cancelled.' : `Signing failed: ${err?.message ?? 'unknown error'}`,
+        ts: new Date(),
+        error: true,
+      });
+    } finally {
+      setIsSigning(false);
+      setPendingTx(null);
+    }
+  };
 
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -167,12 +229,23 @@ function ChatInner() {
   return (
     <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
 
+      {/* ── Confirmation modal ── */}
+      {pendingTx && (
+        <ConfirmModal
+          isOpen={!!pendingTx}
+          onClose={() => setPendingTx(null)}
+          onConfirm={handleConfirm}
+          title={pendingTx.title}
+          data={pendingTx.data}
+          isSubmitting={isSigning}
+        />
+      )}
+
       {/* ── Sidebar ── */}
       <aside
         className={`${sidebarOpen ? 'w-64' : 'w-0'} shrink-0 overflow-hidden transition-all duration-250 border-r border-slate-200 bg-stone-50 flex flex-col`}
       >
         <div className="w-64 flex flex-col h-full p-4 gap-4 overflow-y-auto">
-          {/* Header */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium uppercase tracking-widest text-slate-400">Suggestions</span>
             <button
@@ -183,7 +256,6 @@ function ChatInner() {
             </button>
           </div>
 
-          {/* Category tabs */}
           <div className="flex flex-col gap-0.5">
             {Object.keys(suggestions).map((cat) => (
               <button
@@ -200,7 +272,6 @@ function ChatInner() {
             ))}
           </div>
 
-          {/* Prompt buttons */}
           <div className="flex flex-col gap-1">
             {suggestions[activeCat].map((p) => (
               <button
@@ -239,6 +310,15 @@ function ChatInner() {
               Agent ready
             </p>
           </div>
+          {/* Connected wallet badge */}
+          {isConnected && address && (
+            <div className="ml-auto flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="text-xs font-medium text-emerald-700">
+                {address.slice(0, 6)}…{address.slice(-4)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -250,19 +330,40 @@ function ChatInner() {
                   CM
                 </div>
               )}
-              <div
-                className={`max-w-[78%] px-4 py-3 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-slate-900 text-white/90 rounded-br-md'
-                    : msg.error
-                    ? 'bg-red-50 border border-red-100 text-slate-700 rounded-bl-md'
-                    : 'bg-white border border-slate-200 shadow-sm text-slate-600 rounded-bl-md'
-                }`}
-              >
-                <MessageText content={msg.content} />
-                <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/40' : 'text-slate-300'}`}>
-                  {fmtTime(msg.ts)}
-                </span>
+              <div className="max-w-[78%] flex flex-col gap-2">
+                <div
+                  className={`px-4 py-3 rounded-2xl ${
+                    msg.role === 'user'
+                      ? 'bg-slate-900 text-white/90 rounded-br-md'
+                      : msg.error
+                      ? 'bg-red-50 border border-red-100 text-slate-700 rounded-bl-md'
+                      : 'bg-white border border-slate-200 shadow-sm text-slate-600 rounded-bl-md'
+                  }`}
+                >
+                  <MessageText content={msg.content} />
+                  <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/40' : 'text-slate-300'}`}>
+                    {fmtTime(msg.ts)}
+                  </span>
+                </div>
+
+                {/* Result card rendered below the bubble */}
+                {msg.resultCard && (
+                  <ResultCard
+                    title={msg.resultCard.title}
+                    data={msg.resultCard.data}
+                    className="rounded-xl border-slate-200"
+                  />
+                )}
+
+                {/* Pending tx — show a sign button if no modal was triggered yet */}
+                {msg.pendingTx && !pendingTx && (
+                  <button
+                    onClick={() => setPendingTx(msg.pendingTx)}
+                    className="self-start text-xs font-medium bg-[#FCBE00] hover:bg-[#C49200] hover:text-white text-slate-900 rounded-full px-4 py-1.5 transition-all"
+                  >
+                    Review & sign transaction →
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -286,7 +387,7 @@ function ChatInner() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder={"\"What's my balance?\" or \"Swap 5 CELO for cUSD\""}
+              placeholder={isConnected ? '"What\'s my balance?" or "Swap 5 CELO for cUSD"' : '"Show me CELO price" or paste a wallet address…'}
               rows={1}
               disabled={loading}
               className="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
