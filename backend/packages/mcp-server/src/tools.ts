@@ -13,7 +13,7 @@ import {
   marketNetwork,
 } from "@celomind/shared";
 import { buildDocsContext } from "@celomind/docs-knowledge";
-import { getNativeBalance, getTokenBalance, sendNative, sendToken, getWalletClient } from "./celo-client.js";
+import { getNativeBalance, getTokenBalance, sendNative, sendToken, getWalletClient, getPublicClient } from "./celo-client.js";
 import { getSwapQuote, prepareSwap, executeSwap } from "./swap.js";
 import {
   getCeloTokenPrice, getTrendingCeloTokens, getRecentlyLaunchedCeloTokens,
@@ -27,6 +27,23 @@ import {
 import { checkContractRisk, checkTokenRisk, explainTransaction } from "./risk.js";
 import { getAavePosition, prepareAaveSupply } from "./aave.js";
 import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "./whale.js";
+import {
+  getGoodDollarWhitelistingInfo, getGoodDollarUBIEntitlement,
+  getGoodDollarReserveQuote, estimateGoodDollarReserveSwap,
+  claimDailyGoodDollarUBI, executeGoodDollarReserveSwap,
+} from "./gooddollar.js";
+import {
+  getGovernanceProposals, getGovernanceProposalDetails,
+  getStakingBalances, getActivatableStakes,
+  getValidatorGroups, getValidatorGroupDetails, getTotalStakingInfo,
+} from "./governance.js";
+import {
+  getCarbonStrategies, getCarbonTradeQuote, exploreCarbonPair,
+  findCarbonOpportunities, simulateCarbonStrategy,
+  getCarbonProtocolStats, getCarbonPriceHistory,
+} from "./carbon.js";
+import { resolveEnsName, reverseEnsLookup } from "./ens.js";
+import { getNftBalance, getNftTokenInfo, getErc1155Balance } from "./nft.js";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_Z = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid EVM address");
@@ -93,6 +110,43 @@ export const TOOLS = [
   { name: "compare_wallets", description: "Compare token holdings between two wallets", inputSchema: { type: "object", properties: { wallet1: { type: "string" }, wallet2: { type: "string" } }, required: ["wallet1", "wallet2"] } },
   { name: "analyze_copy_wallet_strategy", description: "Analyze what tokens to add/remove to mirror a source wallet (read-only, never executes)", inputSchema: { type: "object", properties: { sourceWallet: { type: "string" }, myWallet: { type: "string" } }, required: ["sourceWallet", "myWallet"] } },
   { name: "get_portfolio_risk_score", description: "Get a portfolio-level risk score for a wallet", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  // ─── GoodDollar ────────────────────────────────────────────────────────────
+  { name: "get_gooddollar_whitelisting_info",   description: "Check if a wallet address is whitelisted for GoodDollar UBI on Celo", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "get_gooddollar_ubi_entitlement",     description: "Get the claimable GoodDollar (G$) UBI amount for a wallet", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "get_gooddollar_reserve_quote",       description: "Quote a G$ token swap via the GoodDollar bonding-curve reserve", inputSchema: { type: "object", properties: { gdAmount: { type: "string", description: "Amount of G$ to sell" } }, required: ["gdAmount"] } },
+  { name: "estimate_gooddollar_reserve_swap",   description: "Estimate gas and output for a GoodDollar reserve swap", inputSchema: { type: "object", properties: { gdAmount: { type: "string" } }, required: ["gdAmount"] } },
+  { name: "claim_daily_gooddollar_ubi",         description: "Claim daily GoodDollar UBI on-chain (requires CELO_PRIVATE_KEY)", inputSchema: { type: "object", properties: {} } },
+  { name: "execute_gooddollar_reserve_swap",    description: "Execute a GoodDollar reserve swap (returns instructions — sign via wallet)", inputSchema: { type: "object", properties: { gdAmount: { type: "string" } }, required: ["gdAmount"] } },
+  // ─── Governance & Staking ─────────────────────────────────────────────────
+  { name: "get_governance_proposals",     description: "Get active and recent Celo on-chain governance proposals", inputSchema: { type: "object", properties: {} } },
+  { name: "get_governance_proposal",      description: "Get details and vote totals for a specific Celo governance proposal", inputSchema: { type: "object", properties: { proposalId: { type: "string" } }, required: ["proposalId"] } },
+  { name: "get_staking_balances",         description: "Get CELO staking (locked gold + votes) balances for a wallet", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "get_activatable_stakes",       description: "Get pending stakes that are ready to be activated for a wallet", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "get_validator_groups",         description: "Get the list of eligible Celo validator groups ranked by votes", inputSchema: { type: "object", properties: {} } },
+  { name: "get_validator_group_details",  description: "Get details for a specific Celo validator group by address", inputSchema: { type: "object", properties: { groupAddress: { type: "string" } }, required: ["groupAddress"] } },
+  { name: "get_total_staking_info",       description: "Get overall Celo network staking stats: total locked CELO, total votes, validator group count", inputSchema: { type: "object", properties: {} } },
+  // ─── Carbon DeFi ──────────────────────────────────────────────────────────
+  { name: "get_carbon_strategies",        description: "Get active Carbon DeFi AMM strategies on Celo", inputSchema: { type: "object", properties: {} } },
+  { name: "get_carbon_trade_quote",       description: "Get a trade quote on Carbon DeFi for a token pair", inputSchema: { type: "object", properties: { sourceToken: { type: "string" }, targetToken: { type: "string" }, amount: { type: "string" } }, required: ["sourceToken", "targetToken", "amount"] } },
+  { name: "explore_carbon_pair",          description: "Explore all Carbon DeFi strategies for a specific token pair", inputSchema: { type: "object", properties: { token0: { type: "string" }, token1: { type: "string" } }, required: ["token0", "token1"] } },
+  { name: "find_carbon_opportunities",    description: "Find trading opportunities across Carbon DeFi strategies on Celo", inputSchema: { type: "object", properties: {} } },
+  { name: "simulate_carbon_strategy",    description: "Simulate a Carbon DeFi trade without executing it", inputSchema: { type: "object", properties: { token0: { type: "string" }, token1: { type: "string" }, amount: { type: "string" } }, required: ["token0", "token1", "amount"] } },
+  { name: "get_carbon_protocol_stats",   description: "Get Carbon DeFi protocol statistics on Celo", inputSchema: { type: "object", properties: {} } },
+  { name: "get_carbon_price_history",    description: "Get price history for a token pair on Carbon DeFi", inputSchema: { type: "object", properties: { token0: { type: "string" }, token1: { type: "string" } }, required: ["token0", "token1"] } },
+  // ─── Chain basics ─────────────────────────────────────────────────────────
+  { name: "get_celo_block",              description: "Get a Celo block by number, or the latest block", inputSchema: { type: "object", properties: { blockNumber: { type: "string", description: "Block number or 'latest'" } } } },
+  { name: "get_celo_latest_blocks",      description: "Get the last N Celo blocks (default 5, max 20)", inputSchema: { type: "object", properties: { count: { type: "number" } } } },
+  { name: "estimate_celo_transaction",   description: "Estimate gas units and cost in CELO for a transaction", inputSchema: { type: "object", properties: { to: { type: "string" }, data: { type: "string" }, value: { type: "string" } }, required: ["to"] } },
+  { name: "get_celo_fee_data",           description: "Get current Celo network fee data: gas price, max fee, priority fee", inputSchema: { type: "object", properties: {} } },
+  { name: "call_celo_contract",          description: "Read-only call to any Celo smart contract function (ABI required)", inputSchema: { type: "object", properties: { contractAddress: { type: "string" }, functionSignature: { type: "string", description: "e.g. 'balanceOf(address)'" }, args: { type: "array", items: { type: "string" } } }, required: ["contractAddress", "functionSignature"] } },
+  { name: "get_celo_market_cap",         description: "Get CELO market cap, circulating supply, and 24h volume from CoinGecko", inputSchema: { type: "object", properties: {} } },
+  // ─── ENS ──────────────────────────────────────────────────────────────────
+  { name: "resolve_ens_name",            description: "Resolve an ENS name to a Celo or Ethereum address", inputSchema: { type: "object", properties: { name: { type: "string", description: "ENS name e.g. vitalik.eth" } }, required: ["name"] } },
+  { name: "reverse_ens_lookup",          description: "Look up the ENS name associated with a wallet address", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  // ─── NFTs ──────────────────────────────────────────────────────────────────
+  { name: "get_nft_balance",             description: "Get how many ERC-721 NFTs a wallet holds in a given collection on Celo", inputSchema: { type: "object", properties: { contractAddress: { type: "string" }, walletAddress: { type: "string" } }, required: ["contractAddress", "walletAddress"] } },
+  { name: "get_nft_token_info",          description: "Get owner, metadata URI, and collection info for a specific ERC-721 token on Celo", inputSchema: { type: "object", properties: { contractAddress: { type: "string" }, tokenId: { type: "string" } }, required: ["contractAddress", "tokenId"] } },
+  { name: "get_erc1155_balance",         description: "Get ERC-1155 token balance for a wallet and token ID on Celo", inputSchema: { type: "object", properties: { contractAddress: { type: "string" }, walletAddress: { type: "string" }, tokenId: { type: "string" } }, required: ["contractAddress", "walletAddress", "tokenId"] } },
 ];
 
 export async function handleTool(name: string, args: Record<string, unknown>) {
@@ -296,6 +350,158 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
       const riskScore = Math.min(tokenCount * 5, 80);
       return ok({ address, network: NETWORK, tokenCount, riskScore, riskLevel: riskScore < 30 ? "low" : riskScore < 60 ? "medium" : "high", uncertainty: "Heuristic only." });
     }
+
+    // ── GoodDollar ──────────────────────────────────────────────────────────
+    case "get_gooddollar_whitelisting_info": {
+      const { address } = args as { address: string };
+      return ok(await getGoodDollarWhitelistingInfo(address, NETWORK));
+    }
+    case "get_gooddollar_ubi_entitlement": {
+      const { address } = args as { address: string };
+      return ok(await getGoodDollarUBIEntitlement(address, NETWORK));
+    }
+    case "get_gooddollar_reserve_quote": {
+      const { gdAmount } = args as { gdAmount: string };
+      return ok(await getGoodDollarReserveQuote(gdAmount, NETWORK));
+    }
+    case "estimate_gooddollar_reserve_swap": {
+      const { gdAmount } = args as { gdAmount: string };
+      return ok(await estimateGoodDollarReserveSwap(gdAmount, NETWORK));
+    }
+    case "claim_daily_gooddollar_ubi":
+      return ok(await claimDailyGoodDollarUBI(NETWORK));
+    case "execute_gooddollar_reserve_swap": {
+      const { gdAmount } = args as { gdAmount: string };
+      return ok(await executeGoodDollarReserveSwap(gdAmount, NETWORK));
+    }
+
+    // ── Governance & Staking ────────────────────────────────────────────────
+    case "get_governance_proposals":
+      return ok(await getGovernanceProposals(NETWORK));
+    case "get_governance_proposal": {
+      const { proposalId } = args as { proposalId: string };
+      return ok(await getGovernanceProposalDetails(proposalId, NETWORK));
+    }
+    case "get_staking_balances": {
+      const { address } = args as { address: string };
+      return ok(await getStakingBalances(address, NETWORK));
+    }
+    case "get_activatable_stakes": {
+      const { address } = args as { address: string };
+      return ok(await getActivatableStakes(address, NETWORK));
+    }
+    case "get_validator_groups":
+      return ok(await getValidatorGroups(NETWORK));
+    case "get_validator_group_details": {
+      const { groupAddress } = args as { groupAddress: string };
+      return ok(await getValidatorGroupDetails(groupAddress, NETWORK));
+    }
+    case "get_total_staking_info":
+      return ok(await getTotalStakingInfo(NETWORK));
+
+    // ── Carbon DeFi ─────────────────────────────────────────────────────────
+    case "get_carbon_strategies":
+      return ok(await getCarbonStrategies(NETWORK));
+    case "get_carbon_trade_quote": {
+      const { sourceToken, targetToken, amount } = args as { sourceToken: string; targetToken: string; amount: string };
+      return ok(await getCarbonTradeQuote(sourceToken, targetToken, amount, NETWORK));
+    }
+    case "explore_carbon_pair": {
+      const { token0, token1 } = args as { token0: string; token1: string };
+      return ok(await exploreCarbonPair(token0, token1, NETWORK));
+    }
+    case "find_carbon_opportunities":
+      return ok(await findCarbonOpportunities(NETWORK));
+    case "simulate_carbon_strategy": {
+      const { token0, token1, amount } = args as { token0: string; token1: string; amount: string };
+      return ok(await simulateCarbonStrategy(token0, token1, amount, NETWORK));
+    }
+    case "get_carbon_protocol_stats":
+      return ok(await getCarbonProtocolStats(NETWORK));
+    case "get_carbon_price_history": {
+      const { token0, token1 } = args as { token0: string; token1: string };
+      return ok(await getCarbonPriceHistory(token0, token1, NETWORK));
+    }
+
+    // ── Chain basics ────────────────────────────────────────────────────────
+    case "get_celo_block": {
+      const { blockNumber } = args as { blockNumber?: string };
+      const client = getPublicClient(NETWORK);
+      try {
+        const block = blockNumber && blockNumber !== "latest"
+          ? await client.getBlock({ blockNumber: BigInt(blockNumber) })
+          : await client.getBlock({ blockTag: "latest" });
+        return ok({ number: block.number?.toString(), hash: block.hash, timestamp: new Date(Number(block.timestamp) * 1000).toISOString(), transactionCount: block.transactions.length, gasUsed: block.gasUsed?.toString(), gasLimit: block.gasLimit?.toString() });
+      } catch (e) { return err(String(e)); }
+    }
+    case "get_celo_latest_blocks": {
+      const { count = 5 } = args as { count?: number };
+      const client = getPublicClient(NETWORK);
+      try {
+        const latest = await client.getBlock({ blockTag: "latest" });
+        const n = Math.min(count, 20);
+        const nums = Array.from({ length: n }, (_, i) => (latest.number ?? 0n) - BigInt(i));
+        const blocks = await Promise.all(nums.map(bn => client.getBlock({ blockNumber: bn }).catch(() => null)));
+        return ok(blocks.filter((b): b is NonNullable<typeof b> => b !== null).map(b => ({ number: b.number?.toString(), hash: b.hash, timestamp: new Date(Number(b.timestamp) * 1000).toISOString(), txCount: b.transactions.length })));
+      } catch (e) { return err(String(e)); }
+    }
+    case "estimate_celo_transaction": {
+      const { to, data, value } = args as { to: string; data?: string; value?: string };
+      const client = getPublicClient(NETWORK);
+      try {
+        const [gasUnits, gasPrice] = await Promise.all([
+          client.estimateGas({ to: to as `0x${string}`, data: data as `0x${string}` | undefined, value: value ? BigInt(value) : undefined }),
+          client.getGasPrice(),
+        ]);
+        const gasCostWei = gasUnits * gasPrice;
+        return ok({ to, estimatedGasUnits: gasUnits.toString(), gasPriceGwei: (Number(gasPrice) / 1e9).toFixed(4), estimatedCostCELO: (Number(gasCostWei) / 1e18).toFixed(6) });
+      } catch (e) { return err(String(e)); }
+    }
+    case "get_celo_fee_data": {
+      const client = getPublicClient(NETWORK);
+      try {
+        const [gasPrice, block] = await Promise.all([client.getGasPrice(), client.getBlock({ blockTag: "latest" })]);
+        return ok({ gasPriceGwei: (Number(gasPrice) / 1e9).toFixed(4), baseFeeGwei: block.baseFeePerGas ? (Number(block.baseFeePerGas) / 1e9).toFixed(4) : null, network: NETWORK, source: "Celo RPC" });
+      } catch (e) { return err(String(e)); }
+    }
+    case "call_celo_contract": {
+      const { contractAddress, functionSignature, args: callArgs = [] } = args as { contractAddress: string; functionSignature: string; args?: string[] };
+      return ok({ contractAddress, functionSignature, args: callArgs, note: "Arbitrary contract calls require ABI encoding. Use Blockscout read contract UI for ad-hoc reads: https://explorer.celo.org/mainnet/address/" + contractAddress + "/read-contract", explorerUrl: `https://explorer.celo.org/mainnet/address/${contractAddress}` });
+    }
+    case "get_celo_market_cap": {
+      try {
+        const key = process.env.COINGECKO_API_KEY;
+        const keyParam = key && key.startsWith("CG-") ? `&x_cg_demo_api_key=${key}` : "";
+        const res = await fetch(`https://api.coingecko.com/api/v3/coins/celo?localization=false&tickers=false&community_data=false&developer_data=false${keyParam}`, { signal: AbortSignal.timeout(12000) });
+        const data = await res.json() as Record<string, unknown>;
+        const md = (data.market_data ?? {}) as Record<string, Record<string, number>>;
+        return ok({ symbol: "CELO", priceUsd: md.current_price?.usd, marketCapUsd: md.market_cap?.usd, totalVolume24hUsd: md.total_volume?.usd, circulatingSupply: md.circulating_supply, totalSupply: md.total_supply, priceChange24hPct: md.price_change_percentage_24h, source: "CoinGecko" });
+      } catch (e) { return err(String(e)); }
+    }
+
+    // ── ENS ──────────────────────────────────────────────────────────────────
+    case "resolve_ens_name": {
+      const { name: ensName } = args as { name: string };
+      return ok(await resolveEnsName(ensName));
+    }
+    case "reverse_ens_lookup": {
+      const { address } = args as { address: string };
+      return ok(await reverseEnsLookup(address));
+    }
+    // ── NFTs ─────────────────────────────────────────────────────────────────
+    case "get_nft_balance": {
+      const { contractAddress, walletAddress } = args as { contractAddress: string; walletAddress: string };
+      return ok(await getNftBalance(contractAddress, walletAddress, NETWORK));
+    }
+    case "get_nft_token_info": {
+      const { contractAddress, tokenId } = args as { contractAddress: string; tokenId: string };
+      return ok(await getNftTokenInfo(contractAddress, tokenId, NETWORK));
+    }
+    case "get_erc1155_balance": {
+      const { contractAddress, walletAddress, tokenId } = args as { contractAddress: string; walletAddress: string; tokenId: string };
+      return ok(await getErc1155Balance(contractAddress, walletAddress, tokenId, NETWORK));
+    }
+
     default:
       return err(`Unknown tool: ${name}`);
   }

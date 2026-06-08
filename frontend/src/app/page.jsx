@@ -22,7 +22,7 @@ const capabilities = [
 ];
 
 const stats = [
-  { value: '40', label: 'AI tools' },
+  { value: '71', label: 'AI tools' },
   { value: '1.2s', label: 'Avg response' },
   { value: '3ms', label: 'Chain latency' },
   { value: '100%', label: 'Open source' },
@@ -48,14 +48,15 @@ export default function HomePage() {
     <main>
       {/* ── Hero ── */}
       <section className="relative overflow-hidden text-center px-4 pt-20 pb-16 md:pt-28 md:pb-24 bg-stone-50 dark:bg-[#0F0E0C] transition-colors duration-200">
-        {/* Ambient glow */}
+
+        {/* Ambient gold glow */}
         <div
           aria-hidden
           className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full"
           style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.12) 0%, transparent 70%)' }}
         />
 
-        {/* brain.png — luminosity blend in light, screen blend glows in dark */}
+        {/* brain.png — right side */}
         <div className="pointer-events-none absolute right-0 top-0 w-[340px] md:w-[440px] h-full overflow-hidden hidden lg:block" aria-hidden>
           <Image
             src="/brain.png"
@@ -67,15 +68,16 @@ export default function HomePage() {
             priority
           />
         </div>
-        {/* mirror on left */}
-        <div className="pointer-events-none absolute left-0 top-0 w-[260px] h-full overflow-hidden hidden xl:block" aria-hidden>
+
+        {/* brain.png — left side, same size, mirrored */}
+        <div className="pointer-events-none absolute left-0 top-0 w-[340px] md:w-[440px] h-full overflow-hidden hidden lg:block" aria-hidden>
           <Image
             src="/brain.png"
             alt=""
-            width={320}
-            height={500}
-            className="object-cover object-right opacity-15 dark:opacity-35 mix-blend-luminosity dark:mix-blend-screen dark:brightness-125 scale-x-[-1]"
-            style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.4) 0%, transparent 100%)' }}
+            width={440}
+            height={600}
+            className="object-cover object-right opacity-30 dark:opacity-50 mix-blend-luminosity dark:mix-blend-screen dark:brightness-125 scale-x-[-1]"
+            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.6) 0%, transparent 100%)' }}
           />
         </div>
 
@@ -105,7 +107,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 bg-white dark:bg-white/8 text-slate-700 dark:text-slate-300 font-medium text-base px-7 py-3 rounded-full border border-slate-200 dark:border-white/12 shadow-sm hover:bg-slate-50 dark:hover:bg-white/12 transition-all duration-200"
+              className="inline-flex items-center gap-2 bg-white dark:bg-[#242220] text-slate-700 dark:text-slate-200 font-medium text-base px-7 py-3 rounded-full border border-slate-200 dark:border-[rgba(255,240,180,0.12)] shadow-sm hover:bg-slate-50 dark:hover:bg-[#2e2c28] transition-all duration-200"
             >
               View dashboard
             </Link>
@@ -114,9 +116,9 @@ export default function HomePage() {
           {/* Stats row */}
           <div className="flex flex-wrap justify-center gap-3 animate-fade-up delay-3">
             {stats.map((s) => (
-              <div key={s.label} className="flex flex-col items-center bg-stone-100 dark:bg-white/6 border border-stone-200 dark:border-white/8 rounded-2xl px-5 py-3 min-w-[100px]">
-                <span className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none">{s.value}</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">{s.label}</span>
+              <div key={s.label} className="flex flex-col items-center bg-stone-100 dark:bg-[#242220] border border-stone-200 dark:border-[rgba(255,240,180,0.10)] rounded-2xl px-5 py-3 min-w-[100px]">
+                <span className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none">{s.value}</span>
+                <span className="text-xs text-slate-400 dark:text-[#A09880] uppercase tracking-wider mt-1">{s.label}</span>
               </div>
             ))}
           </div>
@@ -175,7 +177,7 @@ export default function HomePage() {
         <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Three ways CeloMind helps you</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {capabilities.map((c, i) => (
+          {capabilities.map((c) => (
             <div key={c.title} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 p-6 shadow-sm hover:shadow-md transition-shadow">
               <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/8 rounded-full px-3 py-0.5 mb-3 inline-block">{c.badge}</span>
               <h3 className="font-medium text-slate-800 dark:text-slate-200 text-base mb-2">{c.title}</h3>
@@ -211,7 +213,7 @@ export default function HomePage() {
         <div className="max-w-2xl mx-auto bg-slate-900 dark:bg-[#1A1916] dark:border dark:border-white/8 rounded-3xl overflow-hidden dark:shadow-[0_0_60px_-10px_rgba(252,190,0,0.15)]">
           <div className="flex flex-col md:flex-row items-center gap-0">
 
-            {/* superb.png — brighter + warm tint in dark mode so it glows against near-black */}
+            {/* superb.png */}
             <div className="md:w-56 shrink-0 self-stretch overflow-hidden hidden md:block">
               <Image
                 src="/superb.png"

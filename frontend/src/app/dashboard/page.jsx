@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
 import { apiClient, apiGet, API_BASE } from '@/lib/api';
@@ -42,6 +43,48 @@ const toolGroups = [
       { id: 'get_whale_wallet_activity',   title: 'Whale tracker',     desc: 'Watch big wallets move' },
     ],
   },
+  {
+    label: 'GoodDollar',
+    tools: [
+      { id: 'get_gooddollar_whitelisting_info', title: 'UBI whitelist check', desc: 'Is this address eligible for GoodDollar UBI?' },
+      { id: 'get_gooddollar_ubi_entitlement',   title: 'Claimable UBI',       desc: 'How much G$ can this wallet claim today?' },
+      { id: 'get_gooddollar_reserve_quote',     title: 'Reserve quote',       desc: 'Quote a G$ swap via the GoodDollar reserve' },
+      { id: 'estimate_gooddollar_reserve_swap', title: 'Estimate swap cost',  desc: 'Gas and output estimate for a reserve swap' },
+      { id: 'claim_daily_gooddollar_ubi',       title: 'Claim UBI',           desc: 'Claim your daily GoodDollar UBI on-chain' },
+    ],
+  },
+  {
+    label: 'Governance',
+    tools: [
+      { id: 'get_governance_proposals',    title: 'Active proposals',    desc: 'View live Celo governance proposals' },
+      { id: 'get_governance_proposal',     title: 'Proposal details',    desc: 'Get votes and details for a proposal' },
+      { id: 'get_staking_balances',        title: 'Staking balances',    desc: 'See locked CELO and votes for a wallet' },
+      { id: 'get_activatable_stakes',      title: 'Activatable stakes',  desc: 'Check pending stakes ready to activate' },
+      { id: 'get_validator_groups',        title: 'Validator groups',    desc: 'Top validator groups by votes' },
+      { id: 'get_total_staking_info',      title: 'Network staking',     desc: 'Total CELO locked and staking stats' },
+    ],
+  },
+  {
+    label: 'Carbon DeFi',
+    tools: [
+      { id: 'get_carbon_strategies',     title: 'AMM strategies',      desc: 'Active Carbon DeFi strategies on Celo' },
+      { id: 'get_carbon_trade_quote',    title: 'Trade quote',         desc: 'Get a Carbon DeFi quote for a token pair' },
+      { id: 'explore_carbon_pair',       title: 'Explore pair',        desc: 'All strategies for a specific token pair' },
+      { id: 'find_carbon_opportunities', title: 'Opportunities',       desc: 'Find trading opportunities on Carbon' },
+      { id: 'get_carbon_protocol_stats', title: 'Protocol stats',      desc: 'Carbon DeFi protocol overview' },
+      { id: 'get_carbon_price_history',  title: 'Price history',       desc: 'Historical prices for a token pair' },
+    ],
+  },
+  {
+    label: 'Chain',
+    tools: [
+      { id: 'get_celo_block',            title: 'Get block',           desc: 'Fetch a Celo block by number or latest' },
+      { id: 'get_celo_latest_blocks',    title: 'Latest blocks',       desc: 'Last N blocks on the Celo chain' },
+      { id: 'estimate_celo_transaction', title: 'Estimate gas',        desc: 'Gas units and cost for a transaction' },
+      { id: 'get_celo_fee_data',         title: 'Fee data',            desc: 'Current gas price and base fee' },
+      { id: 'get_celo_market_cap',       title: 'CELO market cap',     desc: 'Market cap, supply, and 24h volume' },
+    ],
+  },
 ];
 
 function short(addr) {
@@ -61,27 +104,30 @@ export default function DashboardPage() {
   const [activeGroup, setActiveGroup] = useState(0);
 
   // Live market data
-  const [celoPrice, setCeloPrice]     = useState(null);
-  const [celoTvl, setCeloTvl]         = useState(null);
-  const [gasPrice, setGasPrice]       = useState(null);
-  const [networkStats, setNetworkStats] = useState(null);
+  const [celoPrice, setCeloPrice]   = useState(null);
+  const [celoTvl, setCeloTvl]       = useState(null);
+  const [gasPrice, setGasPrice]     = useState(null);
+
+  // Product metrics
+  const [metricsOverview, setMetricsOverview] = useState(null);
+  const [metricsTools, setMetricsTools]       = useState(null);
+  const [metricsToday, setMetricsToday]       = useState(null);
+  const [avgLatencyMs, setAvgLatencyMs]       = useState(null);
+  const [metricsLoading, setMetricsLoading]   = useState(true);
 
   // Wallet data
-  const [portfolio, setPortfolio]     = useState(null);
-  const [recentTxs, setRecentTxs]     = useState(null);
+  const [portfolio, setPortfolio]   = useState(null);
+  const [recentTxs, setRecentTxs]   = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
 
-  // ── Market data (no wallet needed) ──────────────────────────────────────────
+  // ── Market data ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Single dashboard/metrics call returns price, TVL, trending etc.
     apiGet('/api/dashboard/metrics').then((d) => {
       if (d?.celoPrice) setCeloPrice(d.celoPrice);
       if (d?.tvl?.usd) setCeloTvl(`$${(d.tvl.usd / 1e6).toFixed(1)}M`);
     }).catch(() => {});
 
-    // Gas price via chat intent (fastest path)
     apiGet('/api/health').then(() => {
-      // backend is alive — now fetch gas via chat
       apiClient.sendMessage('gas price', undefined, 'tool').then((r) => {
         const match = r?.message?.match(/([\d.]+)\s*Gwei/i);
         if (match) setGasPrice(match[1]);
@@ -89,7 +135,29 @@ export default function DashboardPage() {
     }).catch(() => {});
   }, []);
 
-  // ── Wallet-specific data ────────────────────────────────────────────────────
+  // ── Product metrics ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    setMetricsLoading(true);
+    Promise.all([
+      apiGet('/api/metrics/overview'),
+      apiGet('/api/metrics/tools'),
+      apiGet('/api/metrics/timeseries?days=1'),
+      apiGet('/api/metrics/models'),
+    ]).then(([overview, tools, timeseries, models]) => {
+      if (overview?.data) setMetricsOverview(overview.data);
+      if (tools?.data?.tools) setMetricsTools(tools.data.tools.slice(0, 6));
+      if (timeseries?.data?.series?.length) {
+        const last = timeseries.data.series[timeseries.data.series.length - 1];
+        setMetricsToday(last);
+      }
+      if (models?.data?.avgLatencyMs) {
+        const entries = Object.values(models.data.avgLatencyMs).filter(v => v > 0);
+        if (entries.length) setAvgLatencyMs(Math.round(entries.reduce((a, b) => a + b, 0) / entries.length));
+      }
+    }).catch(() => {}).finally(() => setMetricsLoading(false));
+  }, []);
+
+  // ── Wallet-specific data ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isConnected || !address) {
       setPortfolio(null);
@@ -108,6 +176,7 @@ export default function DashboardPage() {
 
   const change = celoPrice?.usd_24h_change;
   const changeUp = typeof change === 'number' && change >= 0;
+  const successRate = metricsOverview ? Math.round((1 - metricsOverview.fallbackRate) * 100) : null;
 
   return (
     <main className="max-w-6xl mx-auto px-4 md:px-10 py-8 pb-16 flex flex-col gap-6">
@@ -133,7 +202,7 @@ export default function DashboardPage() {
           {isConnected && address && (
             <button
               onClick={() => open()}
-              className="flex items-center gap-2 text-sm font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full px-4 py-1.5 transition-all"
+              className="flex items-center gap-2 text-sm font-medium bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-full px-4 py-1.5 transition-all"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               {short(address)}
@@ -200,16 +269,170 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Network — always known, no skeleton needed */}
+        {/* AI tools available */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Network</p>
-          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">Celo</p>
-          {networkStats?.dailyTxCount ? (
-            <p className="text-xs text-slate-400">{Number(networkStats.dailyTxCount).toLocaleString()} txs today</p>
-          ) : (
-            <p className="text-xs font-medium text-emerald-600">● Mainnet online</p>
-          )}
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">AI tools</p>
+          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">71</p>
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">● All loaded</p>
         </div>
+      </div>
+
+      {/* ── Product metrics ── */}
+      <div>
+        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Product usage</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+          {/* Total tool calls */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Tool calls</p>
+            {metricsOverview ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {metricsOverview.totals.toolCalls.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">All-time total</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-20 mb-1.5" /><div className="skeleton h-3 w-16" /></>
+            )}
+          </div>
+
+          {/* Total conversations */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Conversations</p>
+            {metricsOverview ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {metricsOverview.uniqueSessions.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Unique sessions</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-16 mb-1.5" /><div className="skeleton h-3 w-20" /></>
+            )}
+          </div>
+
+          {/* Unique users */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Unique users</p>
+            {metricsOverview ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {metricsOverview.uniqueUsers.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Distinct wallets</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-14 mb-1.5" /><div className="skeleton h-3 w-24" /></>
+            )}
+          </div>
+
+          {/* Success rate */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Success rate</p>
+            {successRate !== null ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {successRate}%
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">AI responses completed</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-16 mb-1.5" /><div className="skeleton h-3 w-28" /></>
+            )}
+          </div>
+        </div>
+
+        {/* Second row — today + avg latency + top tool + chat requests */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+
+          {/* Tool calls today */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Tool calls today</p>
+            {metricsToday ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {metricsToday.toolCalls.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">{metricsToday.date}</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-12 mb-1.5" /><div className="skeleton h-3 w-20" /></>
+            )}
+          </div>
+
+          {/* Chat requests today */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Chats today</p>
+            {metricsToday ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {metricsToday.chatRequests.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Messages handled</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-12 mb-1.5" /><div className="skeleton h-3 w-24" /></>
+            )}
+          </div>
+
+          {/* Avg response time */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Avg response</p>
+            {avgLatencyMs !== null ? (
+              <>
+                <p className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none mb-1">
+                  {(avgLatencyMs / 1000).toFixed(1)}s
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">AI response latency</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-16 mb-1.5" /><div className="skeleton h-3 w-24" /></>
+            )}
+          </div>
+
+          {/* Top tool */}
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Top tool</p>
+            {metricsOverview?.topTool ? (
+              <>
+                <p className="font-display text-base font-medium text-amber-600 dark:text-amber-400 leading-tight mb-1 truncate">
+                  {metricsOverview.topTool.replace(/_/g, ' ')}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Most invoked</p>
+              </>
+            ) : (
+              <><div className="skeleton h-7 w-28 mb-1.5" /><div className="skeleton h-3 w-16" /></>
+            )}
+          </div>
+        </div>
+
+        {/* Top tools breakdown */}
+        {metricsTools?.length > 0 && (
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5 mt-4">
+            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4">Top tools by usage</p>
+            <div className="flex flex-col gap-2">
+              {metricsTools.map((t, i) => {
+                const max = metricsTools[0]?.count || 1;
+                const pct = Math.round((t.count / max) * 100);
+                return (
+                  <div key={t.tool} className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400 dark:text-slate-500 w-4 shrink-0">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{t.tool.replace(/_/g, ' ')}</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 ml-2 shrink-0">{t.count.toLocaleString()}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 dark:bg-white/8 rounded-full overflow-hidden">
+                        <div className="h-full bg-amber-400 dark:bg-amber-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Two-column area */}
@@ -321,7 +544,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-mono text-slate-700 dark:text-slate-300 truncate">{short(hash)}</p>
                         {ts && <p className="text-xs text-slate-400 dark:text-slate-500">{fmtTime(ts)}</p>}
                       </div>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ok ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400'}`}>
                         {ok ? 'success' : 'failed'}
                       </span>
                     </div>
@@ -335,7 +558,28 @@ export default function DashboardPage() {
         </div>
 
         {/* Right col — AI capabilities */}
-        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-6 lg:sticky lg:top-20">
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm overflow-hidden lg:sticky lg:top-20">
+
+          {/* brainy.png — hands cradling a brain, taller so the brain is visible */}
+          <div className="relative h-56 overflow-hidden bg-white dark:bg-[#0F0E0C]">
+            <Image
+              src="/brainy.png"
+              alt=""
+              fill
+              className="object-cover object-center mix-blend-multiply dark:mix-blend-screen opacity-85 dark:opacity-90 dark:brightness-110"
+              aria-hidden
+            />
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: 'linear-gradient(to bottom, transparent 50%, white 100%)' }}
+              aria-hidden
+            />
+            <div className="absolute inset-0 pointer-events-none hidden dark:block"
+              style={{ background: 'linear-gradient(to bottom, transparent 50%, #1A1916 100%)' }}
+              aria-hidden
+            />
+          </div>
+
+          <div className="p-6">
           <h2 className="font-medium text-slate-800 dark:text-slate-200 mb-1">AI capabilities</h2>
           <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Everything the AI can do, in plain English.</p>
 
@@ -370,6 +614,7 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
+          </div>{/* end p-6 */}
         </div>
       </div>
 
@@ -381,11 +626,11 @@ export default function DashboardPage() {
             { label: 'Celo network',  value: 'Mainnet',                          ok: true },
             { label: 'AI provider',   value: 'Connected',                        ok: true },
             { label: 'RPC latency',   value: gasPrice ? '< 5ms' : 'Checking…',  ok: !!gasPrice },
-            { label: 'MCP tools',     value: '40 loaded',                        ok: true },
+            { label: 'MCP tools',     value: '71 loaded',                        ok: true },
           ].map((s) => (
             <div key={s.label} className="flex items-center justify-between bg-stone-50 dark:bg-white/4 rounded-xl px-3 py-2.5">
               <span className="text-xs text-slate-500 dark:text-slate-400">{s.label}</span>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.ok ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-white/8 text-slate-500 dark:text-slate-400'}`}>
                 {s.value}
               </span>
             </div>
