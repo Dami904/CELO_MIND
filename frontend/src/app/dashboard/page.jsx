@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
@@ -125,6 +125,56 @@ function fmtDayShort(iso) {
   return d.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
+function Reveal({ children, className = '', delay = 0, y = 28 }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.08 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : `translateY(${y}px)`,
+        transition: `opacity 0.55s ease ${delay}ms, transform 0.55s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function AnimatedNumber({ value, fmt = v => v.toLocaleString(), className = '' }) {
+  const [display, setDisplay] = useState(0);
+  const prev = useRef(0);
+  useEffect(() => {
+    if (value == null) return;
+    const start = prev.current;
+    const end = typeof value === 'number' ? value : 0;
+    prev.current = end;
+    const t0 = Date.now();
+    const dur = 900;
+    const tick = () => {
+      const p = Math.min((Date.now() - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(start + (end - start) * eased));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [value]);
+  if (value == null) return null;
+  return <span className={className}>{fmt(display)}</span>;
+}
+
 export default function DashboardPage() {
   const { open } = useAppKit();
   const { address, isConnected } = useAppKitAccount();
@@ -208,7 +258,7 @@ export default function DashboardPage() {
     <main className="max-w-6xl mx-auto px-4 md:px-10 py-8 pb-20 flex flex-col gap-6">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <Reveal className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-3xl font-light tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">Celo Mainnet · live</p>
@@ -228,9 +278,10 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Command card — dark even in light mode ── */}
+      <Reveal delay={60}>
       <div className="relative rounded-2xl overflow-hidden bg-stone-900 dark:bg-[#111009] border border-white/8">
 
         {/* eyehand decorative */}
@@ -256,7 +307,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-medium uppercase tracking-widest text-white/40 mb-1">CELO · Mainnet</p>
               {celoPrice ? (
-                <div className="flex items-end gap-3">
+                <div className="flex items-end gap-3 animate-fade-in">
                   <p className="font-display text-5xl font-light text-white leading-none">
                     ${Number(celoPrice.usd).toFixed(4)}
                   </p>
@@ -293,21 +344,24 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      </Reveal>
 
       {/* ── Usage numbers — borderless, no individual cards ── */}
-      <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm overflow-hidden">
+      <Reveal delay={80} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm overflow-hidden">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-slate-100 dark:divide-white/6">
           {[
-            { label: 'Total chats',       value: metricsOverview?.totals.chatRequests, fmt: v => v.toLocaleString() },
-            { label: 'Sessions',          value: metricsOverview?.uniqueSessions,       fmt: v => v.toLocaleString() },
-            { label: 'Unique users',      value: metricsOverview?.uniqueUsers,          fmt: v => v.toLocaleString() },
-            { label: 'Top intent',        value: metricsOverview?.topIntent,            fmt: v => v.replace(/_/g, ' '), amber: true },
+            { label: 'Total chats',  value: metricsOverview?.totals.chatRequests, numeric: true },
+            { label: 'Sessions',     value: metricsOverview?.uniqueSessions,       numeric: true },
+            { label: 'Unique users', value: metricsOverview?.uniqueUsers,          numeric: true },
+            { label: 'Top intent',   value: metricsOverview?.topIntent,            numeric: false, amber: true },
           ].map((s) => (
             <div key={s.label} className="px-6 py-5">
               <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">{s.label}</p>
               {s.value !== undefined && s.value !== null ? (
-                <p className={`font-display text-2xl font-medium leading-none truncate ${s.amber ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-[#F0EDE4]'}`}>
-                  {s.fmt(s.value)}
+                <p className={`font-display text-2xl font-medium leading-none truncate animate-fade-in ${s.amber ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-[#F0EDE4]'}`}>
+                  {s.numeric
+                    ? <AnimatedNumber value={typeof s.value === 'number' ? s.value : 0} />
+                    : String(s.value).replace(/_/g, ' ')}
                 </p>
               ) : (
                 <div className="skeleton h-7 w-20" />
@@ -333,10 +387,10 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Charts row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Reveal delay={120} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* 7-day sparkline */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
@@ -355,8 +409,8 @@ export default function DashboardPage() {
                   <div key={d.date ?? i} className="flex-1 flex flex-col items-center gap-1.5">
                     <div className="w-full flex flex-col justify-end" style={{ height: 52 }}>
                       <div
-                        className={`w-full rounded-sm ${isToday ? 'bg-amber-400 dark:bg-amber-500' : 'bg-slate-100 dark:bg-white/12'}`}
-                        style={{ height: `${pct}%` }}
+                        className={`w-full rounded-sm animate-grow-up ${isToday ? 'bg-amber-400 dark:bg-amber-500' : 'bg-slate-100 dark:bg-white/12'}`}
+                        style={{ height: `${pct}%`, animationDelay: `${i * 60}ms` }}
                         title={`${d.chatRequests ?? 0} chats`}
                       />
                     </div>
@@ -417,10 +471,10 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Main 2-col ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+      <Reveal delay={150} className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
         {/* Left */}
         <div className="flex flex-col gap-5">
@@ -656,10 +710,10 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── MCP Connect section ── */}
-      <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: '#0D0C0A' }}>
+      <Reveal delay={100} className="rounded-2xl overflow-hidden border border-white/10" style={{ background: '#0D0C0A' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-white/8">
 
           {/* Left — client selector */}
@@ -690,7 +744,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Right — config detail */}
-          <div className="p-7 flex flex-col gap-5 min-w-0">
+          <div key={mcpClient} className="p-7 flex flex-col gap-5 min-w-0 animate-slide-right">
 
             {/* Claude Desktop */}
             {mcpClient === 'claude' && (
@@ -823,7 +877,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-      </div>
+      </Reveal>
     </main>
   );
 }

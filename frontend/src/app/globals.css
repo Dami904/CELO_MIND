@@ -295,6 +295,21 @@ p { color: var(--text-secondary); line-height: 1.7; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes growUp {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -310,6 +325,12 @@ p { color: var(--text-secondary); line-height: 1.7; }
   100% { background-position:  400px 0; }
 }
 
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.88); }
+  60%  { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 .skeleton {
   border-radius: 6px;
   background: linear-gradient(90deg, #e2e0d8 25%, #f0ede6 50%, #e2e0d8 75%);
@@ -322,10 +343,20 @@ p { color: var(--text-secondary); line-height: 1.7; }
   background-size: 800px 100%;
 }
 
-.animate-fade-up { animation: fadeUp 0.5s ease both; }
-.delay-1 { animation-delay: 0.1s; }
-.delay-2 { animation-delay: 0.2s; }
-.delay-3 { animation-delay: 0.3s; }
+.animate-fade-up    { animation: fadeUp    0.5s ease both; }
+.animate-fade-in    { animation: fadeIn    0.35s ease both; }
+.animate-slide-right{ animation: slideRight 0.25s ease both; }
+.animate-grow-up    { animation: growUp    0.6s cubic-bezier(0.16,1,0.3,1) both; transform-origin: bottom; }
+.animate-pop-in     { animation: popIn     0.4s cubic-bezier(0.16,1,0.3,1) both; }
+
+.delay-1  { animation-delay: 0.08s; }
+.delay-2  { animation-delay: 0.16s; }
+.delay-3  { animation-delay: 0.24s; }
+.delay-4  { animation-delay: 0.32s; }
+.delay-5  { animation-delay: 0.40s; }
+.delay-6  { animation-delay: 0.48s; }
+.delay-7  { animation-delay: 0.56s; }
+.delay-8  { animation-delay: 0.64s; }
 
 /* ── Live dot ── */
 .live-dot {
