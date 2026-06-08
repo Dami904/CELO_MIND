@@ -2,8 +2,42 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiGet } from '@/lib/api';
+
+const MCP_URL = 'https://celo-mind-nmk2.onrender.com/mcp';
+
+const MCP_CLIENTS = [
+  { id: 'claude',   label: 'Claude Desktop (Mac / Windows)', icon: '🤖' },
+  { id: 'cursor',   label: 'Cursor IDE',                     icon: '⌨️' },
+  { id: 'windsurf', label: 'Windsurf',                       icon: '🏄' },
+  { id: 'vscode',   label: 'VS Code (Copilot)',               icon: '💻' },
+  { id: 'web',      label: 'Web chat — no config needed',     icon: '🌐' },
+];
+
+function Reveal({ children, delay = 0, y = 24 }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.06 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{
+      opacity: visible ? 1 : 0,
+      transform: visible ? 'translateY(0)' : `translateY(${y}px)`,
+      transition: `opacity 0.55s ease ${delay}ms, transform 0.55s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+    }}>
+      {children}
+    </div>
+  );
+}
 
 const capabilities = [
   {
@@ -39,6 +73,8 @@ const prompts = [
 ];
 
 export default function HomePage() {
+  const [mcpClient, setMcpClient] = useState('claude');
+  const [copied, setCopied] = useState('');
   const [liveStats, setLiveStats] = useState([
     { value: '75', label: 'AI tools' },
     { value: '—', label: 'CELO price' },
@@ -58,6 +94,13 @@ export default function HomePage() {
       ]);
     }).catch(() => {});
   }, []);
+
+  function copyText(text, key) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(''), 2000);
+    }).catch(() => {});
+  }
 
   return (
     <main>
@@ -221,6 +264,161 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+      </section>
+
+      {/* ── MCP Connect ── */}
+      <section className="px-4 py-8 md:py-12 bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
+        <Reveal delay={0}>
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Connect</p>
+          <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Use CeloMind in your AI client</h2>
+          <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: '#0D0C0A' }}>
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-white/8">
+
+              {/* Left — client list */}
+              <div className="p-6 flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-4">Pick your platform</p>
+                <div className="flex flex-col gap-1">
+                  {MCP_CLIENTS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setMcpClient(c.id)}
+                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-left transition-all duration-150 ${mcpClient === c.id ? 'bg-white/10 text-white font-medium' : 'text-white/45 hover:text-white/75 hover:bg-white/5'}`}
+                    >
+                      <span className="text-base shrink-0 w-6 text-center">{c.icon}</span>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-white/25 leading-relaxed mt-auto pt-5">
+                  Free and public — no token or signup required.
+                </p>
+              </div>
+
+              {/* Right — config */}
+              <div key={mcpClient} className="p-6 flex flex-col gap-5 min-w-0 animate-slide-right">
+
+                {mcpClient === 'claude' && (
+                  <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">1 — EASIEST</span>
+                        <span className="text-sm font-medium text-white/70">Settings UI — no config editing</span>
+                      </div>
+                      <p className="text-xs text-white/45 leading-relaxed">
+                        Claude Desktop → Settings → Connectors → Add custom connector → paste this URL:
+                      </p>
+                      <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5">
+                        <span className="font-mono text-sm text-white/80 flex-1 truncate">{MCP_URL}</span>
+                        <button onClick={() => copyText(MCP_URL, 'url1')} className="shrink-0 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                          {copied === 'url1' ? '✓ Copied' : 'Copy URL'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-white/10 text-white/50 px-2 py-0.5 rounded">2 — RECOMMENDED</span>
+                        <span className="text-sm font-medium text-white/70">Config file — modern</span>
+                      </div>
+                      <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2)}</pre>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2), 'cfg1')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                          {copied === 'cfg1' ? '✓ Copied' : 'Copy'}
+                        </button>
+                        <span className="font-mono text-[10px] text-white/25 truncate">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-white/6 text-white/35 px-2 py-0.5 rounded">3 — LEGACY FALLBACK</span>
+                        <span className="text-sm font-medium text-white/50">Config file — requires Node.js</span>
+                      </div>
+                      <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2)}</pre>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2), 'cfg2')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                          {copied === 'cfg2' ? '✓ Copied' : 'Copy'}
+                        </button>
+                        <span className="text-[10px] text-white/25">Use this if Method 2 shows &quot;not valid MCP server configurations&quot;.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {mcpClient === 'cursor' && (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-xs text-white/45 leading-relaxed">
+                      Open <span className="text-white/75 font-medium">Cursor Settings → MCP</span> and add a new server, or paste into{' '}
+                      <code className="bg-white/10 px-1.5 py-0.5 rounded text-white/65 font-mono">~/.cursor/mcp.json</code>
+                    </p>
+                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2)}</pre>
+                    <p className="text-xs text-white/30">No token required. Restart Cursor after saving.</p>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2), 'cursor')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                        {copied === 'cursor' ? '✓ Copied' : 'Copy config'}
+                      </button>
+                      <span className="font-mono text-[10px] text-white/25 truncate">%APPDATA%\Cursor\User\globalStorage\cursor.mcp\mcp.json</span>
+                    </div>
+                    <div className="flex flex-col gap-1 pt-2 border-t border-white/6">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Linux</p>
+                      <code className="font-mono text-[10px] text-white/35">~/.cursor/mcp.json</code>
+                    </div>
+                  </div>
+                )}
+
+                {mcpClient === 'windsurf' && (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-xs text-white/45 leading-relaxed">
+                      Open <span className="text-white/75 font-medium">Windsurf → Cascade panel → Plugin settings</span>, or edit the config file directly:
+                    </p>
+                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2)}</pre>
+                    <p className="text-xs text-white/30">Reload the Windsurf window after saving.</p>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2), 'windsurf')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                        {copied === 'windsurf' ? '✓ Copied' : 'Copy config'}
+                      </button>
+                      <span className="font-mono text-[10px] text-white/25 truncate">~/.codeium/windsurf/mcp_config.json</span>
+                    </div>
+                    <div className="flex flex-col gap-1 pt-2 border-t border-white/6">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Windows</p>
+                      <code className="font-mono text-[10px] text-white/35">%APPDATA%\Codeium\windsurf\mcp_config.json</code>
+                    </div>
+                  </div>
+                )}
+
+                {mcpClient === 'vscode' && (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-xs text-white/45 leading-relaxed">
+                      Requires <span className="text-white/75 font-medium">GitHub Copilot + VS Code ≥ 1.99</span>. Create{' '}
+                      <code className="bg-white/10 px-1.5 py-0.5 rounded text-white/65 font-mono">.vscode/mcp.json</code> in your project:
+                    </p>
+                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2)}</pre>
+                    <p className="text-xs text-white/30">Open Copilot Chat → Agent mode to access CeloMind tools.</p>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <button onClick={() => copyText(JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2), 'vscode')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                        {copied === 'vscode' ? '✓ Copied' : 'Copy config'}
+                      </button>
+                      <span className="font-mono text-[10px] text-white/25">.vscode/mcp.json</span>
+                    </div>
+                  </div>
+                )}
+
+                {mcpClient === 'web' && (
+                  <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                    <span className="text-5xl">🌐</span>
+                    <div>
+                      <p className="text-white/80 font-medium mb-1">No setup needed</p>
+                      <p className="text-sm text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 75 tools, zero config.</p>
+                    </div>
+                    <Link href="/chat" className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-medium text-sm px-6 py-2.5 rounded-full transition-colors">
+                      Open web chat →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        </Reveal>
       </section>
 
       {/* ── CTA ── */}
