@@ -123,6 +123,49 @@ export async function getMentoQuote(
   }
 }
 
+const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
+  "0x471ece3750da237f93b8e339c536989b8978a438": { symbol: "CELO",  decimals: 18 },
+  "0x765de816845861e75a25fca122bb6898b8b1282a": { symbol: "cUSD",  decimals: 18 },
+  "0xd8763cba276a3738e6de85b4b3bf5fded6d6ca73": { symbol: "cEUR",  decimals: 18 },
+  "0xe8537a3d056da446677b9e9d6c5db704eaab4787": { symbol: "cREAL", decimals: 18 },
+  "0xceba9300f2b948710d2653dd7b07f33a8b32118c": { symbol: "USDC",  decimals: 6  },
+  "0x48421ff1c6b93988138130865c4b7e2f76e5b3f5": { symbol: "USDT",  decimals: 6  },
+  "0x2f25deb3848c207fc8e0c34035b3ba7fc157602b": { symbol: "WBTC",  decimals: 8  },
+};
+
+/** Current live rates for every active Mento exchange pair. */
+export async function getMentoRates(network: Network): Promise<Record<string, unknown>> {
+  return cached(`mento:rates:${network}`, 60, async () => {
+    const [exchanges, client] = await Promise.all([getMentoExchanges(network), Promise.resolve(getPublicClient(network))]);
+
+    const rates = (await Promise.all(
+      exchanges.map(async (ex) => {
+        const [a0, a1] = ex.assets;
+        const tok0 = KNOWN_TOKENS[a0] ?? { symbol: a0.slice(2, 8), decimals: 18 };
+        const tok1 = KNOWN_TOKENS[a1] ?? { symbol: a1.slice(2, 8), decimals: 18 };
+        const amountIn = 10n ** BigInt(tok0.decimals);
+        try {
+          const amountOut = (await client.readContract({
+            address: MENTO_BROKER, abi: BROKER_ABI, functionName: "getAmountOut",
+            args: [ex.provider, ex.exchangeId, a0 as Address, a1 as Address, amountIn],
+          })) as bigint;
+          const rate = Number(amountOut) / 10 ** tok1.decimals;
+          return { pair: `${tok0.symbol}/${tok1.symbol}`, rate: rate.toFixed(6), description: `1 ${tok0.symbol} = ${rate.toFixed(4)} ${tok1.symbol}` };
+        } catch {
+          return null;
+        }
+      })
+    )).filter(Boolean);
+
+    return {
+      rates,
+      source: "Mento Broker (on-chain)",
+      brokerAddress: MENTO_BROKER,
+      note: "Rates are live 1-unit on-chain quotes and include Mento spread.",
+    };
+  });
+}
+
 /** Build the Mento swapIn calldata (approval is handled by the caller). */
 export function encodeMentoSwap(
   q: MentoQuote,

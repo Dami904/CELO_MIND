@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { apiGet } from '@/lib/api';
 
 const capabilities = [
   {
@@ -21,13 +23,6 @@ const capabilities = [
   },
 ];
 
-const stats = [
-  { value: '73', label: 'AI tools' },
-  { value: '1.2s', label: 'Avg response' },
-  { value: '3ms', label: 'Chain latency' },
-  { value: '100%', label: 'Open source' },
-];
-
 const steps = [
   { n: '1', title: 'Connect your wallet', desc: 'One click with MetaMask or any Celo-compatible wallet.' },
   { n: '2', title: 'Ask anything', desc: '"What\'s my balance?" or "Swap 5 CELO to cUSD" — the AI handles the rest.' },
@@ -44,6 +39,26 @@ const prompts = [
 ];
 
 export default function HomePage() {
+  const [liveStats, setLiveStats] = useState([
+    { value: '75', label: 'AI tools' },
+    { value: '—', label: 'CELO price' },
+    { value: '—', label: 'Ecosystem TVL' },
+    { value: '100%', label: 'Open source' },
+  ]);
+
+  useEffect(() => {
+    apiGet('/api/dashboard/metrics').then((d) => {
+      const price = d?.celoPrice?.usd != null ? `$${Number(d.celoPrice.usd).toFixed(3)}` : null;
+      const tvl = d?.tvl?.usd != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
+      setLiveStats([
+        { value: '75', label: 'AI tools' },
+        { value: price ?? '—', label: 'CELO price' },
+        { value: tvl ?? '—', label: 'Ecosystem TVL' },
+        { value: '100%', label: 'Open source' },
+      ]);
+    }).catch(() => {});
+  }, []);
+
   return (
     <main>
       {/* ── Hero ── */}
@@ -115,7 +130,7 @@ export default function HomePage() {
 
           {/* Stats row */}
           <div className="flex flex-wrap justify-center gap-3 animate-fade-up delay-3">
-            {stats.map((s) => (
+            {liveStats.map((s) => (
               <div key={s.label} className="flex flex-col items-center bg-stone-100 dark:bg-[#242220] border border-stone-200 dark:border-[rgba(255,240,180,0.10)] rounded-2xl px-5 py-3 min-w-[100px]">
                 <span className="font-display text-2xl font-medium text-slate-900 dark:text-[#F0EDE4] leading-none">{s.value}</span>
                 <span className="text-xs text-slate-400 dark:text-[#A09880] uppercase tracking-wider mt-1">{s.label}</span>

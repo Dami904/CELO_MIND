@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { makeOk, makeErr, resolveNetwork, cached } from "@celomind/shared";
+import { getCeloGasPrice } from "@celomind/mcp-server/market";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 
@@ -25,7 +26,7 @@ async function fetchJson<T>(url: string, ttl: number, key: string): Promise<T> {
 export async function dashboardRoutes(app: FastifyInstance) {
   app.get("/api/dashboard/metrics", async (_req, reply) => {
     try {
-      const [celoRes, tvlRes, trendingRes, newPoolsRes, allPoolsRes, hacksRes] = await Promise.allSettled([
+      const [celoRes, tvlRes, trendingRes, newPoolsRes, allPoolsRes, hacksRes, gasRes] = await Promise.allSettled([
         fetchJson<Record<string, { usd: number; usd_24h_change: number }>>(
           "https://api.coingecko.com/api/v3/simple/price?ids=celo&vs_currencies=usd&include_24hr_change=true",
           60, "dash:celo:price"
@@ -45,10 +46,12 @@ export async function dashboardRoutes(app: FastifyInstance) {
         fetchJson<{ name: string; date: number; amount: number; chains: string[]; protocol: string }[]>(
           "https://api.llama.fi/hacks", 1800, "dash:llama:hacks"
         ),
+        getCeloGasPrice(),
       ]);
 
       // ─── CELO price ───────────────────────────────────────────────────────────
       const celoPrice = celoRes.status === "fulfilled" ? celoRes.value?.["celo"] ?? null : null;
+      const gasPrice = gasRes.status === "fulfilled" && gasRes.value ? gasRes.value.gasPriceGwei : null;
 
       // ─── TVL ─────────────────────────────────────────────────────────────────
       const celoChain = tvlRes.status === "fulfilled" && Array.isArray(tvlRes.value)
@@ -194,6 +197,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       return makeOk("dashboard_metrics", NETWORK, {
         celoPrice,
+        gasPrice,
         tvl,
         trendingTokens: trendingPools.slice(0, 5).map((p) => ({
           name: p.attributes.name,

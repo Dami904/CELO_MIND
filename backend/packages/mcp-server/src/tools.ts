@@ -25,7 +25,8 @@ import {
   getTransactionByHash, getCeloFilteredTransactions,
 } from "./market.js";
 import { checkContractRisk, checkTokenRisk, explainTransaction } from "./risk.js";
-import { getAavePosition, prepareAaveSupply } from "./aave.js";
+import { getAavePosition, prepareAaveSupply, getAaveReserves } from "./aave.js";
+import { getMentoRates } from "./mento.js";
 import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "./whale.js";
 import {
   getGoodDollarWhitelistingInfo, getGoodDollarUBIEntitlement,
@@ -72,6 +73,8 @@ export const TOOLS = [
   // ─── Aave ──────────────────────────────────────────────────────────────────
   { name: "celo_aave_position", description: "Get Aave V3 lending/borrowing position for a wallet on Celo", inputSchema: { type: "object", properties: { walletAddress: { type: "string" } }, required: ["walletAddress"] } },
   { name: "celo_aave_supply", description: "Supply an asset to Aave V3 on Celo (requires CELO_PRIVATE_KEY)", inputSchema: { type: "object", properties: { asset: { type: "string" }, amount: { type: "string" } }, required: ["asset", "amount"] } },
+  { name: "get_aave_reserves", description: "List all Aave V3 reserve assets on Celo with live supply and borrow APR", inputSchema: { type: "object", properties: {} } },
+  { name: "get_mento_rates", description: "Get current live exchange rates for all Mento stable-asset pairs (CELO, cUSD, cEUR, cREAL, USDC)", inputSchema: { type: "object", properties: {} } },
   // ─── Identity ──────────────────────────────────────────────────────────────
   { name: "self_verify", description: "Explain how to verify identity with Self Protocol on Celo", inputSchema: { type: "object", properties: {} } },
   { name: "self_agent_id_check", description: "Check if an address has a Self identity attestation", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
@@ -210,6 +213,10 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
       const prepared = await prepareAaveSupply(asset, amount, owner, NETWORK);
       return "error" in prepared ? err(prepared.error) : ok({ network: NETWORK, ...prepared });
     }
+    case "get_aave_reserves":
+      return ok(await getAaveReserves(NETWORK));
+    case "get_mento_rates":
+      return ok(await getMentoRates(NETWORK));
     case "self_verify":
       return ok({ protocol: "Self (selfxyz.com)", docs: "https://docs.selfxyz.com", steps: ["Download Self app", "Scan your passport", "ZK proof generated locally", "Share proof on-chain"], network: NETWORK });
     case "self_agent_id_check": {

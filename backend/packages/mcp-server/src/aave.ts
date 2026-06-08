@@ -3,11 +3,44 @@
  * Pool verified on-chain (getReservesList returns CELO/cUSD/cEUR/USDC/USDT/WETH).
  */
 import { encodeFunctionData, formatUnits, parseUnits, type Address } from "viem";
-import { findTokenAsync, type Network } from "@celomind/shared";
+import { cached, findTokenAsync, type Network } from "@celomind/shared";
 import { getPublicClient } from "./celo-client.js";
 
 export const AAVE_V3_POOL = "0x3E59A31363E2ad014dcbc521c4a0d5757d9f3402" as Address;
-const UINT_MAX_HF = 10n ** 30n; // healthFactor is type(uint256).max when there's no debt
+const UINT_MAX_HF = 10n ** 30n;
+
+const RESERVES_ABI = [
+  { type: "function", name: "getReservesList", stateMutability: "view", inputs: [], outputs: [{ type: "address[]" }] },
+  {
+    type: "function", name: "getReserveData", stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{
+      type: "tuple",
+      components: [
+        { name: "configuration",              type: "tuple", components: [{ name: "data", type: "uint256" }] },
+        { name: "liquidityIndex",             type: "uint128" },
+        { name: "currentLiquidityRate",       type: "uint128" },
+        { name: "variableBorrowIndex",        type: "uint128" },
+        { name: "currentVariableBorrowRate",  type: "uint128" },
+        { name: "currentStableBorrowRate",    type: "uint128" },
+        { name: "lastUpdateTimestamp",        type: "uint40" },
+        { name: "id",                         type: "uint16" },
+        { name: "aTokenAddress",              type: "address" },
+        { name: "stableDebtTokenAddress",     type: "address" },
+        { name: "variableDebtTokenAddress",   type: "address" },
+        { name: "interestRateStrategyAddress",type: "address" },
+        { name: "accruedToTreasury",          type: "uint128" },
+        { name: "unbacked",                   type: "uint128" },
+        { name: "isolationModeTotalDebt",     type: "uint128" },
+      ],
+    }],
+  },
+] as const;
+
+const ERC20_META_ABI = [
+  { type: "function", name: "symbol",   stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
+] as const;
 
 const POOL_ABI = [
   {
@@ -132,4 +165,36 @@ export async function prepareAaveSupply(
     warning: "Review and sign these in your wallet. The backend never signs or executes.",
     source: "Aave V3 Pool",
   };
+}
+
+/** List all Aave V3 reserves on Celo with live supply/borrow APR. */
+export async function getAaveReserves(network: Network = "celo") {
+  return cached("aave:reserves", 120, async () => {
+    const client = getPublicClient(network);
+    const reserves = (await client.readContract({
+      address: AAVE_V3_POOL, abi: RESERVES_ABI, functionName: "getReservesList",
+    })) as Address[];
+
+    const assets = await Promise.all(reserves.map(async (addr) => {
+      const [rd, symbol] = await Promise.all([
+        client.readContract({ address: AAVE_V3_POOL, abi: RESERVES_ABI, functionName: "getReserveData", args: [addr] }).catch(() => null),
+        client.readContract({ address: addr, abi: ERC20_META_ABI, functionName: "symbol" }).catch(() => addr.slice(0, 10)),
+      ]);
+      if (!rd) return { asset: addr, symbol, error: "Could not read reserve" };
+      const d = rd as { currentLiquidityRate: bigint; currentVariableBorrowRate: bigint; aTokenAddress: string };
+      const RAY = 1e27;
+      const supplyAPR  = (Number(d.currentLiquidityRate)      / RAY * 100).toFixed(2);
+      const borrowAPR  = (Number(d.currentVariableBorrowRate)  / RAY * 100).toFixed(2);
+      return { asset: addr, symbol: symbol as string, supplyAPR: `${supplyAPR}%`, borrowAPR: `${borrowAPR}%`, aTokenAddress: d.aTokenAddress };
+    }));
+
+    return {
+      protocol: "Aave V3 (Celo)",
+      poolAddress: AAVE_V3_POOL,
+      reserves: assets,
+      note: "Rates are live APR (not compounded to APY) and change with pool utilization.",
+      docsUrl: "https://app.aave.com/?marketName=proto_celo_v3",
+      source: "Aave V3 on-chain",
+    };
+  });
 }
