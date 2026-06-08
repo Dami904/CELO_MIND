@@ -22,7 +22,7 @@ const capabilities = [
 ];
 
 const stats = [
-  { value: '71', label: 'AI tools' },
+  { value: '73', label: 'AI tools' },
   { value: '1.2s', label: 'Avg response' },
   { value: '3ms', label: 'Chain latency' },
   { value: '100%', label: 'Open source' },
