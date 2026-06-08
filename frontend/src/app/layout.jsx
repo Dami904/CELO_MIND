@@ -1,5 +1,5 @@
-import '../styles/globals.css';
-import Navbar from '../components/Navbar';
+import './globals.css';
+import Navbar from '../components/ui/Navbar';
 
 export const metadata = {
   title: 'CeloMind — AI assistant for the Celo network',
