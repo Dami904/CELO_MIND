@@ -47,7 +47,7 @@ export default function HomePage() {
   return (
     <main>
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden text-center px-4 pt-20 pb-16 md:pt-28 md:pb-24">
+      <section className="relative overflow-hidden text-center px-4 pt-20 pb-16 md:pt-28 md:pb-24 bg-stone-50 dark:bg-[#0F0E0C] transition-colors duration-200">
         {/* Ambient glow */}
         <div
           aria-hidden
@@ -55,14 +55,14 @@ export default function HomePage() {
           style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.12) 0%, transparent 70%)' }}
         />
 
-        {/* brain.png — floats on the right edge, adds AI/intelligence depth to the hero */}
+        {/* brain.png — luminosity blend in light, screen blend glows in dark */}
         <div className="pointer-events-none absolute right-0 top-0 w-[340px] md:w-[440px] h-full overflow-hidden hidden lg:block" aria-hidden>
           <Image
             src="/brain.png"
             alt=""
             width={440}
             height={600}
-            className="object-cover object-left opacity-30 mix-blend-luminosity"
+            className="object-cover object-left opacity-30 dark:opacity-50 mix-blend-luminosity dark:mix-blend-screen dark:brightness-125"
             style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.6) 0%, transparent 100%)' }}
             priority
           />
@@ -74,24 +74,24 @@ export default function HomePage() {
             alt=""
             width={320}
             height={500}
-            className="object-cover object-right opacity-15 mix-blend-luminosity scale-x-[-1]"
+            className="object-cover object-right opacity-15 dark:opacity-35 mix-blend-luminosity dark:mix-blend-screen dark:brightness-125 scale-x-[-1]"
             style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.4) 0%, transparent 100%)' }}
           />
         </div>
 
         <div className="relative z-10 mx-auto max-w-2xl">
           {/* Live badge */}
-          <div className="inline-flex items-center gap-2 text-xs font-medium text-[#1A8C52] bg-[#D4F5E6] rounded-full px-4 py-1.5 mb-7 animate-fade-up">
+          <div className="inline-flex items-center gap-2 text-xs font-medium text-[#1A8C52] dark:text-[#35D07F] bg-[#D4F5E6] dark:bg-[#35D07F]/15 rounded-full px-4 py-1.5 mb-7 animate-fade-up">
             <span className="live-dot" />
             Live on Celo Mainnet
           </div>
 
-          <h1 className="font-display text-5xl md:text-6xl font-light tracking-tight leading-tight text-slate-900 mb-5 animate-fade-up delay-1">
+          <h1 className="font-display text-5xl md:text-6xl font-light tracking-tight leading-tight text-slate-900 dark:text-slate-100 mb-5 animate-fade-up delay-1">
             Your AI assistant<br />
             <em className="not-italic text-amber-600">for the Celo network</em>
           </h1>
 
-          <p className="text-lg text-slate-500 max-w-lg mx-auto mb-9 leading-relaxed animate-fade-up delay-2">
+          <p className="text-lg text-slate-500 dark:text-slate-400 max-w-lg mx-auto mb-9 leading-relaxed animate-fade-up delay-2">
             CeloMind lets you manage crypto, track tokens, and stay safe — all by having a normal conversation.
             No technical knowledge required.
           </p>
@@ -105,7 +105,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 bg-white text-slate-700 font-medium text-base px-7 py-3 rounded-full border border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-200"
+              className="inline-flex items-center gap-2 bg-white dark:bg-white/8 text-slate-700 dark:text-slate-300 font-medium text-base px-7 py-3 rounded-full border border-slate-200 dark:border-white/12 shadow-sm hover:bg-slate-50 dark:hover:bg-white/12 transition-all duration-200"
             >
               View dashboard
             </Link>
@@ -114,9 +114,9 @@ export default function HomePage() {
           {/* Stats row */}
           <div className="flex flex-wrap justify-center gap-3 animate-fade-up delay-3">
             {stats.map((s) => (
-              <div key={s.label} className="flex flex-col items-center bg-stone-100 border border-stone-200 rounded-2xl px-5 py-3 min-w-[100px]">
-                <span className="font-display text-2xl font-medium text-slate-900 leading-none">{s.value}</span>
-                <span className="text-xs text-slate-400 uppercase tracking-wider mt-1">{s.label}</span>
+              <div key={s.label} className="flex flex-col items-center bg-stone-100 dark:bg-white/6 border border-stone-200 dark:border-white/8 rounded-2xl px-5 py-3 min-w-[100px]">
+                <span className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none">{s.value}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">{s.label}</span>
               </div>
             ))}
           </div>
@@ -124,14 +124,14 @@ export default function HomePage() {
       </section>
 
       {/* ── What is CeloMind ── */}
-      <section className="bg-stone-100 border-y border-stone-200 overflow-hidden">
+      <section className="bg-stone-100 dark:bg-[#1A1916] border-y border-stone-200 dark:border-white/8 overflow-hidden transition-colors duration-200">
         <div className="max-w-5xl mx-auto px-4 py-16 md:py-20 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-center">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-3">What is CeloMind?</p>
-            <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 mb-5 leading-snug">
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">What is CeloMind?</p>
+            <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 dark:text-slate-100 mb-5 leading-snug">
               Crypto can be complex.<br />We made it conversational.
             </h2>
-            <p className="text-base text-slate-500 max-w-xl leading-relaxed mb-10">
+            <p className="text-base text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed mb-10">
               CeloMind connects an AI assistant to the Celo blockchain — a fast, low-cost network built for
               everyday use. Instead of copying addresses or figuring out DeFi, you just type what you want.
             </p>
@@ -143,39 +143,43 @@ export default function HomePage() {
                     {s.n}
                   </div>
                   <div>
-                    <p className="font-medium text-slate-800 text-sm mb-1">{s.title}</p>
-                    <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1">{s.title}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{s.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* smiling.png — friendly face makes this section warm and approachable */}
+          {/* smiling.png — gold glow halo in dark mode */}
           <div className="hidden md:flex items-end justify-center shrink-0">
-            <Image
-              src="/smiling.png"
-              alt="CeloMind is friendly and easy to use"
-              width={220}
-              height={280}
-              className="rounded-3xl shadow-xl object-cover"
+            <div
+              className="rounded-3xl dark:shadow-[0_0_40px_8px_rgba(252,190,0,0.25)]"
               style={{ transform: 'rotate(2deg)' }}
-            />
+            >
+              <Image
+                src="/smiling.png"
+                alt="CeloMind is friendly and easy to use"
+                width={220}
+                height={280}
+                className="rounded-3xl shadow-xl object-cover dark:brightness-110 dark:contrast-105"
+              />
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── Capabilities ── */}
       <section className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-3">What you can do</p>
-        <h2 className="font-display text-3xl font-light text-slate-900 mb-8">Three ways CeloMind helps you</h2>
+        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">What you can do</p>
+        <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Three ways CeloMind helps you</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {capabilities.map((c, i) => (
-            <div key={c.title} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-              <span className="text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-3 py-0.5 mb-3 inline-block">{c.badge}</span>
-              <h3 className="font-medium text-slate-800 text-base mb-2">{c.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{c.desc}</p>
+            <div key={c.title} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 p-6 shadow-sm hover:shadow-md transition-shadow">
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/8 rounded-full px-3 py-0.5 mb-3 inline-block">{c.badge}</span>
+              <h3 className="font-medium text-slate-800 dark:text-slate-200 text-base mb-2">{c.title}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{c.desc}</p>
             </div>
           ))}
         </div>
@@ -185,15 +189,15 @@ export default function HomePage() {
 
       {/* ── Prompt chips ── */}
       <section className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-3">Try these</p>
-        <h2 className="font-display text-3xl font-light text-slate-900 mb-8">Things to ask CeloMind</h2>
+        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Try these</p>
+        <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Things to ask CeloMind</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {prompts.map((p) => (
             <Link
               key={p}
               href={`/chat?q=${encodeURIComponent(p)}`}
-              className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 shadow-sm hover:border-[#FCBE00] hover:bg-[#FFF8D6] hover:-translate-y-0.5 hover:shadow-md transition-all duration-150 group"
+              className="flex items-center justify-between gap-3 bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 rounded-xl px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:border-[#FCBE00] hover:bg-[#FFF8D6] dark:hover:bg-[#2A2510] dark:hover:border-amber-500/50 hover:-translate-y-0.5 hover:shadow-md transition-all duration-150 group"
             >
               <span>{p}</span>
               <span className="text-slate-300 group-hover:text-amber-600 group-hover:translate-x-1 transition-all duration-150 shrink-0">→</span>
@@ -204,17 +208,17 @@ export default function HomePage() {
 
       {/* ── CTA ── */}
       <section className="px-4 pb-20">
-        <div className="max-w-2xl mx-auto bg-slate-900 rounded-3xl overflow-hidden">
+        <div className="max-w-2xl mx-auto bg-slate-900 dark:bg-[#1A1916] dark:border dark:border-white/8 rounded-3xl overflow-hidden dark:shadow-[0_0_60px_-10px_rgba(252,190,0,0.15)]">
           <div className="flex flex-col md:flex-row items-center gap-0">
 
-            {/* superb.png — "OK / approved" hands reinforce the trust & approval message */}
+            {/* superb.png — brighter + warm tint in dark mode so it glows against near-black */}
             <div className="md:w-56 shrink-0 self-stretch overflow-hidden hidden md:block">
               <Image
                 src="/superb.png"
                 alt=""
                 width={224}
                 height={320}
-                className="w-full h-full object-cover opacity-80"
+                className="w-full h-full object-cover opacity-80 dark:opacity-95 dark:brightness-110 dark:saturate-110"
                 aria-hidden
               />
             </div>

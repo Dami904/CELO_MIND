@@ -115,8 +115,8 @@ export default function DashboardPage() {
       {/* Page header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl font-light tracking-tight text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">Live data from Celo Mainnet</p>
+          <h1 className="font-display text-3xl font-light tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Live data from Celo Mainnet</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-xs text-slate-400">
@@ -145,9 +145,9 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* CELO price */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">CELO price</p>
-          <p className="font-display text-2xl font-medium text-slate-900 leading-none mb-1">
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">CELO price</p>
+          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
             {celoPrice ? `$${Number(celoPrice.usd).toFixed(4)}` : '—'}
           </p>
           {typeof change === 'number' && (
@@ -158,25 +158,25 @@ export default function DashboardPage() {
         </div>
 
         {/* TVL */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">Celo TVL</p>
-          <p className="font-display text-2xl font-medium text-slate-900 leading-none mb-1">{celoTvl ?? '—'}</p>
-          <p className="text-xs text-slate-400">Total value locked</p>
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Celo TVL</p>
+          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">{celoTvl ?? '—'}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Total value locked</p>
         </div>
 
         {/* Gas */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">Gas price</p>
-          <p className="font-display text-2xl font-medium text-slate-900 leading-none mb-1">
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Gas price</p>
+          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
             {gasPrice ? `${gasPrice} Gwei` : '—'}
           </p>
-          <p className="text-xs text-slate-400">Current network fee</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Current network fee</p>
         </div>
 
         {/* Network */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">Network</p>
-          <p className="font-display text-2xl font-medium text-slate-900 leading-none mb-1">Celo</p>
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Network</p>
+          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">Celo</p>
           {networkStats?.dailyTxCount ? (
             <p className="text-xs text-slate-400">{Number(networkStats.dailyTxCount).toLocaleString()} txs today</p>
           ) : (
@@ -192,9 +192,9 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-5">
 
           {/* Wallet card */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-6">
             <div className="flex items-center justify-between gap-3 mb-5">
-              <h2 className="font-medium text-slate-800">Your wallet</h2>
+              <h2 className="font-medium text-slate-800 dark:text-slate-200">Your wallet</h2>
               {!isConnected ? (
                 <button
                   onClick={() => open()}
@@ -210,10 +210,10 @@ export default function DashboardPage() {
             </div>
 
             {!isConnected ? (
-              <div className="flex flex-col items-center gap-3 py-8 bg-stone-50 rounded-xl border border-dashed border-slate-200 text-center">
+              <div className="flex flex-col items-center gap-3 py-8 bg-stone-50 dark:bg-white/4 rounded-xl border border-dashed border-slate-200 dark:border-white/10 text-center">
                 <span className="text-3xl">🔐</span>
-                <p className="text-sm font-medium text-slate-700">No wallet connected</p>
-                <p className="text-xs text-slate-400 max-w-[240px]">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No wallet connected</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[240px]">
                   Connect your wallet to see your balances and recent activity.
                 </p>
                 <button
@@ -226,15 +226,15 @@ export default function DashboardPage() {
             ) : walletLoading ? (
               <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Loading portfolio…</div>
             ) : portfolio?.length > 0 ? (
-              <div className="flex flex-col divide-y divide-slate-100">
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
                 {portfolio.slice(0, 8).map((tok, i) => (
                   <div key={i} className="flex items-center justify-between py-2.5">
                     <div>
-                      <p className="text-sm font-medium text-slate-800">{tok.symbol ?? tok.name ?? 'Token'}</p>
-                      <p className="text-xs text-slate-400">{tok.balance ?? '?'}</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{tok.symbol ?? tok.name ?? 'Token'}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{tok.balance ?? '?'}</p>
                     </div>
                     {tok.usdValue && (
-                      <p className="text-sm font-medium text-slate-700">${tok.usdValue}</p>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">${tok.usdValue}</p>
                     )}
                   </div>
                 ))}
@@ -245,9 +245,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Activity feed */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium text-slate-800">Recent activity</h2>
+              <h2 className="font-medium text-slate-800 dark:text-slate-200">Recent activity</h2>
               {isConnected && (
                 <Link href="/chat?q=Show+recent+transactions" className="text-xs text-amber-700 hover:text-amber-900 font-medium">
                   See all →
@@ -256,14 +256,14 @@ export default function DashboardPage() {
             </div>
 
             {!isConnected ? (
-              <div className="flex flex-col items-center gap-3 py-8 bg-stone-50 rounded-xl border border-dashed border-slate-200 text-center">
+              <div className="flex flex-col items-center gap-3 py-8 bg-stone-50 dark:bg-white/4 rounded-xl border border-dashed border-slate-200 dark:border-white/10 text-center">
                 <span className="text-2xl">📋</span>
-                <p className="text-sm text-slate-400">Connect your wallet to see transactions here.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">Connect your wallet to see transactions here.</p>
               </div>
             ) : walletLoading ? (
-              <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Loading transactions…</div>
+              <div className="flex items-center justify-center py-10 text-slate-400 dark:text-slate-500 text-sm">Loading transactions…</div>
             ) : recentTxs?.length > 0 ? (
-              <div className="flex flex-col divide-y divide-slate-100">
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
                 {recentTxs.slice(0, 5).map((tx, i) => {
                   const hash = tx.hash ?? tx.transactionHash ?? '';
                   const ok = tx.status === 'ok' || tx.result === 'success' || tx.isError === '0';
@@ -271,8 +271,8 @@ export default function DashboardPage() {
                   return (
                     <div key={i} className="flex items-center justify-between py-2.5 gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-mono text-slate-700 truncate">{short(hash)}</p>
-                        {ts && <p className="text-xs text-slate-400">{fmtTime(ts)}</p>}
+                        <p className="text-sm font-mono text-slate-700 dark:text-slate-300 truncate">{short(hash)}</p>
+                        {ts && <p className="text-xs text-slate-400 dark:text-slate-500">{fmtTime(ts)}</p>}
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                         {ok ? 'success' : 'failed'}
@@ -288,9 +288,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Right col — AI capabilities */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 lg:sticky lg:top-20">
-          <h2 className="font-medium text-slate-800 mb-1">AI capabilities</h2>
-          <p className="text-xs text-slate-400 mb-4">Everything the AI can do, in plain English.</p>
+        <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-6 lg:sticky lg:top-20">
+          <h2 className="font-medium text-slate-800 dark:text-slate-200 mb-1">AI capabilities</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Everything the AI can do, in plain English.</p>
 
           <div className="flex flex-wrap gap-1.5 mb-4">
             {toolGroups.map((g, i) => (
@@ -300,7 +300,7 @@ export default function DashboardPage() {
                 className={`text-xs font-medium rounded-full px-3 py-1 border transition-all duration-100 ${
                   activeGroup === i
                     ? 'bg-[#FCBE00] text-slate-900 border-transparent'
-                    : 'bg-stone-100 text-slate-500 border-stone-200 hover:bg-stone-200'
+                    : 'bg-stone-100 dark:bg-white/6 text-slate-500 dark:text-slate-400 border-stone-200 dark:border-white/8 hover:bg-stone-200 dark:hover:bg-white/10'
                 }`}
               >
                 {g.label}
@@ -313,13 +313,13 @@ export default function DashboardPage() {
               <Link
                 key={tool.id}
                 href={`/chat?q=${encodeURIComponent(tool.desc)}`}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 border border-transparent hover:border-slate-100 transition-all duration-100 group"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 dark:hover:bg-white/5 border border-transparent hover:border-slate-100 dark:hover:border-white/8 transition-all duration-100 group"
               >
                 <div>
-                  <p className="text-sm font-medium text-slate-800">{tool.title}</p>
-                  <p className="text-xs text-slate-400">{tool.desc}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{tool.title}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{tool.desc}</p>
                 </div>
-                <span className="text-slate-300 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all text-sm shrink-0">→</span>
+                <span className="text-slate-300 dark:text-slate-600 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all text-sm shrink-0">→</span>
               </Link>
             ))}
           </div>
@@ -327,8 +327,8 @@ export default function DashboardPage() {
       </div>
 
       {/* System status */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h2 className="font-medium text-slate-800 mb-4">System status</h2>
+      <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-6">
+        <h2 className="font-medium text-slate-800 dark:text-slate-200 mb-4">System status</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Celo network',  value: 'Mainnet',                          ok: true },
@@ -336,8 +336,8 @@ export default function DashboardPage() {
             { label: 'RPC latency',   value: gasPrice ? '< 5ms' : 'Checking…',  ok: !!gasPrice },
             { label: 'MCP tools',     value: '40 loaded',                        ok: true },
           ].map((s) => (
-            <div key={s.label} className="flex items-center justify-between bg-stone-50 rounded-xl px-3 py-2.5">
-              <span className="text-xs text-slate-500">{s.label}</span>
+            <div key={s.label} className="flex items-center justify-between bg-stone-50 dark:bg-white/4 rounded-xl px-3 py-2.5">
+              <span className="text-xs text-slate-500 dark:text-slate-400">{s.label}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                 {s.value}
               </span>

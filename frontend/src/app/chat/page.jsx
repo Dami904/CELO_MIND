@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
-import { BrowserProvider } from 'ethers';
+import { createWalletClient, custom } from 'viem';
+import { celo } from 'viem/chains';
 import { apiClient } from '@/lib/api';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ResultCard from '@/components/ui/ResultCard';
@@ -191,19 +192,22 @@ function ChatInner() {
     if (!pendingTx || !walletProvider) return;
     setIsSigning(true);
     try {
-      const provider = new BrowserProvider(walletProvider);
-      const signer = await provider.getSigner();
+      const walletClient = createWalletClient({
+        chain: celo,
+        transport: custom(walletProvider),
+      });
+      const [account] = await walletClient.getAddresses();
 
       for (const tx of pendingTx.transactions) {
-        const sent = await signer.sendTransaction({
+        const hash = await walletClient.sendTransaction({
+          account,
           to: tx.to,
           data: tx.data ?? '0x',
           value: tx.value ? BigInt(tx.value) : 0n,
         });
-        await sent.wait();
         addMessage({
           role: 'assistant',
-          content: `Transaction confirmed on Celo Mainnet.\nHash: ${sent.hash}`,
+          content: `Transaction submitted on Celo Mainnet.\nHash: ${hash}`,
           ts: new Date(),
         });
       }
@@ -243,11 +247,11 @@ function ChatInner() {
 
       {/* ── Sidebar ── */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-0'} shrink-0 overflow-hidden transition-all duration-250 border-r border-slate-200 bg-stone-50 flex flex-col`}
+        className={`${sidebarOpen ? 'w-64' : 'w-0'} shrink-0 overflow-hidden transition-all duration-250 border-r border-slate-200 dark:border-white/8 bg-stone-50 dark:bg-[#131210] flex flex-col`}
       >
         <div className="w-64 flex flex-col h-full p-4 gap-4 overflow-y-auto">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium uppercase tracking-widest text-slate-400">Suggestions</span>
+            <span className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500">Suggestions</span>
             <button
               onClick={() => setMessages([{ role: 'assistant', content: 'New conversation started. What would you like to do?', ts: new Date() }])}
               className="text-xs font-medium text-amber-700 bg-[#FFF8D6] hover:bg-[#FCBE00] rounded-full px-2.5 py-1 transition-colors whitespace-nowrap"
@@ -263,8 +267,8 @@ function ChatInner() {
                 onClick={() => setActiveCat(cat)}
                 className={`text-left text-sm rounded-xl px-3 py-2 transition-all ${
                   activeCat === cat
-                    ? 'bg-white text-slate-800 font-medium shadow-sm border border-slate-100'
-                    : 'text-slate-500 hover:bg-stone-100 hover:text-slate-800'
+                    ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-slate-100 font-medium shadow-sm border border-slate-100 dark:border-white/10'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-stone-100 dark:hover:bg-white/6 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 {cat}
@@ -277,7 +281,7 @@ function ChatInner() {
               <button
                 key={p}
                 onClick={() => sendMessage(p)}
-                className="text-left text-sm text-slate-500 hover:text-slate-800 hover:bg-white hover:border-slate-100 border border-transparent rounded-xl px-3 py-2 transition-all leading-snug"
+                className="text-left text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-white/8 hover:border-slate-100 dark:hover:border-white/10 border border-transparent rounded-xl px-3 py-2 transition-all leading-snug"
               >
                 {p}
               </button>
@@ -287,10 +291,10 @@ function ChatInner() {
       </aside>
 
       {/* ── Main ── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-stone-50 dark:bg-[#0F0E0C]">
 
         {/* Chat header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] shrink-0">
           <button
             onClick={() => setSidebarOpen((v) => !v)}
             className="text-slate-400 hover:text-slate-700 hover:bg-stone-100 rounded-lg p-1.5 transition-colors"
@@ -304,7 +308,7 @@ function ChatInner() {
             CM
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-800">CeloMind</p>
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">CeloMind</p>
             <p className="text-xs text-emerald-600 flex items-center gap-1">
               <span className="live-dot" style={{ width: 6, height: 6 }} />
               Agent ready
@@ -334,10 +338,10 @@ function ChatInner() {
                 <div
                   className={`px-4 py-3 rounded-2xl ${
                     msg.role === 'user'
-                      ? 'bg-slate-900 text-white/90 rounded-br-md'
+                      ? 'bg-slate-900 dark:bg-[#FCBE00] dark:text-slate-900 text-white/90 rounded-br-md'
                       : msg.error
-                      ? 'bg-red-50 border border-red-100 text-slate-700 rounded-bl-md'
-                      : 'bg-white border border-slate-200 shadow-sm text-slate-600 rounded-bl-md'
+                      ? 'bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-800/40 text-slate-700 dark:text-red-300 rounded-bl-md'
+                      : 'bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm text-slate-600 dark:text-slate-300 rounded-bl-md'
                   }`}
                 >
                   <MessageText content={msg.content} />
@@ -371,7 +375,7 @@ function ChatInner() {
           {loading && (
             <div className="flex gap-2.5 items-end">
               <div className="w-7 h-7 rounded-full bg-[#FCBE00] text-slate-900 font-display font-bold text-xs flex items-center justify-center shrink-0">CM</div>
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
                 <TypingDots />
               </div>
             </div>
@@ -380,8 +384,8 @@ function ChatInner() {
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-slate-200 bg-white px-4 pt-3 pb-5 max-w-2xl w-full mx-auto self-center">
-          <div className={`flex items-end gap-2 bg-stone-100 rounded-2xl px-4 py-2.5 border transition-colors ${input ? 'border-[#FCBE00]' : 'border-stone-200'}`}>
+        <div className="shrink-0 border-t border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] px-4 pt-3 pb-5 max-w-2xl w-full mx-auto self-center">
+          <div className={`flex items-end gap-2 bg-stone-100 dark:bg-white/6 rounded-2xl px-4 py-2.5 border transition-colors ${input ? 'border-[#FCBE00]' : 'border-stone-200 dark:border-white/8'}`}>
             <textarea
               ref={inputRef}
               value={input}
@@ -390,7 +394,7 @@ function ChatInner() {
               placeholder={isConnected ? '"What\'s my balance?" or "Swap 5 CELO for cUSD"' : '"Show me CELO price" or paste a wallet address…'}
               rows={1}
               disabled={loading}
-              className="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
+              className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
             />
             <button
               onClick={() => sendMessage()}
@@ -401,7 +405,7 @@ function ChatInner() {
               ↑
             </button>
           </div>
-          <p className="text-center text-xs text-slate-400 mt-2">
+          <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-2">
             CeloMind will never move funds without your approval.
           </p>
         </div>

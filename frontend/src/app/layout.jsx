@@ -1,6 +1,7 @@
 import './globals.css';
 import Navbar from '../components/ui/Navbar';
 import Web3ModalProvider from '../components/Web3ModalProvider';
+import { ThemeProvider } from '../components/ThemeProvider';
 
 export const metadata = {
   title: 'CeloMind — AI assistant for the Celo network',
@@ -19,11 +20,13 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body className="bg-stone-50 text-slate-900 antialiased flex flex-col min-h-screen">
-        <Web3ModalProvider>
-          <Navbar />
-          {children}
-        </Web3ModalProvider>
+      <body className="bg-stone-50 dark:bg-[#0F0E0C] text-slate-900 dark:text-[#F0EDE4] antialiased flex flex-col min-h-screen transition-colors duration-200">
+        <ThemeProvider>
+          <Web3ModalProvider>
+            <Navbar />
+            {children}
+          </Web3ModalProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
