@@ -147,33 +147,60 @@ export default function DashboardPage() {
         {/* CELO price */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
           <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">CELO price</p>
-          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
-            {celoPrice ? `$${Number(celoPrice.usd).toFixed(4)}` : '—'}
-          </p>
-          {typeof change === 'number' && (
-            <p className={`text-xs font-medium ${changeUp ? 'text-emerald-600' : 'text-red-500'}`}>
-              {changeUp ? '+' : ''}{change.toFixed(2)}% today
-            </p>
+          {celoPrice ? (
+            <>
+              <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
+                ${Number(celoPrice.usd).toFixed(4)}
+              </p>
+              {typeof change === 'number' && (
+                <p className={`text-xs font-medium ${changeUp ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {changeUp ? '+' : ''}{change.toFixed(2)}% today
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="skeleton h-7 w-24 mb-1.5" />
+              <div className="skeleton h-3 w-16" />
+            </>
           )}
         </div>
 
         {/* TVL */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
           <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Celo TVL</p>
-          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">{celoTvl ?? '—'}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Total value locked</p>
+          {celoTvl ? (
+            <>
+              <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">{celoTvl}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Total value locked</p>
+            </>
+          ) : (
+            <>
+              <div className="skeleton h-7 w-20 mb-1.5" />
+              <div className="skeleton h-3 w-28" />
+            </>
+          )}
         </div>
 
         {/* Gas */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
           <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Gas price</p>
-          <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
-            {gasPrice ? `${gasPrice} Gwei` : '—'}
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Current network fee</p>
+          {gasPrice ? (
+            <>
+              <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">
+                {gasPrice} Gwei
+              </p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Current network fee</p>
+            </>
+          ) : (
+            <>
+              <div className="skeleton h-7 w-20 mb-1.5" />
+              <div className="skeleton h-3 w-24" />
+            </>
+          )}
         </div>
 
-        {/* Network */}
+        {/* Network — always known, no skeleton needed */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
           <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Network</p>
           <p className="font-display text-2xl font-medium text-slate-900 dark:text-slate-100 leading-none mb-1">Celo</p>
@@ -224,7 +251,17 @@ export default function DashboardPage() {
                 </button>
               </div>
             ) : walletLoading ? (
-              <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Loading portfolio…</div>
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
+                {[1,2,3,4].map((n) => (
+                  <div key={n} className="flex items-center justify-between py-3">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="skeleton h-3.5 w-16" />
+                      <div className="skeleton h-2.5 w-10" />
+                    </div>
+                    <div className="skeleton h-3.5 w-14" />
+                  </div>
+                ))}
+              </div>
             ) : portfolio?.length > 0 ? (
               <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
                 {portfolio.slice(0, 8).map((tok, i) => (
@@ -261,7 +298,17 @@ export default function DashboardPage() {
                 <p className="text-sm text-slate-400 dark:text-slate-500">Connect your wallet to see transactions here.</p>
               </div>
             ) : walletLoading ? (
-              <div className="flex items-center justify-center py-10 text-slate-400 dark:text-slate-500 text-sm">Loading transactions…</div>
+              <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
+                {[1,2,3].map((n) => (
+                  <div key={n} className="flex items-center justify-between py-3 gap-3">
+                    <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                      <div className="skeleton h-3.5 w-40" />
+                      <div className="skeleton h-2.5 w-16" />
+                    </div>
+                    <div className="skeleton h-5 w-14 rounded-full shrink-0" />
+                  </div>
+                ))}
+              </div>
             ) : recentTxs?.length > 0 ? (
               <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/6">
                 {recentTxs.slice(0, 5).map((tx, i) => {

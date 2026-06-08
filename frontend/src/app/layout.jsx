@@ -1,5 +1,6 @@
 import './globals.css';
 import Navbar from '../components/ui/Navbar';
+import Footer from '../components/ui/Footer';
 import Web3ModalProvider from '../components/Web3ModalProvider';
 import { ThemeProvider } from '../components/ThemeProvider';
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
           <Web3ModalProvider>
             <Navbar />
             {children}
+            <Footer />
           </Web3ModalProvider>
         </ThemeProvider>
       </body>

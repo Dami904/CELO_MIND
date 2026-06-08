@@ -185,10 +185,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="border-t border-stone-200" />
-
       {/* ── Prompt chips ── */}
-      <section className="max-w-5xl mx-auto px-4 py-16 md:py-20">
+      <section className="bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
+      <div className="max-w-5xl mx-auto px-4 py-16 md:py-20">
         <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Try these</p>
         <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Things to ask CeloMind</h2>
 
@@ -204,6 +203,7 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
+      </div>
       </section>
 
       {/* ── CTA ── */}

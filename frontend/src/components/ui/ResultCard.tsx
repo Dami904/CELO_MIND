@@ -7,34 +7,47 @@ export interface ResultCardProps {
     className?: string;
 }
 
+const colorClass: Record<string, string> = {
+    green:   "text-emerald-600 dark:text-emerald-400 font-semibold",
+    yellow:  "text-amber-600  dark:text-amber-400  font-semibold",
+    red:     "text-red-600    dark:text-red-400    font-semibold",
+    default: "text-slate-800  dark:text-slate-200",
+};
+
 export default function ResultCard({ title, data, className }: ResultCardProps) {
     return (
-        <div className={cn("bg-surface border border-border rounded overflow-hidden flex flex-col font-sans w-full", className)}>
-            {/* Title */}
-            <div className="bg-dark/40 border-b border-border px-3.5 py-2 flex items-center justify-between">
-                <span className="text-2xs font-mono uppercase tracking-widest text-cy font-bold">
+        <div className={cn(
+            "w-full overflow-hidden rounded-xl border font-mono text-xs",
+            "bg-white dark:bg-[#1A1916]",
+            "border-slate-200 dark:border-white/10",
+            "shadow-sm",
+            className,
+        )}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-100 dark:border-white/8 bg-slate-50 dark:bg-white/4">
+                <span className="uppercase tracking-widest text-[10px] font-bold text-amber-600 dark:text-amber-400">
                     {title}
                 </span>
-                <span className="text-[10px] text-muted font-mono uppercase">mcp_result</span>
+                <span className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    mcp_result
+                </span>
             </div>
 
-            {/* Content */}
-            <div className="divide-y divide-border2">
-                {data.map((item, idx) => {
-                    let valueColor = "text-text";
-                    if (item.color === "green") valueColor = "text-cg font-semibold";
-                    else if (item.color === "yellow") valueColor = "text-cy font-semibold";
-                    else if (item.color === "red") valueColor = "text-error font-semibold";
-
-                    return (
-                        <div key={idx} className="flex justify-between items-start gap-4 px-3.5 py-2.5 text-xs">
-                            <span className="text-muted font-medium font-mono shrink-0">{item.label}</span>
-                            <span className={cn("font-mono text-right break-all select-all", valueColor)}>
-                                {item.value}
-                            </span>
-                        </div>
-                    );
-                })}
+            {/* Rows */}
+            <div className="divide-y divide-slate-100 dark:divide-white/6">
+                {data.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-start gap-4 px-3.5 py-2.5">
+                        <span className="shrink-0 text-slate-400 dark:text-slate-500 font-medium">
+                            {item.label}
+                        </span>
+                        <span className={cn(
+                            "text-right break-all select-all",
+                            colorClass[item.color ?? "default"],
+                        )}>
+                            {item.value}
+                        </span>
+                    </div>
+                ))}
             </div>
         </div>
     );
