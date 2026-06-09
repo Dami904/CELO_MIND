@@ -180,6 +180,7 @@ export default function DashboardPage() {
   const [metricsToday, setMetricsToday]       = useState(null);
   const [avgLatencyMs, setAvgLatencyMs]       = useState(null);
   const [timeseries7d, setTimeseries7d]       = useState([]);
+  const [selectedDay, setSelectedDay]         = useState(null); // chart day focus (null = today)
   const [metricsLoading, setMetricsLoading]   = useState(true);
 
   const [portfolio, setPortfolio]       = useState(null);
@@ -248,14 +249,9 @@ export default function DashboardPage() {
           <span className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
             <span className="live-dot" /> Live
           </span>
-          {!isConnected ? (
+          {!isConnected && (
             <button onClick={() => open()} className="text-sm font-medium bg-[#FCBE00] hover:bg-[#C49200] hover:text-white text-slate-900 rounded-full px-5 py-2 transition-all">
               Connect wallet
-            </button>
-          ) : (
-            <button onClick={() => open()} className="flex items-center gap-2 text-sm font-medium bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-full px-4 py-1.5 transition-all">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              {short(address)}
             </button>
           )}
         </div>
@@ -375,30 +371,55 @@ export default function DashboardPage() {
 
         {/* 7-day sparkline */}
         <div className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500">7-day activity</p>
-            {weekTotal > 0 && (
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{weekTotal.toLocaleString()} this week</p>
-            )}
-          </div>
+          {(() => {
+            const focusIdx = selectedDay != null && selectedDay < timeseries7d.length
+              ? selectedDay
+              : timeseries7d.length - 1;
+            const focus = timeseries7d[focusIdx];
+            return (
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500">7-day activity</p>
+                {focus && selectedDay != null ? (
+                  <button
+                    onClick={() => setSelectedDay(null)}
+                    className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5"
+                    title="Clear selection"
+                  >
+                    {fmtDayShort(focus.date)}: {(focus.chatRequests ?? 0).toLocaleString()} chats
+                    <span className="text-slate-400 dark:text-slate-500">✕</span>
+                  </button>
+                ) : weekTotal > 0 ? (
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{weekTotal.toLocaleString()} this week</p>
+                ) : null}
+              </div>
+            );
+          })()}
           {timeseries7d.length > 0 ? (
             <div className="flex items-end gap-1.5 h-16">
               {timeseries7d.map((d, i) => {
-                const isToday = i === timeseries7d.length - 1;
+                const focusIdx = selectedDay != null && selectedDay < timeseries7d.length
+                  ? selectedDay
+                  : timeseries7d.length - 1;
+                const isActive = i === focusIdx;
                 const pct = Math.max(Math.round(((d.chatRequests || 0) / sparkMax) * 100), 4);
                 return (
-                  <div key={d.date ?? i} className="flex-1 flex flex-col items-center gap-1.5">
+                  <button
+                    key={d.date ?? i}
+                    onClick={() => setSelectedDay(i)}
+                    className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer"
+                    title={`${fmtDayShort(d.date)}: ${d.chatRequests ?? 0} chats`}
+                    aria-label={`${fmtDayShort(d.date)}: ${d.chatRequests ?? 0} chats`}
+                  >
                     <div className="w-full flex flex-col justify-end" style={{ height: 52 }}>
                       <div
-                        className={`w-full rounded-sm animate-grow-up ${isToday ? 'bg-amber-400 dark:bg-amber-500' : 'bg-slate-100 dark:bg-white/12'}`}
+                        className={`w-full rounded-sm animate-grow-up transition-colors ${isActive ? 'bg-amber-400 dark:bg-amber-500' : 'bg-slate-100 dark:bg-white/12 group-hover:bg-amber-200 dark:group-hover:bg-amber-500/40'}`}
                         style={{ height: `${pct}%`, animationDelay: `${i * 60}ms` }}
-                        title={`${d.chatRequests ?? 0} chats`}
                       />
                     </div>
-                    <span className={`text-[9px] ${isToday ? 'text-amber-500 font-semibold' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <span className={`text-[9px] ${isActive ? 'text-amber-500 font-semibold' : 'text-slate-400 dark:text-slate-500'}`}>
                       {fmtDayShort(d.date)}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

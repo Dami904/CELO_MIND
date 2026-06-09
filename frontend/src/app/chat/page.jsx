@@ -119,6 +119,29 @@ function loadHistory() {
 function saveHistory(history) {
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY))); } catch {}
 }
+
+// Per-conversation message persistence so a chat can be resumed from history.
+const MSGS_PREFIX = 'celomind_chat_msgs_';
+function loadMessages(id) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MSGS_PREFIX + id) ?? 'null');
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    return raw.map((m) => ({ ...m, ts: new Date(m.ts) }));
+  } catch { return null; }
+}
+function saveMessages(id, messages) {
+  try { localStorage.setItem(MSGS_PREFIX + id, JSON.stringify(messages)); } catch {}
+}
+// Drop stored messages for conversations no longer in history (keeps localStorage bounded).
+function pruneMessages(keepIds) {
+  try {
+    const keep = new Set(keepIds.map((id) => MSGS_PREFIX + id));
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(MSGS_PREFIX) && !keep.has(k)) localStorage.removeItem(k);
+    }
+  } catch {}
+}
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -144,9 +167,24 @@ function ChatInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
   const [history, setHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Load history from localStorage on mount
-  useEffect(() => { setHistory(loadHistory()); }, []);
+  useEffect(() => { setHistory(loadHistory()); setHistoryLoaded(true); }, []);
+
+  // Persist the current conversation's messages so it can be resumed later.
+  useEffect(() => {
+    if (!messages.some((m) => m.role === 'user')) return;
+    saveMessages(conversationId, messages);
+  }, [messages, conversationId]);
+
+  // Keep stored messages bounded to conversations still in history (+ the active one).
+  // Guarded so it never runs before history has loaded (which would wipe stored chats).
+  useEffect(() => {
+    if (!historyLoaded) return;
+    pruneMessages([...history.map((h) => h.id), conversationId]);
+  }, [historyLoaded, history, conversationId]);
 
   // Sidebar opens by default on desktop; on mobile it stays closed and overlays.
   useEffect(() => {
@@ -166,6 +204,14 @@ function ChatInner() {
     const q = searchParams.get('q');
     if (q) { setInput(q); inputRef.current?.focus(); }
   }, [searchParams]);
+
+  // Auto-grow the input as text wraps to new lines, up to a max height (then it scrolls).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -203,13 +249,30 @@ function ChatInner() {
     });
   }, []);
 
+  const closeSidebarOnMobile = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) setSidebarOpen(false);
+  }, []);
+
   const startNewChat = useCallback(() => {
     saveCurrentSession(messages, conversationId);
     const newId = crypto.randomUUID();
     setConversationId(newId);
     setMessages([{ role: 'assistant', content: GREETING, ts: new Date() }]);
     setInput('');
-  }, [messages, conversationId, saveCurrentSession]);
+    closeSidebarOnMobile();
+  }, [messages, conversationId, saveCurrentSession, closeSidebarOnMobile]);
+
+  // Resume a past conversation: restore its messages and reuse its id so the backend
+  // (which keys chat memory by conversationId) continues the thread seamlessly.
+  const openConversation = useCallback((id) => {
+    if (id === conversationId) { closeSidebarOnMobile(); return; }
+    saveCurrentSession(messages, conversationId);
+    const restored = loadMessages(id) ?? [{ role: 'assistant', content: GREETING, ts: new Date() }];
+    setConversationId(id);
+    setMessages(restored);
+    setInput('');
+    closeSidebarOnMobile();
+  }, [conversationId, messages, saveCurrentSession, closeSidebarOnMobile]);
 
   const sendMessage = useCallback(async (text) => {
     const content = (text || input).trim();
@@ -353,36 +416,46 @@ function ChatInner() {
             </button>
           </div>
 
-          {/* ── Chat history ── */}
+          {/* ── Chat history (collapsible + bounded so Suggestions stay visible) ── */}
           {history.length > 0 && (
-            <div className="px-4 pb-3 flex flex-col gap-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1 px-1">
-                Recent
-              </p>
-              {history.slice(0, 8).map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => {
-                    // Start fresh session — full history retrieval needs backend support
-                    startNewChat();
-                  }}
-                  className="group flex flex-col items-start px-3 py-2 rounded-xl text-left
-                    hover:bg-white dark:hover:bg-white/8
-                    border border-transparent hover:border-slate-100 dark:hover:border-white/10
-                    transition-all duration-100"
+            <div className="px-4 pb-3 shrink-0">
+              <button
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-expanded={historyOpen}
+                className="w-full flex items-center justify-between px-1 mb-1 py-0.5 rounded-md hover:bg-stone-100 dark:hover:bg-white/5 transition-colors"
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                  Recent
+                  <span className="normal-case tracking-normal text-slate-300 dark:text-slate-600">({history.length})</span>
+                </span>
+                <svg
+                  className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${historyOpen ? '' : '-rotate-90'}`}
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
                 >
-                  <span className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">
-                    {h.title}
-                  </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {relativeTime(h.ts)}
-                  </span>
-                </button>
-              ))}
-              {history.length > 8 && (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 px-3 pt-1">
-                  +{history.length - 8} more
-                </p>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {historyOpen && (
+                <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto">
+                  {history.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => openConversation(h.id)}
+                      className={`group flex flex-col items-start px-3 py-2 rounded-xl text-left border transition-all duration-100 ${
+                        h.id === conversationId
+                          ? 'bg-white dark:bg-white/8 border-slate-200 dark:border-white/10'
+                          : 'border-transparent hover:bg-white dark:hover:bg-white/8 hover:border-slate-100 dark:hover:border-white/10'
+                      }`}
+                    >
+                      <span className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">
+                        {h.title}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {relativeTime(h.ts)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -415,7 +488,7 @@ function ChatInner() {
               {suggestions[activeCat].map((p) => (
                 <button
                   key={p}
-                  onClick={() => sendMessage(p)}
+                  onClick={() => { sendMessage(p); closeSidebarOnMobile(); }}
                   className="text-left text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-white/8 hover:border-slate-100 dark:hover:border-white/10 border border-transparent rounded-xl px-3 py-2 transition-all leading-snug"
                 >
                   {p}
@@ -450,15 +523,6 @@ function ChatInner() {
               Agent ready
             </p>
           </div>
-          {/* Connected wallet badge */}
-          {isConnected && address && (
-            <div className="ml-auto flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                {address.slice(0, 6)}…{address.slice(-4)}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Messages */}
@@ -552,7 +616,8 @@ function ChatInner() {
               placeholder={isConnected ? '"What\'s my balance?" or "Swap 5 CELO for cUSD"' : '"Show me CELO price" or paste a wallet address…'}
               rows={1}
               disabled={loading}
-              className="flex-1 bg-transparent text-sm text-[color:var(--text-primary)] caret-[var(--celo-gold)] placeholder:text-[color:var(--text-tertiary)] outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
+              style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)', caretColor: 'var(--celo-gold)' }}
+              className="flex-1 bg-transparent text-sm placeholder:text-[color:var(--text-tertiary)] outline-none resize-none leading-relaxed max-h-40 overflow-y-auto disabled:opacity-50"
             />
             <button
               onClick={() => sendMessage()}

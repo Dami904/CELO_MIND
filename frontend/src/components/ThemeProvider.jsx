@@ -16,10 +16,14 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const toggle = () => {
+    const root = document.documentElement;
+    // Briefly enable a global color transition so the switch cross-fades smoothly.
+    root.classList.add('theme-transition');
+    window.setTimeout(() => root.classList.remove('theme-transition'), 350);
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
       localStorage.setItem('theme', next);
-      document.documentElement.classList.toggle('dark', next === 'dark');
+      root.classList.toggle('dark', next === 'dark');
       return next;
     });
   };
