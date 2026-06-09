@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Logo from '@/components/ui/Logo';
 
 const links = [
   { label: 'Home',      href: '/' },
@@ -19,8 +20,8 @@ export default function Footer() {
 
         {/* Brand */}
         <div className="flex flex-col items-center md:items-start gap-1">
-          <Link href="/" className="font-display text-lg font-medium tracking-tight text-slate-900 dark:text-slate-100">
-            Celo<span className="text-amber-600">Mind</span>
+          <Link href="/" aria-label="CeloMind home">
+            <Logo imgClassName="h-12 w-auto" textClassName="text-lg" />
           </Link>
           <p className="text-xs text-slate-400 dark:text-slate-500">
             AI assistant for the Celo network

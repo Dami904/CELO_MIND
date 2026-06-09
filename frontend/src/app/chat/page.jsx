@@ -28,7 +28,7 @@ function CopyableHex({ value }) {
   return (
     <span className="inline-flex items-center gap-1 align-baseline">
       <span
-        className="font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 text-[11px] cursor-pointer select-all"
+        className="font-mono text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 rounded px-1 py-0.5 text-[11px] cursor-pointer select-all"
         title={value}
         onClick={copy}
       >
@@ -37,7 +37,7 @@ function CopyableHex({ value }) {
       <button
         onClick={copy}
         title={`Copy full ${isTx ? 'transaction hash' : 'address'}`}
-        className="text-slate-400 hover:text-slate-700 transition-colors"
+        className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
         style={{ lineHeight: 1 }}
       >
         {copied ? (
@@ -100,7 +100,7 @@ function TypingDots() {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="w-2 h-2 rounded-full bg-slate-300"
+          className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"
           style={{ animation: `typingBounce 1.2s ease-in-out infinite`, animationDelay: `${i * 0.2}s` }}
         />
       ))}
@@ -141,12 +141,17 @@ function ChatInner() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeCat, setActiveCat] = useState('My wallet');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
   const [history, setHistory] = useState([]);
 
   // Load history from localStorage on mount
   useEffect(() => { setHistory(loadHistory()); }, []);
+
+  // Sidebar opens by default on desktop; on mobile it stays closed and overlays.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
 
   // Confirmation modal state
   const [pendingTx, setPendingTx] = useState(null);
@@ -301,7 +306,7 @@ function ChatInner() {
   const fmtTime = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex relative" style={{ height: 'calc(100vh - 64px)' }}>
 
       {/* ── Confirmation modal ── */}
       {pendingTx && (
@@ -315,9 +320,18 @@ function ChatInner() {
         />
       )}
 
+      {/* ── Mobile sidebar backdrop ── */}
+      {sidebarOpen && (
+        <div
+          className="absolute inset-0 z-20 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+
       {/* ── Sidebar ── */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-0'} shrink-0 overflow-hidden transition-all duration-250 border-r border-slate-200 dark:border-white/8 bg-stone-50 dark:bg-[#131210] flex flex-col`}
+        className={`${sidebarOpen ? 'w-64' : 'w-0'} shrink-0 overflow-hidden transition-all duration-250 border-r border-slate-200 dark:border-white/8 bg-stone-50 dark:bg-[#131210] flex flex-col absolute lg:relative inset-y-0 left-0 z-30`}
       >
         <div className="w-64 flex flex-col h-full overflow-y-auto">
 
@@ -419,15 +433,15 @@ function ChatInner() {
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] shrink-0">
           <button
             onClick={() => setSidebarOpen((v) => !v)}
-            className="text-slate-400 hover:text-slate-700 hover:bg-stone-100 rounded-lg p-1.5 transition-colors"
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-stone-100 dark:hover:bg-white/8 rounded-lg p-1.5 transition-colors"
             aria-label="Toggle sidebar"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
             </svg>
           </button>
-          <div className="w-9 h-9 rounded-full bg-[#FCBE00] text-slate-900 font-display font-semibold text-sm flex items-center justify-center shrink-0">
-            CM
+          <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-amber-400/10 ring-1 ring-amber-200/60 dark:ring-amber-400/15 flex items-center justify-center shrink-0">
+            <img src="/logo-icon.png" alt="CeloMind" className="w-6 h-6 object-contain" />
           </div>
           <div>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">CeloMind</p>
@@ -438,9 +452,9 @@ function ChatInner() {
           </div>
           {/* Connected wallet badge */}
           {isConnected && address && (
-            <div className="ml-auto flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+            <div className="ml-auto flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-full px-3 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-xs font-medium text-emerald-700">
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 {address.slice(0, 6)}…{address.slice(-4)}
               </span>
             </div>
@@ -454,8 +468,8 @@ function ChatInner() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-2.5 items-end ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-[#FCBE00] text-slate-900 font-display font-bold text-xs flex items-center justify-center shrink-0">
-                  CM
+                <div className="w-7 h-7 rounded-full bg-amber-50 dark:bg-amber-400/10 ring-1 ring-amber-200/60 dark:ring-amber-400/15 flex items-center justify-center shrink-0">
+                  <img src="/logo-icon.png" alt="CeloMind" className="w-5 h-5 object-contain" />
                 </div>
               )}
               <div className="max-w-[78%] flex flex-col gap-2">
@@ -498,7 +512,7 @@ function ChatInner() {
 
           {loading && (
             <div className="flex gap-2.5 items-end">
-              <div className="w-7 h-7 rounded-full bg-[#FCBE00] text-slate-900 font-display font-bold text-xs flex items-center justify-center shrink-0">CM</div>
+              <div className="w-7 h-7 rounded-full bg-amber-50 dark:bg-amber-400/10 ring-1 ring-amber-200/60 dark:ring-amber-400/15 flex items-center justify-center shrink-0"><img src="/logo-icon.png" alt="CeloMind" className="w-5 h-5 object-contain" /></div>
               <div className="bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
                 <TypingDots />
               </div>
@@ -538,7 +552,7 @@ function ChatInner() {
               placeholder={isConnected ? '"What\'s my balance?" or "Swap 5 CELO for cUSD"' : '"Show me CELO price" or paste a wallet address…'}
               rows={1}
               disabled={loading}
-              className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
+              className="flex-1 bg-transparent text-sm text-[color:var(--text-primary)] caret-[var(--celo-gold)] placeholder:text-[color:var(--text-tertiary)] outline-none resize-none leading-relaxed max-h-36 overflow-y-auto disabled:opacity-50"
             />
             <button
               onClick={() => sendMessage()}

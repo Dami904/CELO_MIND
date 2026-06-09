@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
 import { useTheme } from '@/components/ThemeProvider';
+import Logo from '@/components/ui/Logo';
 
 const NAV_LINKS = [
   { label: 'Home',      href: '/' },
@@ -35,8 +36,8 @@ export default function Navbar() {
       <nav className="sticky top-0 z-50 h-16 bg-stone-50/80 dark:bg-[#0F0E0C]/85 backdrop-blur-md border-b border-stone-200 dark:border-white/8 flex items-center px-4 md:px-10 gap-6 transition-colors duration-200">
 
         {/* Logo */}
-        <Link href="/" className="font-display text-xl font-medium tracking-tight text-slate-900 dark:text-slate-100 shrink-0">
-          Celo<span className="text-amber-600">Mind</span>
+        <Link href="/" className="shrink-0" aria-label="CeloMind home">
+          <Logo imgClassName="h-12 w-auto" textClassName="text-xl" />
         </Link>
 
         {/* Desktop nav links */}
@@ -130,9 +131,9 @@ export default function Navbar() {
           <Link
             href="/"
             onClick={() => setDrawerOpen(false)}
-            className="font-display text-lg font-medium text-slate-900 dark:text-slate-100"
+            aria-label="CeloMind home"
           >
-            Celo<span className="text-amber-600">Mind</span>
+            <Logo imgClassName="h-11 w-auto" textClassName="text-lg" />
           </Link>
           <button
             onClick={() => setDrawerOpen(false)}

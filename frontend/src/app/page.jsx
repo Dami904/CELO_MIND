@@ -320,110 +320,109 @@ export default function HomePage() {
       {(() => {
         const numerals = ['I', 'II', 'III'];
         const stepPanels = [
-          <div key="s0" className="rounded-2xl border border-white/10 bg-[#1A1916] p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
+          <div key="s0" className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1916] shadow-sm p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
             <div className="flex items-center justify-between mb-5">
-              <p className="text-white/50 text-xs uppercase tracking-widest">Wallet</p>
-              <span className="text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+              <p className="text-slate-400 dark:text-white/50 text-xs uppercase tracking-widest">Wallet</p>
+              <span className="text-[11px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Connected
               </span>
             </div>
-            <p className="font-mono text-xs text-white/30 mb-5">0x4f3a…82b1 · Celo Mainnet</p>
+            <p className="font-mono text-xs text-slate-400 dark:text-white/30 mb-5">0x4f3a…82b1 · Celo Mainnet</p>
             {[['CELO', '12.45', '$7.23'], ['cUSD', '50.00', '$50.00'], ['G$', '100', '$0.25']].map(([sym, bal, usd]) => (
-              <div key={sym} className="flex items-center justify-between py-2.5 border-b border-white/6 last:border-0">
+              <div key={sym} className="flex items-center justify-between py-2.5 border-b border-slate-100 dark:border-white/6 last:border-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-400">{sym[0]}</div>
-                  <span className="text-sm text-white/70">{sym}</span>
+                  <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-600 dark:text-amber-400">{sym[0]}</div>
+                  <span className="text-sm text-slate-600 dark:text-white/70">{sym}</span>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-white/80">{bal}</p>
-                  <p className="text-[11px] text-white/30">{usd}</p>
+                  <p className="text-sm text-slate-800 dark:text-white/80">{bal}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-white/30">{usd}</p>
                 </div>
               </div>
             ))}
           </div>,
-          <div key="s1" className="rounded-2xl border border-white/10 bg-[#0D0C0A] p-5 space-y-3" style={{ animation: 'slideRight 0.55s ease both' }}>
-            <div className="flex items-center gap-2 pb-3 border-b border-white/8">
-              <div className="w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center text-[10px] font-bold text-slate-900">CM</div>
-              <span className="text-xs text-white/40">CeloMind</span>
-              <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+          <div key="s1" className="rounded-2xl border border-slate-200 dark:border-white/10 bg-stone-50 dark:bg-[#0D0C0A] shadow-sm p-5 space-y-3" style={{ animation: 'slideRight 0.55s ease both' }}>
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-white/8">
+              <div className="w-6 h-6 rounded-full bg-amber-50 dark:bg-amber-400/10 ring-1 ring-amber-200/60 dark:ring-amber-400/15 flex items-center justify-center shrink-0"><img src="/logo-icon.png" alt="CeloMind" className="w-4 h-4 object-contain" /></div>
+              <span className="text-xs text-slate-400 dark:text-white/40">CeloMind</span>
+              <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />Live
               </span>
             </div>
             <div className="flex justify-end">
-              <div className="bg-slate-800 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%]">Swap 5 CELO to cUSD</div>
+              <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%]">Swap 5 CELO to cUSD</div>
             </div>
             <div className="flex gap-2">
-              <div className="w-6 h-6 rounded-full bg-amber-400 text-[10px] text-slate-900 font-bold flex items-center justify-center shrink-0">CM</div>
-              <div className="bg-[#1A1916] border border-white/8 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-white/80 leading-relaxed">
-                Best rate on <span className="text-amber-400 font-medium">Mento</span>: 5 CELO → <span className="text-emerald-400 font-medium">3.12 cUSD</span>. Shall I proceed?
+              <div className="w-6 h-6 rounded-full bg-amber-50 dark:bg-amber-400/10 ring-1 ring-amber-200/60 dark:ring-amber-400/15 flex items-center justify-center shrink-0"><img src="/logo-icon.png" alt="CeloMind" className="w-4 h-4 object-contain" /></div>
+              <div className="bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-slate-600 dark:text-white/80 leading-relaxed">
+                Best rate on <span className="text-amber-600 dark:text-amber-400 font-medium">Mento</span>: 5 CELO → <span className="text-emerald-600 dark:text-emerald-400 font-medium">3.12 cUSD</span>. Shall I proceed?
               </div>
             </div>
             <div className="flex gap-2 justify-center pt-1">
-              <button className="text-xs bg-amber-400/15 text-amber-400 px-4 py-1.5 rounded-full border border-amber-400/25">Confirm</button>
-              <button className="text-xs bg-white/6 text-white/35 px-4 py-1.5 rounded-full">Cancel</button>
+              <button className="text-xs bg-amber-400/15 text-amber-600 dark:text-amber-400 px-4 py-1.5 rounded-full border border-amber-400/25">Confirm</button>
+              <button className="text-xs bg-slate-100 dark:bg-white/6 text-slate-400 dark:text-white/35 px-4 py-1.5 rounded-full">Cancel</button>
             </div>
           </div>,
-          <div key="s2" className="rounded-2xl border border-white/10 bg-[#1A1916] p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
+          <div key="s2" className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1916] shadow-sm p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center">🔐</div>
               <div>
-                <p className="text-sm font-medium text-white/90">Sign transaction</p>
-                <p className="text-[11px] text-white/30">Approved by you · never by CeloMind</p>
+                <p className="text-sm font-medium text-slate-800 dark:text-white/90">Sign transaction</p>
+                <p className="text-[11px] text-slate-400 dark:text-white/30">Approved by you · never by CeloMind</p>
               </div>
             </div>
             <div className="space-y-2.5 mb-5">
               {[['From', '5 CELO'], ['To (est.)', '3.12 cUSD'], ['Route', 'Mento DEX'], ['Gas', '~0.001 CELO']].map(([label, value]) => (
                 <div key={label} className="flex justify-between">
-                  <span className="text-xs text-white/35">{label}</span>
-                  <span className="text-xs font-medium text-white/80">{value}</span>
+                  <span className="text-xs text-slate-400 dark:text-white/35">{label}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-white/80">{value}</span>
                 </div>
               ))}
             </div>
             <button className="w-full bg-amber-400 text-slate-900 font-medium text-sm py-2.5 rounded-xl">Sign with wallet</button>
-            <p className="text-[10px] text-white/20 text-center mt-2.5">CeloMind never stores or touches your keys</p>
+            <p className="text-[10px] text-slate-400 dark:text-white/20 text-center mt-2.5">CeloMind never stores or touches your keys</p>
           </div>,
         ];
         return (
-          <section className="bg-[#0D0C0A]">
+          <section className="bg-stone-100 dark:bg-[#0D0C0A] transition-colors duration-200">
             <div className="max-w-5xl mx-auto px-8 pt-16 pb-8">
-              <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-white/30 mb-4">
+              <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-white/30 mb-4">
                 <span className="w-5 h-px bg-current inline-block opacity-50" />
                 How it works
               </p>
-              <h2 className="font-display text-3xl md:text-4xl font-light text-white leading-tight mb-10">
+              <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 dark:text-white leading-tight mb-10">
                 Three simple steps.<br />
-                <span className="text-white/35">No technical knowledge needed.</span>
+                <span className="text-slate-400 dark:text-white/35">No technical knowledge needed.</span>
               </h2>
 
               <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
                 {/* Left — compact step list */}
-                <div className="rounded-2xl border border-white/8 overflow-hidden">
+                <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-white dark:bg-transparent shadow-sm dark:shadow-none overflow-hidden">
                   {steps.map((s, i) => {
                     const isActive = activeStep === i;
                     return (
                       <button
                         key={s.n}
                         onClick={() => setActiveStep(i)}
-                        className="flex items-start gap-4 px-5 pt-5 pb-6 text-left transition-all duration-300 w-full relative border-b border-white/6 last:border-0 overflow-hidden"
-                        style={{ background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                        className={`flex items-start gap-4 px-5 pt-5 pb-6 text-left transition-all duration-300 w-full relative border-b border-slate-100 dark:border-white/6 last:border-0 overflow-hidden ${isActive ? 'bg-stone-100 dark:bg-white/5' : 'bg-transparent'}`}
                       >
                         <span
                           className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-amber-400 transition-all duration-500"
                           style={{ opacity: isActive ? 1 : 0, transform: isActive ? 'scaleY(1)' : 'scaleY(0)' }}
                         />
-                        <span className={`font-display text-2xl font-light leading-none mt-0.5 shrink-0 transition-colors duration-300 ${isActive ? 'text-amber-400/70' : 'text-white/15'}`}>
+                        <span className={`font-display text-2xl font-light leading-none mt-0.5 shrink-0 transition-colors duration-300 ${isActive ? 'text-amber-500 dark:text-amber-400/70' : 'text-slate-300 dark:text-white/15'}`}>
                           {numerals[i]}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/35'}`}>
+                          <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/35'}`}>
                             {s.title}
                           </p>
-                          <p className={`text-xs mt-1.5 leading-relaxed transition-colors duration-300 ${isActive ? 'text-white/40' : 'text-white/20'}`}>
+                          <p className={`text-xs mt-1.5 leading-relaxed transition-colors duration-300 ${isActive ? 'text-slate-500 dark:text-white/40' : 'text-slate-400 dark:text-white/20'}`}>
                             {s.desc}
                           </p>
                         </div>
                         {/* Progress bar */}
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/6">
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-white/6">
                           {isActive && (
                             <div
                               key={activeStep}
@@ -525,20 +524,19 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto">
           <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Connect</p>
           <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Use CeloMind in your AI client</h2>
-          <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: '#0D0C0A' }}>
+          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D0C0A] shadow-sm">
             <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] items-start">
 
               {/* Left — compact client list */}
-              <div className="border-b lg:border-b-0 lg:border-r border-white/8 p-5 flex flex-col gap-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3 px-2">Pick your platform</p>
+              <div className="border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/8 p-5 flex flex-col gap-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-3 px-2">Pick your platform</p>
                 {MCP_CLIENTS.map((c) => {
                   const isActive = mcpClient === c.id;
                   return (
                     <button
                       key={c.id}
                       onClick={() => setMcpClient(c.id)}
-                      className="flex items-center gap-3 rounded-xl px-3.5 pt-3 pb-4 text-left transition-all duration-300 w-full relative overflow-hidden"
-                      style={{ background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent' }}
+                      className={`flex items-center gap-3 rounded-xl px-3.5 pt-3 pb-4 text-left transition-all duration-300 w-full relative overflow-hidden ${isActive ? 'bg-stone-100 dark:bg-white/[0.07]' : 'bg-transparent'}`}
                     >
                       {/* Active left bar */}
                       <span
@@ -547,17 +545,17 @@ export default function HomePage() {
                       />
                       <span className="text-lg shrink-0 w-7 text-center">{c.icon}</span>
                       <div className="min-w-0">
-                        <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/40'}`}>
+                        <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/40'}`}>
                           {c.label}
                         </p>
                         {c.sublabel && (
-                          <p className={`text-[10px] mt-0.5 transition-colors duration-300 ${isActive ? 'text-white/35' : 'text-white/20'}`}>
+                          <p className={`text-[10px] mt-0.5 transition-colors duration-300 ${isActive ? 'text-slate-500 dark:text-white/35' : 'text-slate-400 dark:text-white/20'}`}>
                             {c.sublabel}
                           </p>
                         )}
                       </div>
                       {/* Progress bar */}
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/6">
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-white/6">
                         {isActive && (
                           <div
                             key={mcpClient}
@@ -573,7 +571,7 @@ export default function HomePage() {
                     </button>
                   );
                 })}
-                <p className="text-[10px] text-white/20 leading-relaxed mt-4 px-2">
+                <p className="text-[10px] text-slate-400 dark:text-white/20 leading-relaxed mt-4 px-2">
                   Free &amp; public — no token or signup required.
                 </p>
               </div>
@@ -585,14 +583,14 @@ export default function HomePage() {
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">1 — EASIEST</span>
-                        <span className="text-sm font-medium text-white/70">Settings UI — no config editing</span>
+                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">1 — EASIEST</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-white/70">Settings UI — no config editing</span>
                       </div>
-                      <p className="text-xs text-white/45 leading-relaxed">
+                      <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
                         Claude Desktop → Settings → Connectors → Add custom connector → paste this URL:
                       </p>
-                      <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5">
-                        <span className="font-mono text-sm text-white/80 flex-1 truncate">{MCP_URL}</span>
+                      <div className="flex items-center gap-2 bg-slate-900 dark:bg-black/30 border border-slate-700 dark:border-white/10 rounded-xl px-4 py-2.5">
+                        <span className="font-mono text-sm text-slate-100 dark:text-white/80 flex-1 truncate">{MCP_URL}</span>
                         <button onClick={() => copyText(MCP_URL, 'url1')} className="shrink-0 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
                           {copied === 'url1' ? '✓ Copied' : 'Copy URL'}
                         </button>
@@ -600,28 +598,28 @@ export default function HomePage() {
                     </div>
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-white/10 text-white/50 px-2 py-0.5 rounded">2 — RECOMMENDED</span>
-                        <span className="text-sm font-medium text-white/70">Config file — modern</span>
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50 px-2 py-0.5 rounded">2 — RECOMMENDED</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-white/70">Config file — modern</span>
                       </div>
-                      <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2)}</pre>
+                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2)}</pre>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2), 'cfg1')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2), 'cfg1')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
                           {copied === 'cfg1' ? '✓ Copied' : 'Copy'}
                         </button>
-                        <span className="font-mono text-[10px] text-white/25 truncate">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/Library/Application Support/Claude/claude_desktop_config.json</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-white/6 text-white/35 px-2 py-0.5 rounded">3 — LEGACY FALLBACK</span>
-                        <span className="text-sm font-medium text-white/50">Config file — requires Node.js</span>
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-400 dark:bg-white/6 dark:text-white/35 px-2 py-0.5 rounded">3 — LEGACY FALLBACK</span>
+                        <span className="text-sm font-medium text-slate-500 dark:text-white/50">Config file — requires Node.js</span>
                       </div>
-                      <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2)}</pre>
+                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2)}</pre>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2), 'cfg2')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2), 'cfg2')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
                           {copied === 'cfg2' ? '✓ Copied' : 'Copy'}
                         </button>
-                        <span className="text-[10px] text-white/25">Use this if Method 2 shows &quot;not valid MCP server configurations&quot;.</span>
+                        <span className="text-[10px] text-slate-400 dark:text-white/25">Use this if Method 2 shows &quot;not valid MCP server configurations&quot;.</span>
                       </div>
                     </div>
                   </div>
@@ -629,58 +627,58 @@ export default function HomePage() {
 
                 {mcpClient === 'cursor' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-xs text-white/45 leading-relaxed">
-                      Open <span className="text-white/75 font-medium">Cursor Settings → MCP</span> and add a new server, or paste into{' '}
-                      <code className="bg-white/10 px-1.5 py-0.5 rounded text-white/65 font-mono">~/.cursor/mcp.json</code>
+                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                      Open <span className="text-slate-700 dark:text-white/75 font-medium">Cursor Settings → MCP</span> and add a new server, or paste into{' '}
+                      <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">~/.cursor/mcp.json</code>
                     </p>
-                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2)}</pre>
-                    <p className="text-xs text-white/30">No token required. Restart Cursor after saving.</p>
+                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2)}</pre>
+                    <p className="text-xs text-slate-400 dark:text-white/30">No token required. Restart Cursor after saving.</p>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2), 'cursor')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2), 'cursor')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
                         {copied === 'cursor' ? '✓ Copied' : 'Copy config'}
                       </button>
-                      <span className="font-mono text-[10px] text-white/25 truncate">%APPDATA%\Cursor\User\globalStorage\cursor.mcp\mcp.json</span>
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">%APPDATA%\Cursor\User\globalStorage\cursor.mcp\mcp.json</span>
                     </div>
-                    <div className="flex flex-col gap-1 pt-2 border-t border-white/6">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Linux</p>
-                      <code className="font-mono text-[10px] text-white/35">~/.cursor/mcp.json</code>
+                    <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Linux</p>
+                      <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">~/.cursor/mcp.json</code>
                     </div>
                   </div>
                 )}
 
                 {mcpClient === 'windsurf' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-xs text-white/45 leading-relaxed">
-                      Open <span className="text-white/75 font-medium">Windsurf → Cascade panel → Plugin settings</span>, or edit the config file directly:
+                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                      Open <span className="text-slate-700 dark:text-white/75 font-medium">Windsurf → Cascade panel → Plugin settings</span>, or edit the config file directly:
                     </p>
-                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2)}</pre>
-                    <p className="text-xs text-white/30">Reload the Windsurf window after saving.</p>
+                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2)}</pre>
+                    <p className="text-xs text-slate-400 dark:text-white/30">Reload the Windsurf window after saving.</p>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2), 'windsurf')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2), 'windsurf')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
                         {copied === 'windsurf' ? '✓ Copied' : 'Copy config'}
                       </button>
-                      <span className="font-mono text-[10px] text-white/25 truncate">~/.codeium/windsurf/mcp_config.json</span>
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/.codeium/windsurf/mcp_config.json</span>
                     </div>
-                    <div className="flex flex-col gap-1 pt-2 border-t border-white/6">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Windows</p>
-                      <code className="font-mono text-[10px] text-white/35">%APPDATA%\Codeium\windsurf\mcp_config.json</code>
+                    <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Windows</p>
+                      <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">%APPDATA%\Codeium\windsurf\mcp_config.json</code>
                     </div>
                   </div>
                 )}
 
                 {mcpClient === 'vscode' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-xs text-white/45 leading-relaxed">
-                      Requires <span className="text-white/75 font-medium">GitHub Copilot + VS Code ≥ 1.99</span>. Create{' '}
-                      <code className="bg-white/10 px-1.5 py-0.5 rounded text-white/65 font-mono">.vscode/mcp.json</code> in your project:
+                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                      Requires <span className="text-slate-700 dark:text-white/75 font-medium">GitHub Copilot + VS Code ≥ 1.99</span>. Create{' '}
+                      <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">.vscode/mcp.json</code> in your project:
                     </p>
-                    <pre className="bg-black/40 border border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2)}</pre>
-                    <p className="text-xs text-white/30">Open Copilot Chat → Agent mode to access CeloMind tools.</p>
+                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2)}</pre>
+                    <p className="text-xs text-slate-400 dark:text-white/30">Open Copilot Chat → Agent mode to access CeloMind tools.</p>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2), 'vscode')} className="text-xs font-medium bg-white/10 hover:bg-white/15 text-white/70 px-4 py-2 rounded-lg transition-colors">
+                      <button onClick={() => copyText(JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2), 'vscode')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
                         {copied === 'vscode' ? '✓ Copied' : 'Copy config'}
                       </button>
-                      <span className="font-mono text-[10px] text-white/25">.vscode/mcp.json</span>
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25">.vscode/mcp.json</span>
                     </div>
                   </div>
                 )}
@@ -689,8 +687,8 @@ export default function HomePage() {
                   <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
                     <span className="text-5xl">🌐</span>
                     <div>
-                      <p className="text-white/80 font-medium mb-1">No setup needed</p>
-                      <p className="text-sm text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 75 tools, zero config.</p>
+                      <p className="text-slate-700 dark:text-white/80 font-medium mb-1">No setup needed</p>
+                      <p className="text-sm text-slate-500 dark:text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 75 tools, zero config.</p>
                     </div>
                     <Link href="/chat" className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-medium text-sm px-6 py-2.5 rounded-full transition-colors">
                       Open web chat →

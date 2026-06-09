@@ -460,7 +460,7 @@ export default function DashboardPage() {
         {/* Left */}
         <div className="flex flex-col gap-5">
 
-          {/* Jump-in cards — dark, editorial style */}
+          {/* Jump-in cards — editorial style, theme-adaptive */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -484,15 +484,15 @@ export default function DashboardPage() {
                 <Link
                   key={j.title}
                   href={`/chat?q=${encodeURIComponent(j.prompt)}`}
-                  className="group relative flex gap-4 items-start bg-stone-900 dark:bg-[#111009] border border-white/8 rounded-2xl p-5 overflow-hidden hover:border-amber-500/40 transition-all duration-200"
+                  className="group relative flex gap-4 items-start bg-white dark:bg-[#111009] border border-slate-200 dark:border-white/8 shadow-sm rounded-2xl p-5 overflow-hidden hover:border-amber-500/40 hover:shadow-md transition-all duration-200"
                 >
                   <div className="absolute left-0 top-4 bottom-4 w-0.5 bg-amber-400/60 rounded-r group-hover:bg-amber-400 transition-colors" />
                   <span className="text-2xl shrink-0">{j.icon}</span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-white/90 mb-1 group-hover:text-amber-300 transition-colors">{j.title}</p>
-                    <p className="text-xs text-white/40 leading-relaxed">{j.desc}</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-white/90 mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors">{j.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-white/40 leading-relaxed">{j.desc}</p>
                   </div>
-                  <span className="absolute right-4 bottom-4 text-white/20 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all text-xs">→</span>
+                  <span className="absolute right-4 bottom-4 text-slate-300 dark:text-white/20 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all text-xs">→</span>
                 </Link>
               ))}
               </div>{/* end grid */}

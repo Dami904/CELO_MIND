@@ -16,6 +16,7 @@
     "start:mcp": "node packages/mcp-server/dist/index.js",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
+    "register:8004": "tsx scripts/register-8004.ts",
     "lint": "tsc --noEmit --project tsconfig.json",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },

@@ -197,6 +197,17 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
   const tokenSymbol = extractKnownTokenSymbol(cleaned);
   const tokenSymbolLower = tokenSymbol?.toLowerCase() ?? null;
 
+  // A pasted tx hash or contract address on its own (no other words) is never "predefined" —
+  // route it straight to a live on-chain lookup instead of falling through to "unsupported".
+  const bareHash = cleaned.match(/0x[0-9a-fA-F]{64}/)?.[0];
+  if (bareHash && cleaned.replace(bareHash, "").replace(/[^a-z0-9]/gi, "") === "") {
+    return { intent: "transaction_explain" };
+  }
+  const bareAddr = cleaned.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/)?.[0];
+  if (bareAddr && cleaned.replace(bareAddr, "").replace(/[^a-z0-9]/gi, "") === "") {
+    return { intent: "token_info" };
+  }
+
   if (needsBestPoolClarification(cleaned)) {
     return { intent: "unsupported", clarification: "Do you mean the highest TVL pool, the highest volume pool, or the best fee tier?" };
   }

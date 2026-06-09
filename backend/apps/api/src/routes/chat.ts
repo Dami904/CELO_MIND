@@ -9,6 +9,7 @@ import {
   INTENTS,
   type Intent,
   getTokenList,
+  findTokenAsync,
   resolveNetwork,
 } from "@celomind/shared";
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
@@ -94,6 +95,30 @@ function resolveTokenInput(input: unknown, message: string, network = NETWORK) {
     if (found) return found;
   }
   return resolveMentionedToken(message, network);
+}
+
+/**
+ * Like resolveTokenInput, but a contract address in the user's message is authoritative,
+ * and unknown (non-curated) tokens are resolved via Blockscout (findTokenAsync). This stops
+ * a pasted token address from being ignored and falling back to a curated default like cUSD.
+ * Token addresses are always looked up on the market network (mainnet), where the tokens live.
+ */
+async function resolveTokenInputAsync(input: unknown, message: string) {
+  const net = marketNetwork();
+  // 1. A contract address in the message is the source of truth for token identity.
+  //    The negative lookahead avoids matching the 40-hex prefix of a 64-hex tx hash.
+  const addrInMsg = message.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/)?.[0];
+  if (addrInMsg) {
+    const byAddr = await findTokenAsync(addrInMsg, net);
+    if (byAddr) return byAddr;
+  }
+  // 2. A planner-supplied symbol or address (Blockscout-backed for non-curated symbols).
+  if (typeof input === "string" && input.trim()) {
+    const byInput = await findTokenAsync(input.trim(), net);
+    if (byInput) return byInput;
+  }
+  // 3. A curated token mentioned by name/symbol in the message.
+  return resolveMentionedToken(message, net);
 }
 
 function plannedTokenArg(args?: Record<string, unknown>) {
@@ -609,10 +634,13 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_balance": {
-        const tokenBalAddr = extractAddress(req.message, wa);
-        if (!tokenBalAddr) return { note: "No wallet address provided. Connect your wallet or paste an address." };
-        const wa_resolved = tokenBalAddr;
-        const requestedToken = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
+        // Resolve the token online-first (any symbol/address, not just the curated 7).
+        const requestedToken = await resolveTokenInputAsync(plannedTokenArg(req.toolArgs), req.message);
+        // Wallet = a pasted address that ISN'T the token's own contract, else the connected wallet.
+        const msgAddrs = req.message.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/g) ?? [];
+        const walletFromMsg = msgAddrs.find((a) => a.toLowerCase() !== requestedToken?.address?.toLowerCase());
+        const wa_resolved = walletFromMsg ?? wa;
+        if (!wa_resolved) return { note: "No wallet address provided. Connect your wallet or paste an address." };
         if (requestedToken) {
           if (requestedToken.symbol === "CELO") return await getNativeBalance(wa_resolved, net);
           const balance = await getTokenBalance(wa_resolved, requestedToken.address, net);
@@ -627,13 +655,27 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       }
 
       case "token_price": {
-        const mentioned = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
+        const mentioned = await resolveTokenInputAsync(plannedTokenArg(req.toolArgs), req.message);
         if (mentioned?.coingeckoId) {
           const price = await getCeloTokenPrice(mentioned.coingeckoId);
           return {
             result: { [mentioned.symbol]: price },
             source: "CoinGecko",
             note: !price ? `Live price data for ${mentioned.symbol} is unavailable right now.` : undefined,
+          };
+        }
+
+        // Non-curated token (no CoinGecko id) resolved by its address → use Blockscout's
+        // on-chain USD price for THAT token, instead of falling back to the whole curated list.
+        if (mentioned?.address) {
+          const info = await getCeloTokenInfo(mentioned.address, marketNetwork());
+          const usd = (info?.data as { usdPrice?: string | null } | undefined)?.usdPrice;
+          return {
+            result: { [mentioned.symbol]: usd != null ? { usd: Number(usd) } : null },
+            source: info?.source ?? "Blockscout",
+            note: usd == null
+              ? `No live USD price found for ${mentioned.symbol} (${mentioned.address}).`
+              : undefined,
           };
         }
 
@@ -866,7 +908,7 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         const days = /(\d+)\s*day/i.test(msg)
           ? parseInt(msg.match(/(\d+)\s*day/i)?.[1] ?? "7", 10)
           : /month/i.test(msg) ? 30 : /year/i.test(msg) ? 365 : /week/i.test(msg) ? 7 : 7;
-        const token = resolveTokenInput(plannedTokenArg(req.toolArgs), req.message, net);
+        const token = await resolveTokenInputAsync(plannedTokenArg(req.toolArgs), req.message);
         if (!token?.coingeckoId) {
           return {
             note: token
