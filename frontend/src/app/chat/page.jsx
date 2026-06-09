@@ -58,7 +58,7 @@ function CopyableHex({ value }) {
 function MessageText({ content }) {
   const parts = content.split(HEX_RE);
   return (
-    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-inherit">
       {parts.map((part, i) =>
         isHex(part) ? <CopyableHex key={i} value={part} /> : part
       )}
@@ -462,14 +462,14 @@ function ChatInner() {
                 <div
                   className={`px-4 py-3 rounded-2xl ${
                     msg.role === 'user'
-                      ? 'bg-slate-900 dark:bg-[#FCBE00] dark:text-slate-900 text-white/90 rounded-br-md'
+                      ? 'bg-slate-900 dark:bg-[#FCBE00] dark:text-slate-900 text-white rounded-br-md'
                       : msg.error
                       ? 'bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-800/40 text-slate-700 dark:text-red-300 rounded-bl-md'
                       : 'bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm text-slate-600 dark:text-slate-300 rounded-bl-md'
                   }`}
                 >
                   <MessageText content={msg.content} />
-                  <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/40' : 'text-slate-300'}`}>
+                  <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/55 dark:text-slate-900/50' : 'text-slate-400 dark:text-slate-500'}`}>
                     {fmtTime(msg.ts)}
                   </span>
                 </div>

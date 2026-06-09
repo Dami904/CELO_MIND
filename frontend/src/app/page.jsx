@@ -8,12 +8,53 @@ import { apiGet } from '@/lib/api';
 const MCP_URL = 'https://celo-mind-nmk2.onrender.com/mcp';
 
 const MCP_CLIENTS = [
-  { id: 'claude',   label: 'Claude Desktop (Mac / Windows)', icon: '🤖' },
-  { id: 'cursor',   label: 'Cursor IDE',                     icon: '⌨️' },
-  { id: 'windsurf', label: 'Windsurf',                       icon: '🏄' },
-  { id: 'vscode',   label: 'VS Code (Copilot)',               icon: '💻' },
-  { id: 'web',      label: 'Web chat — no config needed',     icon: '🌐' },
+  { id: 'claude',   label: 'Claude Desktop', sublabel: 'Mac / Windows', icon: '🤖', desc: 'Three methods: Settings UI connector, JSON config file, or npx legacy fallback for older versions.' },
+  { id: 'cursor',   label: 'Cursor IDE',     sublabel: null,            icon: '⌨️', desc: 'Add via Cursor Settings → MCP, or paste the config into ~/.cursor/mcp.json and restart.' },
+  { id: 'windsurf', label: 'Windsurf',       sublabel: null,            icon: '🏄', desc: 'Open the Cascade panel → Plugin settings, or edit your mcp_config.json directly.' },
+  { id: 'vscode',   label: 'VS Code',        sublabel: 'Copilot',       icon: '💻', desc: 'Requires GitHub Copilot ≥ v1.99. Create .vscode/mcp.json in your project, then use Agent mode.' },
+  { id: 'web',      label: 'Web chat',       sublabel: 'no config',     icon: '🌐', desc: 'Already connected. Open the chat and start asking — 75 tools available instantly, zero setup.' },
 ];
+
+function StickyScrollSection({ items, outerClass = '', leftClass = '', rightClass = '' }) {
+  const [active, setActive] = useState(0);
+  const refs = useRef([]);
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const hit = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (hit) setActive(Number(hit.target.dataset.idx));
+      },
+      { threshold: 0.45, rootMargin: '-10% 0px -10% 0px' }
+    );
+    refs.current.forEach(el => el && obs.observe(el));
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div className={`grid grid-cols-1 lg:grid-cols-2 items-start ${outerClass}`}>
+      <div className={leftClass}>
+        {items.map((item, i) => (
+          <div
+            key={i}
+            ref={el => refs.current[i] = el}
+            data-idx={i}
+            onClick={() => setActive(i)}
+            className="min-h-[60vh] flex flex-col justify-center py-14 cursor-default border-b border-white/6 last:border-0"
+            style={{ opacity: active === i ? 1 : 0.3, transition: 'opacity 0.4s ease' }}
+          >
+            {item.trigger}
+          </div>
+        ))}
+      </div>
+      <div className={`hidden lg:block ${rightClass}`}>
+        <div className="sticky top-24">
+          <div key={active} className="animate-fade-in">{items[active]?.panel}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Reveal({ children, delay = 0, y = 24 }) {
   const ref = useRef(null);
@@ -38,6 +79,20 @@ function Reveal({ children, delay = 0, y = 24 }) {
     </div>
   );
 }
+
+const MARQUEE_ROW1 = [
+  'Check balance', 'Swap tokens', 'Token prices', 'Risk scan',
+  'GoodDollar UBI', 'Governance', 'Carbon DeFi', 'Block explorer',
+  'Top liquidity pools', 'Whale watch', 'Earn yield', 'NFT portfolio',
+  'Send CELO', 'Trending tokens', 'Gas fees', 'Validator groups',
+];
+
+const MARQUEE_ROW2 = [
+  'Full portfolio', 'Contract audit', 'Swap quote', 'Staking balances',
+  'G$ entitlement', 'ENS resolve', 'Recent transactions', 'Fee data',
+  'Activate stakes', 'AMM strategies', 'Price feeds', 'Celo Mainnet',
+  'Token risk check', 'Pool liquidity', 'Uniswap V3', 'Mento DEX',
+];
 
 const capabilities = [
   {
@@ -73,6 +128,7 @@ const prompts = [
 ];
 
 export default function HomePage() {
+  const [activeStep, setActiveStep] = useState(0);
   const [mcpClient, setMcpClient] = useState('claude');
   const [copied, setCopied] = useState('');
   const [liveStats, setLiveStats] = useState([
@@ -81,17 +137,26 @@ export default function HomePage() {
     { value: '—', label: 'Ecosystem TVL' },
     { value: '100%', label: 'Open source' },
   ]);
+  const [ticker, setTicker] = useState({
+    price: null, change: null, tvl: null, gas: null, chats: null,
+  });
 
   useEffect(() => {
     apiGet('/api/dashboard/metrics').then((d) => {
       const price = d?.celoPrice?.usd != null ? `$${Number(d.celoPrice.usd).toFixed(3)}` : null;
-      const tvl = d?.tvl?.usd != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
+      const tvl   = d?.tvl?.usd  != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
+      const gas   = d?.gasPrice   != null ? `${parseFloat(d.gasPrice).toFixed(3)} Gwei` : null;
+      const change = d?.celoPrice?.usd_24h_change ?? null;
       setLiveStats([
         { value: '75', label: 'AI tools' },
         { value: price ?? '—', label: 'CELO price' },
         { value: tvl ?? '—', label: 'Ecosystem TVL' },
         { value: '100%', label: 'Open source' },
       ]);
+      setTicker(t => ({ ...t, price, tvl, gas, change }));
+    }).catch(() => {});
+    apiGet('/api/metrics/overview').then((d) => {
+      if (d?.totals?.chatRequests) setTicker(t => ({ ...t, chats: d.totals.chatRequests }));
     }).catch(() => {});
   }, []);
 
@@ -183,32 +248,54 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Live Stats Ticker ── */}
+      {(() => {
+        const changeUp = typeof ticker.change === 'number' && ticker.change >= 0;
+        const items = [
+          { value: ticker.price ?? '—',  label: 'CELO',          accent: true, badge: ticker.change != null ? `${changeUp ? '▲' : '▼'} ${Math.abs(ticker.change).toFixed(2)}%` : null, badgeUp: changeUp },
+          { value: ticker.tvl   ?? '—',  label: 'Ecosystem TVL' },
+          { value: ticker.gas   ?? '—',  label: 'Gas' },
+          { value: '75',                 label: 'AI tools' },
+          { value: ticker.chats ? `${ticker.chats}+` : '167+', label: 'Conversations' },
+          { value: '< 1s',               label: 'Avg response' },
+          { value: '100%',               label: 'Open source' },
+          { value: 'Mainnet',            label: 'Celo network' },
+        ];
+        return (
+          <div className="border-y border-stone-200 dark:border-white/8 bg-white dark:bg-[#0D0C0A] overflow-hidden select-none">
+            <div className="ticker-pause flex animate-ticker" style={{ width: 'max-content' }}>
+              {[...items, ...items].map((item, i) => (
+                <span key={i} className="inline-flex items-center gap-2 px-6 py-2.5 whitespace-nowrap">
+                  <span className={`text-sm font-medium tabular-nums ${item.accent ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-[#F0EDE4]'}`}>
+                    {item.value}
+                  </span>
+                  {item.badge && (
+                    <span className={`text-[10px] font-medium ${item.badgeUp ? 'text-emerald-500' : 'text-red-400'}`}>{item.badge}</span>
+                  )}
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider">{item.label}</span>
+                  <span className="text-slate-200 dark:text-white/10 mx-1 text-xs">·</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── What is CeloMind ── */}
       <section className="bg-stone-100 dark:bg-[#1A1916] border-y border-stone-200 dark:border-white/8 overflow-hidden transition-colors duration-200">
         <div className="max-w-5xl mx-auto px-4 py-16 md:py-20 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-center">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">What is CeloMind?</p>
+            <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
+              <span className="w-5 h-px bg-current inline-block opacity-50" />
+              What is CeloMind?
+            </p>
             <h2 className="font-display text-3xl md:text-4xl font-light text-slate-900 dark:text-slate-100 mb-5 leading-snug">
               Crypto can be complex.<br />We made it conversational.
             </h2>
-            <p className="text-base text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed mb-10">
+            <p className="text-base text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
               CeloMind connects an AI assistant to the Celo blockchain — a fast, low-cost network built for
               everyday use. Instead of copying addresses or figuring out DeFi, you just type what you want.
             </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {steps.map((s) => (
-                <div key={s.n} className="flex gap-4 items-start">
-                  <div className="shrink-0 w-9 h-9 rounded-full bg-[#FCBE00] text-slate-900 font-display font-semibold text-sm flex items-center justify-center">
-                    {s.n}
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1">{s.title}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{s.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* smiling.png — gold glow halo in dark mode */}
@@ -229,17 +316,153 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── How it works ── */}
+      {(() => {
+        const numerals = ['I', 'II', 'III'];
+        const stepPanels = [
+          <div key="s0" className="rounded-2xl border border-white/10 bg-[#1A1916] p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-white/50 text-xs uppercase tracking-widest">Wallet</p>
+              <span className="text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Connected
+              </span>
+            </div>
+            <p className="font-mono text-xs text-white/30 mb-5">0x4f3a…82b1 · Celo Mainnet</p>
+            {[['CELO', '12.45', '$7.23'], ['cUSD', '50.00', '$50.00'], ['G$', '100', '$0.25']].map(([sym, bal, usd]) => (
+              <div key={sym} className="flex items-center justify-between py-2.5 border-b border-white/6 last:border-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-400">{sym[0]}</div>
+                  <span className="text-sm text-white/70">{sym}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-white/80">{bal}</p>
+                  <p className="text-[11px] text-white/30">{usd}</p>
+                </div>
+              </div>
+            ))}
+          </div>,
+          <div key="s1" className="rounded-2xl border border-white/10 bg-[#0D0C0A] p-5 space-y-3" style={{ animation: 'slideRight 0.55s ease both' }}>
+            <div className="flex items-center gap-2 pb-3 border-b border-white/8">
+              <div className="w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center text-[10px] font-bold text-slate-900">CM</div>
+              <span className="text-xs text-white/40">CeloMind</span>
+              <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />Live
+              </span>
+            </div>
+            <div className="flex justify-end">
+              <div className="bg-slate-800 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%]">Swap 5 CELO to cUSD</div>
+            </div>
+            <div className="flex gap-2">
+              <div className="w-6 h-6 rounded-full bg-amber-400 text-[10px] text-slate-900 font-bold flex items-center justify-center shrink-0">CM</div>
+              <div className="bg-[#1A1916] border border-white/8 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-white/80 leading-relaxed">
+                Best rate on <span className="text-amber-400 font-medium">Mento</span>: 5 CELO → <span className="text-emerald-400 font-medium">3.12 cUSD</span>. Shall I proceed?
+              </div>
+            </div>
+            <div className="flex gap-2 justify-center pt-1">
+              <button className="text-xs bg-amber-400/15 text-amber-400 px-4 py-1.5 rounded-full border border-amber-400/25">Confirm</button>
+              <button className="text-xs bg-white/6 text-white/35 px-4 py-1.5 rounded-full">Cancel</button>
+            </div>
+          </div>,
+          <div key="s2" className="rounded-2xl border border-white/10 bg-[#1A1916] p-6" style={{ animation: 'slideRight 0.55s ease both' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center">🔐</div>
+              <div>
+                <p className="text-sm font-medium text-white/90">Sign transaction</p>
+                <p className="text-[11px] text-white/30">Approved by you · never by CeloMind</p>
+              </div>
+            </div>
+            <div className="space-y-2.5 mb-5">
+              {[['From', '5 CELO'], ['To (est.)', '3.12 cUSD'], ['Route', 'Mento DEX'], ['Gas', '~0.001 CELO']].map(([label, value]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-xs text-white/35">{label}</span>
+                  <span className="text-xs font-medium text-white/80">{value}</span>
+                </div>
+              ))}
+            </div>
+            <button className="w-full bg-amber-400 text-slate-900 font-medium text-sm py-2.5 rounded-xl">Sign with wallet</button>
+            <p className="text-[10px] text-white/20 text-center mt-2.5">CeloMind never stores or touches your keys</p>
+          </div>,
+        ];
+        return (
+          <section className="bg-[#0D0C0A]">
+            <div className="max-w-5xl mx-auto px-8 pt-16 pb-8">
+              <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-white/30 mb-4">
+                <span className="w-5 h-px bg-current inline-block opacity-50" />
+                How it works
+              </p>
+              <h2 className="font-display text-3xl md:text-4xl font-light text-white leading-tight mb-10">
+                Three simple steps.<br />
+                <span className="text-white/35">No technical knowledge needed.</span>
+              </h2>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
+                {/* Left — compact step list */}
+                <div className="rounded-2xl border border-white/8 overflow-hidden">
+                  {steps.map((s, i) => {
+                    const isActive = activeStep === i;
+                    return (
+                      <button
+                        key={s.n}
+                        onClick={() => setActiveStep(i)}
+                        className="flex items-start gap-4 px-5 pt-5 pb-6 text-left transition-all duration-300 w-full relative border-b border-white/6 last:border-0 overflow-hidden"
+                        style={{ background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                      >
+                        <span
+                          className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-amber-400 transition-all duration-500"
+                          style={{ opacity: isActive ? 1 : 0, transform: isActive ? 'scaleY(1)' : 'scaleY(0)' }}
+                        />
+                        <span className={`font-display text-2xl font-light leading-none mt-0.5 shrink-0 transition-colors duration-300 ${isActive ? 'text-amber-400/70' : 'text-white/15'}`}>
+                          {numerals[i]}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/35'}`}>
+                            {s.title}
+                          </p>
+                          <p className={`text-xs mt-1.5 leading-relaxed transition-colors duration-300 ${isActive ? 'text-white/40' : 'text-white/20'}`}>
+                            {s.desc}
+                          </p>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/6">
+                          {isActive && (
+                            <div
+                              key={activeStep}
+                              className="h-full bg-amber-400"
+                              style={{ animation: 'progressFill 3.5s linear forwards' }}
+                              onAnimationEnd={() => setActiveStep((activeStep + 1) % steps.length)}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Right — panel */}
+                <div>{stepPanels[activeStep]}</div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* ── Capabilities ── */}
       <section className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">What you can do</p>
+        <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
+          <span className="w-5 h-px bg-current inline-block opacity-50" />
+          What you can do
+        </p>
         <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Three ways CeloMind helps you</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {capabilities.map((c) => (
-            <div key={c.title} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 p-6 shadow-sm hover:shadow-md transition-shadow">
-              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/8 rounded-full px-3 py-0.5 mb-3 inline-block">{c.badge}</span>
-              <h3 className="font-medium text-slate-800 dark:text-slate-200 text-base mb-2">{c.title}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{c.desc}</p>
+          {capabilities.map((c, i) => (
+            <div key={c.title} className="relative bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 p-6 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+              <span className="absolute top-4 right-5 font-display text-5xl font-light text-slate-100 dark:text-white/6 leading-none select-none tabular-nums">
+                0{i + 1}
+              </span>
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/8 rounded-full px-3 py-0.5 mb-4 inline-block relative z-10">{c.badge}</span>
+              <h3 className="font-medium text-slate-800 dark:text-slate-200 text-base mb-2 relative z-10">{c.title}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed relative z-10">{c.desc}</p>
             </div>
           ))}
         </div>
@@ -248,7 +471,10 @@ export default function HomePage() {
       {/* ── Prompt chips ── */}
       <section className="bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
       <div className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Try these</p>
+        <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
+          <span className="w-5 h-px bg-current inline-block opacity-50" />
+          Try these
+        </p>
         <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Things to ask CeloMind</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -266,6 +492,33 @@ export default function HomePage() {
       </div>
       </section>
 
+      {/* ── 75 Tools Marquee ── */}
+      <div className="border-y border-stone-200 dark:border-white/8 bg-stone-50 dark:bg-[#0D0C0A] py-4 overflow-hidden select-none">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-white/15 mb-3">75 AI-powered tools</p>
+
+        {/* Row 1 — scrolls left */}
+        <div className="overflow-hidden mb-2">
+          <div className="ticker-pause flex animate-ticker" style={{ width: 'max-content' }}>
+            {[...MARQUEE_ROW1, ...MARQUEE_ROW1].map((tool, i) => (
+              <span key={i} className="inline-flex items-center mx-1.5 px-3.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full whitespace-nowrap">
+                {tool}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 2 — scrolls right */}
+        <div className="overflow-hidden">
+          <div className="ticker-pause flex animate-ticker-back" style={{ width: 'max-content' }}>
+            {[...MARQUEE_ROW2, ...MARQUEE_ROW2].map((tool, i) => (
+              <span key={i} className="inline-flex items-center mx-1.5 px-3.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-500 bg-stone-100 dark:bg-white/3 border border-stone-200 dark:border-white/6 rounded-full whitespace-nowrap">
+                {tool}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* ── MCP Connect ── */}
       <section className="px-4 py-8 md:py-12 bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
         <Reveal delay={0}>
@@ -273,30 +526,60 @@ export default function HomePage() {
           <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Connect</p>
           <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Use CeloMind in your AI client</h2>
           <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: '#0D0C0A' }}>
-            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-white/8">
+            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] items-start">
 
-              {/* Left — client list */}
-              <div className="p-6 flex flex-col">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-4">Pick your platform</p>
-                <div className="flex flex-col gap-1">
-                  {MCP_CLIENTS.map((c) => (
+              {/* Left — compact client list */}
+              <div className="border-b lg:border-b-0 lg:border-r border-white/8 p-5 flex flex-col gap-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3 px-2">Pick your platform</p>
+                {MCP_CLIENTS.map((c) => {
+                  const isActive = mcpClient === c.id;
+                  return (
                     <button
                       key={c.id}
                       onClick={() => setMcpClient(c.id)}
-                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-left transition-all duration-150 ${mcpClient === c.id ? 'bg-white/10 text-white font-medium' : 'text-white/45 hover:text-white/75 hover:bg-white/5'}`}
+                      className="flex items-center gap-3 rounded-xl px-3.5 pt-3 pb-4 text-left transition-all duration-300 w-full relative overflow-hidden"
+                      style={{ background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent' }}
                     >
-                      <span className="text-base shrink-0 w-6 text-center">{c.icon}</span>
-                      {c.label}
+                      {/* Active left bar */}
+                      <span
+                        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-amber-400 transition-all duration-500"
+                        style={{ opacity: isActive ? 1 : 0, transform: isActive ? 'scaleY(1)' : 'scaleY(0)' }}
+                      />
+                      <span className="text-lg shrink-0 w-7 text-center">{c.icon}</span>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/40'}`}>
+                          {c.label}
+                        </p>
+                        {c.sublabel && (
+                          <p className={`text-[10px] mt-0.5 transition-colors duration-300 ${isActive ? 'text-white/35' : 'text-white/20'}`}>
+                            {c.sublabel}
+                          </p>
+                        )}
+                      </div>
+                      {/* Progress bar */}
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/6">
+                        {isActive && (
+                          <div
+                            key={mcpClient}
+                            className="h-full bg-amber-400"
+                            style={{ animation: 'progressFill 3.5s linear forwards' }}
+                            onAnimationEnd={() => {
+                              const idx = MCP_CLIENTS.findIndex(x => x.id === mcpClient);
+                              setMcpClient(MCP_CLIENTS[(idx + 1) % MCP_CLIENTS.length].id);
+                            }}
+                          />
+                        )}
+                      </div>
                     </button>
-                  ))}
-                </div>
-                <p className="text-xs text-white/25 leading-relaxed mt-auto pt-5">
-                  Free and public — no token or signup required.
+                  );
+                })}
+                <p className="text-[10px] text-white/20 leading-relaxed mt-4 px-2">
+                  Free &amp; public — no token or signup required.
                 </p>
               </div>
 
-              {/* Right — config */}
-              <div key={mcpClient} className="p-6 flex flex-col gap-5 min-w-0 animate-slide-right">
+              {/* Right — config panel */}
+              <div key={mcpClient} className="p-7 flex flex-col gap-5 min-w-0" style={{ animation: 'slideRight 0.55s ease both' }}>
 
                 {mcpClient === 'claude' && (
                   <div className="flex flex-col gap-5">
