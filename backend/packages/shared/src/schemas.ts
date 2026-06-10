@@ -216,6 +216,7 @@ export const INTENTS = [
   "gas_price",
   "defi_protocols",
   "network_stats",
+  "network_pulse",
   "price_history",
   "top_pools",
   "token_search",

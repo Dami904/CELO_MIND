@@ -140,8 +140,12 @@ const TOOL_CATALOG = [
     args: { address: "optional 0x wallet address" },
   },
   {
+    intent: "network_pulse",
+    description: "A live overview of the Celo network RIGHT NOW. Use for broad 'what's happening on Celo', 'how is Celo doing today', 'state of Celo', 'Celo overview/summary', 'anything new on Celo', 'is Celo busy'. Aggregates network stats, gas, trending tokens, top yields and CELO price into one snapshot. Prefer this over docs_explain whenever the user asks about the current/today state of the network.",
+  },
+  {
     intent: "docs_explain",
-    description: "General Celo/Mento/Aave/MCP/Self/x402/docs/concept questions that are not asking for live wallet or market data.",
+    description: "General Celo/Mento/Aave/MCP/Self/x402/docs/concept questions that are not asking for live wallet or market data. Do NOT use for 'what's happening today / current state' — use network_pulse for that.",
   },
   {
     intent: "unsupported",

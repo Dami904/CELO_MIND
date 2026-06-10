@@ -18,6 +18,8 @@ export type RecordChatRequestInput = {
 export type RecordToolCallInput = {
   tool: string;
   success: boolean;
+  /** Where the call came from. "mcp" calls are counted separately from the web app. */
+  source?: "web" | "mcp";
 };
 
 type MetricsEnvelope<T> = {
@@ -222,11 +224,16 @@ export async function recordChatRequest(input: RecordChatRequestInput): Promise<
 
 export async function recordToolCall(input: RecordToolCallInput): Promise<void> {
   const dailyKey = `metrics:daily:${todayKeyDate()}`;
+  // MCP calls are tracked under their own fields so the dashboard can split MCP vs web.
+  const mcp = input.source === "mcp";
+  const totalField = mcp ? "mcp_tool_calls" : "tool_calls";
+  const errorField = mcp ? "mcp_errors" : "errors";
+  const toolsHkey = mcp ? "metrics:mcp_tools" : "metrics:tools";
   const counters: CounterOp[] = [
-    { hkey: "metrics:totals", field: "tool_calls", amount: 1 },
-    { hkey: "metrics:totals", field: "errors", amount: input.success ? 0 : 1 },
-    { hkey: "metrics:tools", field: input.tool, amount: 1 },
-    { hkey: dailyKey, field: "tool_calls", amount: 1 },
+    { hkey: "metrics:totals", field: totalField, amount: 1 },
+    { hkey: "metrics:totals", field: errorField, amount: input.success ? 0 : 1 },
+    { hkey: toolsHkey, field: input.tool, amount: 1 },
+    { hkey: dailyKey, field: totalField, amount: 1 },
   ];
 
   await Promise.all([
@@ -268,9 +275,10 @@ async function pfcountResilient(key: string): Promise<number> {
 }
 
 export async function getMetricsOverview() {
-  const [totalsHash, toolsHash, intentsHash, providersHash, uniqueUsers, uniqueSessions] = await Promise.all([
+  const [totalsHash, toolsHash, mcpToolsHash, intentsHash, providersHash, uniqueUsers, uniqueSessions] = await Promise.all([
     hgetallResilient("metrics:totals"),
     hgetallResilient("metrics:tools"),
+    hgetallResilient("metrics:mcp_tools"),
     hgetallResilient("metrics:intents"),
     hgetallResilient("metrics:providers"),
     pfcountResilient("metrics:users"),
@@ -279,7 +287,8 @@ export async function getMetricsOverview() {
 
   const totals = {
     chatRequests: hashNumber(totalsHash, "chat_requests"),
-    toolCalls: hashNumber(totalsHash, "tool_calls"),
+    toolCalls: hashNumber(totalsHash, "tool_calls"),       // web app tool calls
+    mcpToolCalls: hashNumber(totalsHash, "mcp_tool_calls"), // MCP-client tool calls (Claude Desktop / Cursor)
     modelCalls: hashNumber(totalsHash, "model_calls"),
     fallbacks: hashNumber(totalsHash, "fallbacks"),
     errors: hashNumber(totalsHash, "errors"),
@@ -291,15 +300,20 @@ export async function getMetricsOverview() {
     uniqueSessions,
     fallbackRate: totals.chatRequests ? totals.fallbacks / totals.chatRequests : 0,
     topTool: topHashKey(toolsHash),
+    topMcpTool: topHashKey(mcpToolsHash),
     topIntent: topHashKey(intentsHash),
     topProvider: topHashKey(providersHash),
   });
 }
 
 export async function getMetricsTools() {
-  const toolsHash = await hgetallResilient("metrics:tools");
+  const [toolsHash, mcpToolsHash] = await Promise.all([
+    hgetallResilient("metrics:tools"),
+    hgetallResilient("metrics:mcp_tools"),
+  ]);
   return envelope("metrics_tools", {
-    tools: sortedCounts(toolsHash, "tool"),
+    tools: sortedCounts(toolsHash, "tool"),       // web app
+    mcpTools: sortedCounts(mcpToolsHash, "tool"), // MCP clients
   });
 }
 
@@ -337,6 +351,7 @@ export async function getMetricsTimeseries(daysInput?: unknown) {
         date,
         chatRequests: hashNumber(hash, "chat_requests"),
         toolCalls: hashNumber(hash, "tool_calls"),
+        mcpToolCalls: hashNumber(hash, "mcp_tool_calls"),
         modelCalls: hashNumber(hash, "model_calls"),
       };
     }),

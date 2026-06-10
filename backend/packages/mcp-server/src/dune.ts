@@ -51,7 +51,9 @@ export async function runDuneQueryLatest<Row = Record<string, unknown>>(
   return cached(`dune:latest:${queryId}`, ttlSeconds, async () => {
     const res = await fetch(`${DUNE_BASE}/query/${queryId}/results?limit=100`, {
       headers: headers(),
-      signal: AbortSignal.timeout(15000),
+      // Reading cached results is fast; cap low so an interactive tool fails over quickly
+      // instead of blowing past the MCP client's tool-call timeout.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
       // 404 here usually means "no execution exists yet" — caller falls back.

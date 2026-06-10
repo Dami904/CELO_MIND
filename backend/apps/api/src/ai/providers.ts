@@ -175,6 +175,8 @@ const INTENT_ROUTES: Record<string, () => Route> = {
   recent_transactions: FAST, swap_quote: FAST, aave_position: FAST,
   agent_id_check: GROUNDED,
   send: FAST, swap_execute: FAST, aave_supply: FAST,
+  // "What's happening on Celo" — many live signals synthesized into a narrative; needs the smart model
+  network_pulse: REASON,
   // New live-data intents — structured results, fast model is ideal
   gas_price: FAST, defi_protocols: FAST, network_stats: FAST, price_history: FAST,
   top_pools: FAST, token_search: FAST, token_holders: FAST,
@@ -188,6 +190,21 @@ const INTENT_ROUTES: Record<string, () => Route> = {
 /** The provider+model best suited to a given intent. */
 export function routeForIntent(intent: string): Route {
   return (INTENT_ROUTES[intent] ?? DEFAULT_ROUTE)();
+}
+
+/**
+ * Model for the USER-FACING answer (and the agentic reasoning that writes it). Answer quality
+ * matters most here, so this uses the strongest available model rather than the fast planner model.
+ * Defaults to the 70B reasoning model (still fast on Groq). For top-tier answers, point
+ * AI_SYNTH_PROVIDER + AI_SYNTH_MODEL at OpenRouter + a Claude model, e.g.:
+ *   AI_SYNTH_PROVIDER=openrouter
+ *   AI_SYNTH_MODEL=anthropic/claude-sonnet-4.5
+ */
+export function synthesisRoute(): Route {
+  const provider = process.env.AI_SYNTH_PROVIDER as AIProvider | undefined;
+  const model = process.env.AI_SYNTH_MODEL;
+  if (provider && model) return { provider, model };
+  return REASON();
 }
 
 // ─── Provider availability & failover ─────────────────────────────────────────

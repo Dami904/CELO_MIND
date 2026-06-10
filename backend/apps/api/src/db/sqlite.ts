@@ -31,6 +31,7 @@ export async function initDb(): Promise<void> {
       response_summary TEXT,
       tx_hash TEXT,
       risk_score INTEGER,
+      source TEXT NOT NULL DEFAULT 'web',
       timestamp TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -102,6 +103,10 @@ export async function initDb(): Promise<void> {
     CREATE INDEX IF NOT EXISTS chat_conversation_summaries_conversation_idx ON chat_conversation_summaries(conversation_id);
     CREATE INDEX IF NOT EXISTS chat_conversation_summaries_wallet_idx ON chat_conversation_summaries(wallet_address);
   `);
+
+  // Migrate older DBs that predate the tool_calls.source column.
+  try { await db.execute("ALTER TABLE tool_calls ADD COLUMN source TEXT NOT NULL DEFAULT 'web'"); }
+  catch { /* column already exists */ }
 }
 
 export type ToolCallLog = {
@@ -112,15 +117,16 @@ export type ToolCallLog = {
   responseSummary?: string;
   txHash?: string;
   riskScore?: number;
+  source?: "web" | "mcp";
 };
 
 export async function logToolCall(log: ToolCallLog): Promise<void> {
   try {
     const db = getClient();
     await db.execute({
-      sql: `INSERT INTO tool_calls (tool_name, wallet_address, network, request_summary, response_summary, tx_hash, risk_score)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [log.toolName, log.walletAddress ?? null, log.network ?? null, log.requestSummary ?? null, log.responseSummary ?? null, log.txHash ?? null, log.riskScore ?? null],
+      sql: `INSERT INTO tool_calls (tool_name, wallet_address, network, request_summary, response_summary, tx_hash, risk_score, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [log.toolName, log.walletAddress ?? null, log.network ?? null, log.requestSummary ?? null, log.responseSummary ?? null, log.txHash ?? null, log.riskScore ?? null, log.source ?? "web"],
     });
   } catch { /* non-fatal logging failure */ }
 }

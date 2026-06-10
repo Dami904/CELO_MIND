@@ -11,6 +11,8 @@ import { whaleRoutes } from "./routes/whales.js";
 import { toolRoutes } from "./routes/tools.js";
 import { mcpHttpRoutes } from "./routes/mcp-http.js";
 import { metricsRoutes } from "../../../dashboard/src/index.js";
+import { getTopCeloWhales } from "@celomind/mcp-server/whale";
+import { getTrendingCeloTokens } from "@celomind/mcp-server/market";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -63,6 +65,11 @@ async function main() {
   await app.listen({ port: PORT, host: HOST });
   console.log(`[CeloMind API] Listening on http://${HOST}:${PORT}`);
   console.log(`[CeloMind API] Network: celo (mainnet-only)`);
+
+  // Pre-warm the slow Dune-backed caches (whale leaderboard + trending tokens) so the first
+  // MCP/web call returns from cache instead of hitting a cold-cache timeout. Fire-and-forget.
+  void Promise.allSettled([getTopCeloWhales(), getTrendingCeloTokens()])
+    .then(() => console.log("[CeloMind API] Pre-warmed whale + trending caches"));
 }
 
 main().catch((e) => {

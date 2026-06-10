@@ -15,7 +15,7 @@ import {
 import { buildDocsContextAsync, buildDocsContext } from "@celomind/docs-knowledge";
 import { planChatTool } from "../ai/tool-planner.js";
 import { resolveIntent } from "../ai/intent-router.js";
-import { aiComplete, routeForIntent, type AIMessage } from "../ai/providers.js";
+import { aiComplete, routeForIntent, synthesisRoute, type AIMessage } from "../ai/providers.js";
 import {
   getChatMessages,
   getChatConversationSummary,
@@ -52,6 +52,7 @@ import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "@ce
 import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-server/swap";
 import { prepareTransfer, parseSendRequest } from "@celomind/mcp-server/transfer";
 import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
+import { checkSelfAgentId } from "@celomind/mcp-server/self";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_RE = /0x[0-9a-fA-F]{40}/;
@@ -476,6 +477,26 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
         `Source: ${source ?? "Blockscout"}.`,
       ].filter(Boolean).join("\n");
     }
+    case "network_pulse": {
+      const p = payload as {
+        stats?: { transactionsToday?: number; averageBlockTimeMs?: number } | null;
+        gas?: { gasPriceGwei?: string } | null;
+        celoPriceUsd?: number | null;
+        trendingTokens?: Array<Record<string, unknown>>;
+        topYields?: Array<Record<string, unknown>>;
+      };
+      if (!p) return "Could not fetch the Celo network snapshot right now.";
+      const lines: string[] = ["Celo — live snapshot:"];
+      const bits: string[] = [];
+      if (p.stats?.transactionsToday != null) bits.push(`${p.stats.transactionsToday.toLocaleString()} txns today`);
+      if (p.celoPriceUsd != null) bits.push(`CELO $${Number(p.celoPriceUsd).toFixed(4)}`);
+      if (p.gas?.gasPriceGwei) bits.push(`gas ${p.gas.gasPriceGwei} Gwei`);
+      if (bits.length) lines.push(`• ${bits.join(" · ")}`);
+      if (p.trendingTokens?.length) lines.push(`Trending: ${p.trendingTokens.slice(0, 5).map((t) => String(t.symbol ?? t.name ?? "?")).join(", ")}`);
+      if (p.topYields?.length) lines.push(`Top yields: ${p.topYields.slice(0, 3).map((y) => `${String(y.symbol ?? y.pool ?? "?")}${y.apy != null ? ` ${Number(y.apy).toFixed(1)}%` : ""}`).join(", ")}`);
+      lines.push(`Source: ${source ?? "Blockscout + DefiLlama + CoinGecko"}.`);
+      return lines.join("\n");
+    }
     case "price_history": {
       const items = Array.isArray(payload) ? payload : [];
       if (!items.length) return "Could not fetch price history from CoinGecko right now.";
@@ -606,6 +627,13 @@ CONVERSATION RULES (follow strictly):
 - Never offer multiple-choice follow-ups. Pick the most likely interpretation and answer it directly.
 - Only ask a clarifying question when a critical piece of information (wallet address, tx hash, token, amount) is completely absent and cannot be inferred.
 - One question maximum per response, never a list of options.
+
+ANSWER QUALITY (this is what makes you good):
+- GROUND EVERY ANSWER IN THE LIVE DATA provided below. Cite the actual numbers — prices, %s, $ volumes, counts, APYs, addresses. Never answer a question about Celo's current/live state from memory or training; if the data is there, use it.
+- Be specific and substantive: lead with the direct answer, then back it with concrete figures. Avoid vague filler like "is doing well" without the numbers behind it.
+- Synthesize across ALL the data gathered — connect the signals (e.g., what trending tokens + yields + gas together say about activity) rather than listing them in isolation.
+- Format for fast reading: a short lead line, then tight bullets or short paragraphs; bold the key numbers. Aim for the depth of a sharp analyst, not a one-line bot.
+- If a needed data point is missing and one more tool would get it, request it via the [[TOOL:...]] mechanism before answering.
 
 When "Live Celo data for this request" is provided below, treat it as current and authoritative. Current network: ${network}.`;
 
@@ -792,8 +820,11 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       case "self_verify":
         return { ...getSelfInfo(extractAddress(req.message, wa)), context: await buildDocsContextAsync("Self Protocol Celo identity verification") };
 
-      case "agent_id_check":
-        return getSelfInfo(extractAddress(req.message, wa));
+      case "agent_id_check": {
+        const idAddr = extractAddress(req.message, wa);
+        if (!idAddr) return { note: "Provide a wallet address (0x…) to check for a Self Agent-ID." };
+        return await checkSelfAgentId(idAddr);
+      }
 
       case "x402_pay": {
         // The real, signable leg of an x402 flow is the payment transfer. If the message names an
@@ -901,6 +932,32 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
       case "network_stats": {
         const r = await getCeloNetworkStats();
         return { result: r.data, source: r.source };
+      }
+
+      // "What's happening on Celo" — one live snapshot aggregating the same signals an agent
+      // would gather (network stats, gas, CELO price, trending tokens, top yields).
+      case "network_pulse": {
+        const [stats, gas, price, trending, yields] = await Promise.allSettled([
+          getCeloNetworkStats(),
+          getCeloGasPrice(),
+          getCeloTokenPrice("celo"),
+          getTrendingCeloTokens(),
+          getCeloYieldOpportunities(),
+        ]);
+        const ok = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === "fulfilled" ? r.value : null);
+        const statsV = ok(stats);
+        const trendV = ok(trending);
+        const yieldV = ok(yields);
+        return {
+          pulse: true,
+          network: NETWORK,
+          stats: statsV?.data ?? null,
+          gas: ok(gas),
+          celoPriceUsd: ok(price)?.usd ?? null,
+          trendingTokens: Array.isArray(trendV?.data) ? trendV.data.slice(0, 8) : [],
+          topYields: Array.isArray(yieldV?.data) ? yieldV.data.slice(0, 6) : [],
+          source: "Blockscout · Dune/GeckoTerminal · DefiLlama · CoinGecko",
+        };
       }
 
       case "price_history": {
@@ -1222,9 +1279,10 @@ export async function chatRoutes(app: FastifyInstance) {
         ? "\n\nIf you need one more piece of data before answering, emit exactly: [[TOOL:<intent_name>]] on its own line (e.g. [[TOOL:token_risk]] or [[TOOL:swap_quote:fromToken=CELO,toToken=cUSD,amount=10]]). Otherwise give your final answer directly."
         : "\n\nThis is your final iteration — give your best answer now with the data you have.";
 
-      // 3. Ask the AI.
+      // 3. Ask the AI. The user-facing answer always uses the strong synthesis model
+      //    (not the fast planner model) — this is the single biggest lever on answer quality.
       try {
-        const route = routeForIntent(currentIntent);
+        const route = synthesisRoute();
         // Structured data intents rarely need more than 400 tokens; capping saves
         // 200-400ms on fast models. Analysis/docs intents keep the full 1024.
         const LONG_INTENTS = new Set([
@@ -1233,7 +1291,7 @@ export async function chatRoutes(app: FastifyInstance) {
           "portfolio_risk_score", "copy_wallet_analyze", "copy_wallet_prepare",
           "whale_activity", "get_transaction",
         ]);
-        const maxTokens = LONG_INTENTS.has(currentIntent) ? 1024 : 480;
+        const maxTokens = LONG_INTENTS.has(currentIntent) ? 1200 : 700;
         const result = await aiComplete({
           messages: [
             { role: "system", content: systemPrompt + summaryBlock + contextBlock + pageContext + agentInstruction },

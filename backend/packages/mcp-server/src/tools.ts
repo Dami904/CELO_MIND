@@ -45,6 +45,8 @@ import {
 } from "./carbon.js";
 import { resolveEnsName, reverseEnsLookup } from "./ens.js";
 import { getNftBalance, getNftTokenInfo, getErc1155Balance } from "./nft.js";
+import { checkSelfAgentId } from "./self.js";
+import { prepareX402Payment } from "./x402.js";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_Z = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid EVM address");
@@ -77,8 +79,8 @@ export const TOOLS = [
   { name: "get_mento_rates", description: "Get current live exchange rates for all Mento stable-asset pairs (CELO, cUSD, cEUR, cREAL, USDC)", inputSchema: { type: "object", properties: {} } },
   // ─── Identity ──────────────────────────────────────────────────────────────
   { name: "self_verify", description: "Explain how to verify identity with Self Protocol on Celo", inputSchema: { type: "object", properties: {} } },
-  { name: "self_agent_id_check", description: "Check if an address has a Self identity attestation", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
-  { name: "x402_pay", description: "Explain or prepare an x402 API payment on Celo", inputSchema: { type: "object", properties: { endpoint: { type: "string" }, amount: { type: "string" }, currency: { type: "string" } }, required: ["endpoint"] } },
+  { name: "self_agent_id_check", description: "Check on-chain whether an address owns a Self Agent-ID (ERC-8004) identity on Celo", inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] } },
+  { name: "x402_pay", description: "Prepare a signable x402 payment (ERC-20 transfer) on Celo", inputSchema: { type: "object", properties: { endpoint: { type: "string" }, amount: { type: "string" }, currency: { type: "string" }, payTo: { type: "string" } } } },
   // ─── Docs ──────────────────────────────────────────────────────────────────
   { name: "celo_docs_explain", description: "Answer questions about Celo using curated documentation", inputSchema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] } },
   // ─── Market data ───────────────────────────────────────────────────────────
@@ -221,11 +223,13 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
       return ok({ protocol: "Self (selfxyz.com)", docs: "https://docs.selfxyz.com", steps: ["Download Self app", "Scan your passport", "ZK proof generated locally", "Share proof on-chain"], network: NETWORK });
     case "self_agent_id_check": {
       const { address } = args as { address: string };
-      return ok({ address, message: "Self identity check requires querying Self smart contracts. Visit https://selfxyz.com or use Self SDK.", docs: "https://docs.selfxyz.com", network: NETWORK });
+      const r = await checkSelfAgentId(address);
+      return "error" in r && r.error ? err(r.error) : ok(r);
     }
     case "x402_pay": {
-      const { endpoint, amount, currency } = args as { endpoint: string; amount?: string; currency?: string };
-      return ok({ protocol: "x402", endpoint, amount: amount ?? "variable", currency: currency ?? "cUSD", flow: ["Call API", "Receive 402", "Sign payment tx", "Retry with proof"], docs: "https://x402.org", network: NETWORK });
+      const { endpoint, amount, currency, payTo } = args as { endpoint?: string; amount?: string; currency?: string; payTo?: string };
+      const r = await prepareX402Payment({ endpoint, amount, currency, payTo }, NETWORK);
+      return "error" in r ? err((r as { error: string }).error) : ok(r);
     }
     case "celo_docs_explain": {
       const { question } = args as { question: string };
@@ -514,6 +518,16 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
   }
 }
 
+// Lets the host (e.g. the HTTP /mcp route) observe every tool call for dashboard metrics,
+// without this low-level package depending on the API/metrics layer. Set by createMcpServer.
+export type ToolCallHook = (entry: { name: string; args: Record<string, unknown>; ok: boolean }) => void;
+let activeToolCallHook: ToolCallHook | undefined;
+
+function reportToolCall(name: string, args: Record<string, unknown>, ok: boolean) {
+  if (!activeToolCallHook) return;
+  try { activeToolCallHook({ name, args, ok }); } catch { /* telemetry must never break a tool */ }
+}
+
 function registerCeloTool(
   server: McpServer,
   name: string,
@@ -521,13 +535,25 @@ function registerCeloTool(
   inputSchema: Record<string, z.ZodTypeAny>
 ) {
   server.registerTool(name, { description, inputSchema }, async (args) => {
-    try { return await handleTool(name, args as Record<string, unknown>); }
-    catch (e: unknown) { return err(e instanceof Error ? e.message : String(e)); }
+    const a = args as Record<string, unknown>;
+    try {
+      const result = await handleTool(name, a);
+      reportToolCall(name, a, !(result as { isError?: boolean }).isError);
+      return result;
+    } catch (e: unknown) {
+      reportToolCall(name, a, false);
+      return err(e instanceof Error ? e.message : String(e));
+    }
   });
 }
 
-/** Create a fully configured MCP server instance. Use with any transport (stdio or HTTP). */
-export function createMcpServer(): McpServer {
+/**
+ * Create a fully configured MCP server instance. Use with any transport (stdio or HTTP).
+ * Pass `onToolCall` to observe every tool invocation (e.g. to record dashboard metrics on the
+ * HTTP /mcp route). The stdio entrypoint omits it, so local Claude Desktop calls stay unrecorded.
+ */
+export function createMcpServer(opts?: { onToolCall?: ToolCallHook }): McpServer {
+  activeToolCallHook = opts?.onToolCall;
   const server = new McpServer({ name: "celomind-mcp", version: "1.0.0" });
 
   registerCeloTool(server, "celo_get_balance", "Get the native CELO balance of a wallet address.", {
@@ -569,13 +595,14 @@ export function createMcpServer(): McpServer {
     walletAddress: ADDRESS_Z.optional().describe("Wallet that will sign the supply."),
   });
   registerCeloTool(server, "self_verify", "Explain how to verify identity with Self Protocol on Celo.", {});
-  registerCeloTool(server, "self_agent_id_check", "Check whether an address has a Self identity attestation.", {
+  registerCeloTool(server, "self_agent_id_check", "Check on-chain whether an address owns a Self Agent-ID (ERC-8004) identity on Celo.", {
     address: ADDRESS_Z.describe("Address to check."),
   });
-  registerCeloTool(server, "x402_pay", "Explain or prepare an x402 API payment on Celo.", {
-    endpoint: z.string().min(1).describe("API endpoint or payment target."),
-    amount: AMOUNT_Z.optional().describe("Optional payment amount."),
-    currency: TOKEN_Z.optional().describe("Optional payment currency; defaults to cUSD in explanations."),
+  registerCeloTool(server, "x402_pay", "Prepare a signable x402 payment (ERC-20 transfer) on Celo.", {
+    endpoint: z.string().min(1).optional().describe("x402-enabled endpoint; probed for HTTP 402 payment requirements when payTo is omitted."),
+    amount: AMOUNT_Z.optional().describe("Payment amount (used with payTo)."),
+    currency: TOKEN_Z.optional().describe("Payment token/currency; defaults to cUSD."),
+    payTo: ADDRESS_Z.optional().describe("Recipient address; skips endpoint probing when provided."),
   });
   registerCeloTool(server, "celo_docs_explain", "Answer questions about Celo using curated documentation.", {
     question: z.string().min(1).describe("User's Celo documentation question."),

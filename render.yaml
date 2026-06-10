@@ -24,6 +24,12 @@ services:
         sync: false
       - key: AI_PROVIDER
         sync: false
+      # Strong model for the user-facing answer. Unset → defaults to GROQ_MODEL_SMART (70B).
+      # Set both to route synthesis through Claude via OpenRouter (needs OPENROUTER_API_KEY).
+      - key: AI_SYNTH_PROVIDER
+        sync: false
+      - key: AI_SYNTH_MODEL
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL_FAST
@@ -49,6 +55,10 @@ services:
       - key: BLOCKSCOUT_API_KEY
         sync: false
       - key: DUNE_API_KEY
+        sync: false
+      - key: DUNE_QUERY_TRENDING_TOKENS
+        sync: false
+      - key: DUNE_QUERY_TOP_WHALES
         sync: false
       - key: COINGECKO_API_KEY
         sync: false

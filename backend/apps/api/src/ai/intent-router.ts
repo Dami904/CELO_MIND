@@ -130,6 +130,20 @@ function looksLikeTokenBalance(message: string, tokenSymbolLower: string | null)
   return Boolean(tokenSymbolLower && tokenSymbolLower !== "celo") && /\b(how much|how many)\b/i.test(message) && /\b(do i have|do i own|do i hold|in my wallet|balance)\b/i.test(message);
 }
 
+// Broad "state of the network right now" questions → aggregate live data (network_pulse),
+// not the static docs answer. Skips anything clearly about a specific wallet/token/tx.
+function looksLikeNetworkPulse(message: string): boolean {
+  if (/0x[0-9a-fA-F]{40}/.test(message)) return false;
+  if (/\bmy\b|\bwallet\b|\bbalance\b|\bportfolio\b|\bswap\b|\bsend\b|\bsign\b/i.test(message)) return false;
+  return /\b(what'?s|what is|whats)\s+(happening|going on|up|new)\b/i.test(message)
+    || /\b(celo\s+)?(overview|summary|snapshot|rundown|pulse)\b/i.test(message)
+    || /\bstate of (celo|the network|the chain)\b/i.test(message)
+    || /\banything\s+(new|happening|going on)\b/i.test(message)
+    || /\bhow'?s\s+(celo|the network|the chain)\b/i.test(message)
+    || /\bhow\s+is\s+(celo|the network|the chain)\s+(doing|going|looking|today|now)\b/i.test(message)
+    || /\bis\s+celo\s+(busy|active|doing|healthy)\b/i.test(message);
+}
+
 const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "token_balance", patterns: [/\btoken balance\b/i, /\bcusd balance\b/i, /\bceur balance\b/i, /\bbalance of\b/i] },
   { intent: "balance", patterns: [/\bbalance\b/i, /\bhow much celo\b/i, /\bmy celo\b/i] },
@@ -207,6 +221,9 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
   if (bareAddr && cleaned.replace(bareAddr, "").replace(/[^a-z0-9]/gi, "") === "") {
     return { intent: "token_info" };
   }
+
+  // Broad "what's happening / state of Celo" → live aggregated snapshot, before the docs catch-all.
+  if (looksLikeNetworkPulse(cleaned)) return { intent: "network_pulse" };
 
   if (needsBestPoolClarification(cleaned)) {
     return { intent: "unsupported", clarification: "Do you mean the highest TVL pool, the highest volume pool, or the best fee tier?" };

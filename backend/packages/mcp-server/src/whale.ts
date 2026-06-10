@@ -44,20 +44,19 @@ export async function getWhaleWalletActivity(
 
 /** Top Celo whales via a Dune Analytics leaderboard query, falling back to cUSD holders on Blockscout. */
 export async function getTopCeloWhales(): Promise<{ data: unknown[]; source: string }> {
-  try {
-    const dune = await getDuneTopWhales();
-    if (dune && dune.rows.length > 0) return { data: dune.rows, source: "Dune Analytics" };
-  } catch {
-    /* fall through */
-  }
-  try {
-    // Fallback: top holders of cUSD on mainnet as a proxy for whales.
-    const CUSD_MAINNET = "0x765DE816845861e75A25fCA122bb6898B8B1282a";
-    const holders = await getTokenHoldersV2(CUSD_MAINNET, "celo", 20);
-    return { data: holders, source: "Blockscout (cUSD holders)" };
-  } catch {
-    return { data: [], source: "unavailable" };
-  }
+  // Top holders of cUSD on mainnet as a proxy for whales (the fallback when Dune has nothing).
+  const CUSD_MAINNET = "0x765DE816845861e75A25fCA122bb6898B8B1282a";
+  // Start both in parallel so a cold call never pays Dune's timeout AND then Blockscout's
+  // serially (that ~27s worst case is what trips the MCP client's tool-call timeout).
+  const dunePromise = getDuneTopWhales().catch(() => null);
+  const holdersPromise = getTokenHoldersV2(CUSD_MAINNET, "celo", 20).catch(() => null);
+
+  const dune = await dunePromise;
+  if (dune && dune.rows.length > 0) return { data: dune.rows, source: "Dune Analytics" };
+
+  const holders = await holdersPromise;
+  if (holders && holders.length > 0) return { data: holders, source: "Blockscout (cUSD holders)" };
+  return { data: [], source: "unavailable" };
 }
 
 export type CopyWalletAnalysis = {

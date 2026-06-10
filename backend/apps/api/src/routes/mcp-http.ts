@@ -10,6 +10,27 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "@celomind/mcp-server/tools";
+import { resolveNetwork } from "@celomind/shared";
+import { recordToolCall } from "../../../../dashboard/src/index.js";
+import { logToolCall } from "../db/sqlite.js";
+
+const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
+
+// Record every MCP tool call (remote clients / URL connector) on the dashboard, mirroring the
+// REST /api/tools route. Local Claude Desktop via stdio runs a separate process and isn't seen here.
+function recordMcpToolCall({ name, args, ok }: { name: string; args: Record<string, unknown>; ok: boolean }) {
+  void recordToolCall({ tool: name, success: ok, source: "mcp" });
+  const walletAddress =
+    typeof args?.walletAddress === "string" ? args.walletAddress :
+    typeof args?.address === "string" ? args.address : undefined;
+  void logToolCall({
+    toolName: name,
+    walletAddress,
+    network: NETWORK,
+    requestSummary: JSON.stringify(args ?? {}).slice(0, 200),
+    source: "mcp",
+  });
+}
 
 type Session = { server: McpServer; transport: StreamableHTTPServerTransport };
 
@@ -38,7 +59,7 @@ export async function mcpHttpRoutes(app: FastifyInstance) {
       sessionIdGenerator: () => randomUUID(),
     });
 
-    const server = createMcpServer();
+    const server = createMcpServer({ onToolCall: recordMcpToolCall });
     await server.connect(transport);
 
     transport.onclose = () => {

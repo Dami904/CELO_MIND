@@ -325,9 +325,11 @@ export default function DashboardPage() {
 
       {/* ── Usage numbers — borderless, no individual cards ── */}
       <Reveal delay={80} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-slate-100 dark:divide-white/6">
+        <div className="grid grid-cols-2 md:grid-cols-3 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-slate-100 dark:divide-white/6">
           {[
             { label: 'Total chats',  value: metricsOverview?.totals.chatRequests, numeric: true },
+            { label: 'Tool calls',   value: metricsOverview?.totals.toolCalls,     numeric: true },
+            { label: 'MCP calls',    value: metricsOverview?.totals.mcpToolCalls,  numeric: true, amber: true },
             { label: 'Sessions',     value: metricsOverview?.uniqueSessions,       numeric: true },
             { label: 'Unique users', value: metricsOverview?.uniqueUsers,          numeric: true },
             { label: 'Top intent',   value: metricsOverview?.topIntent,            numeric: false, amber: true },
