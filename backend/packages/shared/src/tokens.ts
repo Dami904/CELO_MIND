@@ -25,6 +25,13 @@ export const CELO_TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     coingeckoId: "celo-dollar",
   },
+  USDm: {
+    symbol: "USDm",
+    name: "Mento USD",
+    address: "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    decimals: 18,
+    coingeckoId: "celo-dollar",
+  },
   cEUR: {
     symbol: "cEUR",
     name: "Celo Euro",

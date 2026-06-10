@@ -58,10 +58,16 @@ function CopyableHex({ value }) {
 }
 
 function InlineText({ children }) {
-  const text = String(children);
-  const parts = text.split(HEX_RE);
-  if (parts.length === 1) return <>{text}</>;
-  return <>{parts.map((p, i) => isHex(p) ? <CopyableHex key={i} value={p} /> : p)}</>;
+  const processChild = (child, index) => {
+    if (typeof child !== 'string') return child;
+    const parts = child.split(HEX_RE);
+    if (parts.length === 1) return child;
+    return parts.map((p, i) => isHex(p) ? <CopyableHex key={`${index}-${i}`} value={p} /> : p);
+  };
+  if (Array.isArray(children)) {
+    return <>{children.map((child, i) => processChild(child, i))}</>;
+  }
+  return <>{processChild(children, 0)}</>;
 }
 
 function MessageText({ content }) {
@@ -166,7 +172,7 @@ function loadHistory(scope) {
   try { return JSON.parse(localStorage.getItem(HISTORY_PREFIX + scope) ?? '[]'); } catch { return []; }
 }
 function saveHistory(scope, history) {
-  try { localStorage.setItem(HISTORY_PREFIX + scope, JSON.stringify(history.slice(0, MAX_HISTORY))); } catch {}
+  try { localStorage.setItem(HISTORY_PREFIX + scope, JSON.stringify(history.slice(0, MAX_HISTORY))); } catch { }
 }
 // Merge two history lists, dedupe by id (keep the newer entry), newest-first, capped.
 function mergeHistories(a, b) {
@@ -191,7 +197,7 @@ function loadMessages(id) {
   } catch { return null; }
 }
 function saveMessages(id, messages) {
-  try { localStorage.setItem(MSGS_PREFIX + id, JSON.stringify(messages)); } catch {}
+  try { localStorage.setItem(MSGS_PREFIX + id, JSON.stringify(messages)); } catch { }
 }
 // Drop message blobs not referenced by ANY scope's history (+ the active conversation),
 // so localStorage stays bounded without wiping other wallets' stored chats.
@@ -212,7 +218,7 @@ function pruneMessages(activeId) {
       const k = localStorage.key(i);
       if (k && k.startsWith(MSGS_PREFIX) && !keep.has(k)) localStorage.removeItem(k);
     }
-  } catch {}
+  } catch { }
 }
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -266,24 +272,24 @@ function humanizeWalletError(err) {
 
 // ── Slash command palette ──────────────────────────────────────────────────────
 const SLASH_COMMANDS = [
-  { cmd: 'balance',    icon: '💰', label: 'Balance',            desc: 'Check your CELO or token balance',                      prompt: 'What is my CELO balance?' },
-  { cmd: 'price',      icon: '📊', label: 'Token price',        desc: 'Live price for CELO or any supported token',            prompt: 'What is the current price of CELO?' },
-  { cmd: 'portfolio',  icon: '💼', label: 'Portfolio',          desc: 'All token holdings for a wallet',                      prompt: 'Show my portfolio' },
-  { cmd: 'swap',       icon: '🔄', label: 'Swap tokens',        desc: 'Get a quote or execute a token swap',                   prompt: 'Swap 10 CELO to cUSD' },
-  { cmd: 'send',       icon: '📤', label: 'Send tokens',        desc: 'Transfer CELO or tokens to an address',                 prompt: 'Send 1 CELO to ' },
-  { cmd: 'launch',     icon: '🚀', label: 'Launch token',       desc: 'Deploy a new ERC-20 token on Celo',                    prompt: 'Launch a token called ' },
-  { cmd: 'whales',     icon: '🐋', label: 'Whale leaderboard',  desc: 'Top CELO large-holders ranked by balance',             prompt: 'Show me the top CELO whale leaderboard' },
-  { cmd: 'trending',   icon: '🔥', label: 'Trending tokens',    desc: 'High-volume tokens on Celo right now',                 prompt: 'What are the trending tokens on Celo?' },
-  { cmd: 'pulse',      icon: '🌐', label: 'Network pulse',      desc: 'Live Celo stats: gas, price, trending, yields',        prompt: "What's happening on Celo today?" },
-  { cmd: 'gas',        icon: '⛽', label: 'Gas price',          desc: 'Current Celo network gas fee',                         prompt: 'What is the current gas price on Celo?' },
-  { cmd: 'risk',       icon: '🛡️', label: 'Risk scan',          desc: 'Honeypot and rug-pull check for a token or contract',  prompt: 'Is this token safe to buy: ' },
-  { cmd: 'staking',    icon: '🔒', label: 'Staking',            desc: 'Locked CELO, active votes, pending stakes',            prompt: 'Show my staking balances and locked CELO' },
-  { cmd: 'yield',      icon: '💸', label: 'Best yield',         desc: 'Top APY across Celo lending and liquidity pools',      prompt: 'What are the best yield opportunities on Celo?' },
-  { cmd: 'nfts',       icon: '🖼️', label: 'My NFTs',            desc: 'ERC-721 and ERC-1155 NFTs held by your wallet',        prompt: 'Show my NFT holdings' },
-  { cmd: 'governance', icon: '🗳️', label: 'Governance',         desc: 'Active CGPs with vote tallies and deadlines',          prompt: 'Show me active Celo governance proposals' },
-  { cmd: 'history',    icon: '📜', label: 'Transaction history', desc: 'Recent on-chain activity for a wallet',               prompt: 'Show my recent transactions' },
-  { cmd: 'compare',    icon: '🔍', label: 'Compare wallets',    desc: 'Side-by-side token portfolio of two addresses',        prompt: 'Compare wallet ' },
-  { cmd: 'gooddollar', icon: '🤑', label: 'GoodDollar UBI',     desc: 'Check claimable G$ amount and whitelist status',       prompt: 'Check my GoodDollar UBI claim' },
+  { cmd: 'balance', icon: '💰', label: 'Balance', desc: 'Check your CELO or token balance', prompt: 'What is my CELO balance?' },
+  { cmd: 'price', icon: '📊', label: 'Token price', desc: 'Live price for CELO or any supported token', prompt: 'What is the current price of CELO?' },
+  { cmd: 'portfolio', icon: '💼', label: 'Portfolio', desc: 'All token holdings for a wallet', prompt: 'Show my portfolio' },
+  { cmd: 'swap', icon: '🔄', label: 'Swap tokens', desc: 'Get a quote or execute a token swap', prompt: 'Swap 10 CELO to cUSD' },
+  { cmd: 'send', icon: '📤', label: 'Send tokens', desc: 'Transfer CELO or tokens to an address', prompt: 'Send 1 CELO to ' },
+  { cmd: 'launch', icon: '🚀', label: 'Launch token', desc: 'Deploy a new ERC-20 token on Celo', prompt: 'Launch a token called ' },
+  { cmd: 'whales', icon: '🐋', label: 'Whale leaderboard', desc: 'Top CELO large-holders ranked by balance', prompt: 'who are the top 10 whales on celo today' },
+  { cmd: 'trending', icon: '🔥', label: 'Trending tokens', desc: 'High-volume tokens on Celo right now', prompt: 'What are the trending tokens on Celo?' },
+  { cmd: 'pulse', icon: '🌐', label: 'Network pulse', desc: 'Live Celo stats: gas, price, trending, yields', prompt: "What's happening on Celo today?" },
+  { cmd: 'gas', icon: '⛽', label: 'Gas price', desc: 'Current Celo network gas fee', prompt: 'What is the current gas price on Celo?' },
+  { cmd: 'risk', icon: '🛡️', label: 'Risk scan', desc: 'Honeypot and rug-pull check for a token or contract', prompt: 'Is this token safe to buy: ' },
+  { cmd: 'staking', icon: '🔒', label: 'Staking', desc: 'Locked CELO, active votes, pending stakes', prompt: 'Show my staking balances and locked CELO' },
+  { cmd: 'yield', icon: '💸', label: 'Best yield', desc: 'Top APY across Celo lending and liquidity pools', prompt: 'What are the best yield opportunities on Celo?' },
+  { cmd: 'nfts', icon: '🖼️', label: 'My NFTs', desc: 'ERC-721 and ERC-1155 NFTs held by your wallet', prompt: 'Show my NFT holdings' },
+  { cmd: 'governance', icon: '🗳️', label: 'Governance', desc: 'Active CGPs with vote tallies and deadlines', prompt: 'Show me active Celo governance proposals' },
+  { cmd: 'history', icon: '📜', label: 'Transaction history', desc: 'Recent on-chain activity for a wallet', prompt: 'Show my recent transactions' },
+  { cmd: 'compare', icon: '🔍', label: 'Compare wallets', desc: 'Side-by-side token portfolio of two addresses', prompt: 'Compare wallet ' },
+  { cmd: 'gooddollar', icon: '🤑', label: 'GoodDollar UBI', desc: 'Check claimable G$ amount and whitelist status', prompt: 'Check my GoodDollar UBI claim' },
 ];
 
 // ── Main chat component ────────────────────────────────────────────────────────
@@ -547,9 +553,9 @@ function ChatInner() {
 
   const handleKey = (e) => {
     if (slashOpen && slashCmds.length > 0) {
-      if (e.key === 'ArrowDown')  { e.preventDefault(); setSlashHighlight((h) => Math.min(h + 1, slashCmds.length - 1)); return; }
-      if (e.key === 'ArrowUp')    { e.preventDefault(); setSlashHighlight((h) => Math.max(h - 1, 0)); return; }
-      if (e.key === 'Escape')     { e.preventDefault(); setSlashOpen(false); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashHighlight((h) => Math.min(h + 1, slashCmds.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashHighlight((h) => Math.max(h - 1, 0)); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setSlashOpen(false); return; }
       if (e.key === 'Tab' || (e.key === 'Enter' && slashOpen)) {
         e.preventDefault();
         selectSlashCmd(slashCmds[slashHighlight] ?? slashCmds[0]);
@@ -645,11 +651,10 @@ function ChatInner() {
                     <button
                       key={h.id}
                       onClick={() => openConversation(h.id)}
-                      className={`group flex flex-col items-start px-3 py-2 rounded-xl text-left border transition-all duration-100 ${
-                        h.id === conversationId
+                      className={`group flex flex-col items-start px-3 py-2 rounded-xl text-left border transition-all duration-100 ${h.id === conversationId
                           ? 'bg-white dark:bg-white/8 border-slate-200 dark:border-white/10'
                           : 'border-transparent hover:bg-white dark:hover:bg-white/8 hover:border-slate-100 dark:hover:border-white/10'
-                      }`}
+                        }`}
                     >
                       <span className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">
                         {h.title}
@@ -677,11 +682,10 @@ function ChatInner() {
                 <button
                   key={cat}
                   onClick={() => setActiveCat(cat)}
-                  className={`text-left text-sm rounded-xl px-3 py-2 transition-all ${
-                    activeCat === cat
+                  className={`text-left text-sm rounded-xl px-3 py-2 transition-all ${activeCat === cat
                       ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-slate-100 font-medium shadow-sm border border-slate-100 dark:border-white/10'
                       : 'text-slate-500 dark:text-slate-400 hover:bg-stone-100 dark:hover:bg-white/6 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -692,7 +696,7 @@ function ChatInner() {
               {suggestions[activeCat].map((p) => (
                 <button
                   key={p}
-                  onClick={() => { sendMessage(p); closeSidebarOnMobile(); }}
+                  onClick={() => { setInput(p); closeSidebarOnMobile(); }}
                   className="text-left text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-white/8 hover:border-slate-100 dark:hover:border-white/10 border border-transparent rounded-xl px-3 py-2 transition-all leading-snug"
                 >
                   {p}
@@ -742,20 +746,19 @@ function ChatInner() {
               )}
               <div className="max-w-[78%] flex flex-col gap-2">
                 <div
-                  className={`px-4 py-3 rounded-2xl ${
-                    msg.role === 'user'
-                      ? 'bg-slate-900 dark:bg-[#FCBE00] dark:text-slate-900 text-white rounded-br-md'
+                  className={`px-4 py-3 rounded-2xl ${msg.role === 'user'
+                      ? 'bg-slate-800 dark:bg-[#FCBE00] rounded-br-md'
                       : msg.error
-                      ? 'bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-800/40 text-slate-700 dark:text-red-300 rounded-bl-md'
-                      : 'bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm text-slate-600 dark:text-slate-300 rounded-bl-md'
-                  }`}
+                        ? 'bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-800/40 text-slate-700 dark:text-red-300 rounded-bl-md'
+                        : 'bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm text-slate-600 dark:text-slate-300 rounded-bl-md'
+                    }`}
                 >
                   {msg.role === 'user' ? (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                    <p className="text-sm font-[450] leading-relaxed whitespace-pre-wrap break-words text-white dark:text-slate-900">{msg.content}</p>
                   ) : (
                     <MessageText content={msg.content} />
                   )}
-                  <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/55 dark:text-slate-900/50' : 'text-slate-400 dark:text-slate-500'}`}>
+                  <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/70 dark:text-slate-900/60' : 'text-slate-400 dark:text-slate-500'}`}>
                     {fmtTime(msg.ts)}
                   </span>
                 </div>
@@ -833,11 +836,10 @@ function ChatInner() {
                       type="button"
                       onMouseDown={(e) => { e.preventDefault(); selectSlashCmd(c); }}
                       onMouseEnter={() => setSlashHighlight(i)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-                        i === slashHighlight
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${i === slashHighlight
                           ? 'bg-[#FCBE00]/15 dark:bg-[#FCBE00]/10'
                           : 'hover:bg-slate-50 dark:hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       <span className="text-lg w-6 shrink-0 text-center">{c.icon}</span>
                       <span className="flex-1 min-w-0">

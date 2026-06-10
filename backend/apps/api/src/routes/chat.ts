@@ -712,11 +712,14 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         if (requestedToken) {
           if (requestedToken.symbol === "CELO") return await getNativeBalance(wa_resolved, net);
           const balance = await getTokenBalance(wa_resolved, requestedToken.address, net);
-          return { items: [{ ...requestedToken, ...balance }], source: "Celo RPC", requestedToken: requestedToken.symbol };
+          // Keep the curated symbol/name — don't let the on-chain contract symbol overwrite it.
+          return { items: [{ ...requestedToken, balance: balance.balance, balanceRaw: balance.balanceRaw, decimals: balance.decimals }], source: "Celo RPC", requestedToken: requestedToken.symbol };
         }
         const tokenSymbols = Object.values(getTokenList(net));
         const balances = await Promise.allSettled(
-          tokenSymbols.map((t) => getTokenBalance(wa_resolved, t.address, net).then((b) => ({ ...t, ...b })))
+          tokenSymbols.map((t) => getTokenBalance(wa_resolved, t.address, net).then((b) => ({
+            ...t, balance: b.balance, balanceRaw: b.balanceRaw, decimals: b.decimals,
+          })))
         );
         const items = balances.filter((r) => r.status === "fulfilled").map((r) => (r as PromiseFulfilledResult<unknown>).value);
         return { items, source: "Celo RPC" };
