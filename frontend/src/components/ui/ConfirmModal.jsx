@@ -17,7 +17,7 @@ export default function ConfirmModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          className="absolute inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -25,20 +25,20 @@ export default function ConfirmModal({
         >
           <motion.div
             className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden shadow-2xl
-              bg-white dark:bg-[#1A1916]
-              border border-red-200 dark:border-red-800/60
+              bg-stone-50 dark:bg-[#1A1916]
+              border border-slate-200 dark:border-white/8
               text-slate-800 dark:text-slate-200"
-            initial={reduce ? false : { opacity: 0, scale: 0.95, y: 8 }}
+            initial={reduce ? false : { opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 8 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
             {/* Warning banner */}
             <div className="flex items-start gap-2.5 px-4 py-3
-              bg-red-50 dark:bg-red-950/50
-              border-b border-red-200 dark:border-red-800/60">
-              <span className="text-red-500 dark:text-red-400 font-bold text-base select-none mt-0.5">⚠</span>
-              <p className="text-xs text-red-600 dark:text-red-400 font-medium leading-relaxed uppercase tracking-wide">
+              bg-amber-50 dark:bg-[#FCBE00]/8
+              border-b border-amber-200/60 dark:border-[#FCBE00]/15">
+              <span className="text-amber-500 dark:text-[#FCBE00] text-base select-none mt-0.5">⚠</span>
+              <p className="text-[11px] text-amber-700 dark:text-[#FCBE00]/80 font-semibold leading-relaxed uppercase tracking-wide">
                 This action will be broadcast to Celo Mainnet. Verify parameters before signing.
               </p>
             </div>
@@ -46,10 +46,10 @@ export default function ConfirmModal({
             {/* Body */}
             <div className="p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest font-medium text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500">
                   Transaction Request
                 </span>
-                <h3 className="font-display text-lg font-medium text-slate-900 dark:text-slate-100 tracking-tight">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
                   {title}
                 </h3>
               </div>
@@ -58,12 +58,12 @@ export default function ConfirmModal({
               <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-white/8 divide-y divide-slate-100 dark:divide-white/6">
                 {data.map((row, idx) => (
                   <div key={idx} className="flex justify-between items-center px-3.5 py-2.5 text-xs
-                    bg-slate-50 dark:bg-white/3">
-                    <span className="text-slate-400 dark:text-slate-500 font-medium font-mono shrink-0">
+                    bg-white dark:bg-white/[0.03]">
+                    <span className="text-slate-400 dark:text-slate-500 font-medium shrink-0">
                       {row.label}
                     </span>
                     <span
-                      className="font-mono text-slate-700 dark:text-slate-300 truncate max-w-[240px] ml-4"
+                      className="font-mono text-slate-700 dark:text-slate-300 truncate max-w-[240px] ml-4 text-right"
                       title={row.value}
                     >
                       {row.value}
@@ -74,9 +74,7 @@ export default function ConfirmModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 px-5 py-4
-              border-t border-slate-100 dark:border-white/8
-              bg-slate-50 dark:bg-white/3">
+            <div className="flex gap-3 px-5 pb-5">
               <button
                 type="button"
                 onClick={onClose}
@@ -94,11 +92,11 @@ export default function ConfirmModal({
                 onClick={onConfirm}
                 disabled={isSubmitting}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold
-                  bg-red-500 hover:bg-red-600
-                  text-white
+                  bg-[#FCBE00] hover:bg-[#C49200]
+                  text-slate-900 hover:text-white
                   disabled:opacity-50
                   flex items-center justify-center gap-1.5
-                  transition-colors"
+                  transition-all duration-150"
               >
                 {isSubmitting ? (
                   <>
