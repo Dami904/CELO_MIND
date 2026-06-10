@@ -145,7 +145,12 @@ export default function HomePage() {
     apiGet('/api/dashboard/metrics').then((d) => {
       const price = d?.celoPrice?.usd != null ? `$${Number(d.celoPrice.usd).toFixed(3)}` : null;
       const tvl   = d?.tvl?.usd  != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
-      const gas   = d?.gasPrice   != null ? `${parseFloat(d.gasPrice).toFixed(3)} Gwei` : null;
+      const gas = (() => {
+        const raw = d?.gasPrice;
+        if (raw == null) return null;
+        const n = parseFloat(String(raw));
+        return Number.isFinite(n) ? `${n.toFixed(3)} Gwei` : null;
+      })();
       const change = d?.celoPrice?.usd_24h_change ?? null;
       setLiveStats([
         { value: '76', label: 'AI tools' },

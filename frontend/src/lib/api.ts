@@ -100,6 +100,14 @@ function unwrap(data: unknown): { payload: unknown; source?: string } {
   return { payload: data };
 }
 
+function formatForDisplay(x: unknown): string {
+  if (x === null || x === undefined) return "";
+  if (typeof x === "string") return x;
+  if (typeof x === "number" || typeof x === "boolean") return String(x);
+  if (x instanceof Error) return x.message;
+  try { return JSON.stringify(x); } catch { return String(x); }
+}
+
 function riskColor(level?: string): CardColor {
   const l = (level ?? "").toLowerCase();
   if (l.includes("high") || l.includes("critical")) return "red";
@@ -138,29 +146,29 @@ function buildPendingTx(intent: string, intentData: unknown, transactions: Prepa
   const steps = transactions.map((t) => t.type ?? "tx").join(" → ");
 
   if (intent === "swap_execute" && isObj(d.quote)) {
-    const q = d.quote as Record<string, unknown>;
-    rows.push({ label: "Action", value: "Swap Tokens" });
-    rows.push({ label: "From", value: `${q.amountIn ?? "?"} ${q.fromToken ?? ""}` });
-    rows.push({ label: "To (est.)", value: `${q.amountOut ?? "?"} ${q.toToken ?? ""}` });
-    if (q.route) rows.push({ label: "Route", value: String(q.route) });
-    if (d.minAmountOut) rows.push({ label: "Min received", value: String(d.minAmountOut) });
+  const q = d.quote as Record<string, unknown>;
+  rows.push({ label: "Action", value: "Swap Tokens" });
+  rows.push({ label: "From", value: `${formatForDisplay(q.amountIn ?? "?")} ${formatForDisplay(q.fromToken ?? "")}` });
+  rows.push({ label: "To (est.)", value: `${formatForDisplay(q.amountOut ?? "?")} ${formatForDisplay(q.toToken ?? "")}` });
+  if (q.route) rows.push({ label: "Route", value: q.route });
+  if (d.minAmountOut) rows.push({ label: "Min received", value: d.minAmountOut });
   } else if (intent === "aave_supply") {
-    rows.push({ label: "Action", value: "Supply to Aave V3" });
-    rows.push({ label: "Asset", value: String(d.asset ?? "") });
-    rows.push({ label: "Amount", value: String(d.amount ?? "") });
+  rows.push({ label: "Action", value: "Supply to Aave V3" });
+  rows.push({ label: "Asset", value: d.asset });
+  rows.push({ label: "Amount", value: d.amount });
   } else if (intent === "launch_token") {
-    const tok = isObj(d.token) ? (d.token as Record<string, unknown>) : {};
-    rows.push({ label: "Action", value: "Deploy new ERC-20" });
-    rows.push({ label: "Name", value: String(tok.name ?? "") });
-    rows.push({ label: "Symbol", value: String(tok.symbol ?? "") });
-    rows.push({ label: "Supply", value: `${tok.totalSupply ?? "?"} (${tok.decimals ?? 18} decimals)` });
-    rows.push({ label: "Type", value: String(d.kind ?? "fixed-supply") });
+  const tok = isObj(d.token) ? (d.token as Record<string, unknown>) : {};
+  rows.push({ label: "Action", value: "Deploy new ERC-20" });
+  rows.push({ label: "Name", value: tok.name });
+  rows.push({ label: "Symbol", value: tok.symbol });
+  rows.push({ label: "Supply", value: `${tok.totalSupply ?? "?"} (${tok.decimals ?? 18} decimals)` });
+  rows.push({ label: "Type", value: d.kind ?? "fixed-supply" });
   } else {
-    // send / x402_pay / generic transfer
-    rows.push({ label: "Action", value: intent === "x402_pay" ? "x402 Payment" : "Transfer" });
-    if (d.token) rows.push({ label: "Asset", value: String(d.token) });
-    if (d.amount) rows.push({ label: "Amount", value: String(d.amount) });
-    if (d.to) rows.push({ label: "Recipient", value: String(d.to) });
+  // send / x402_pay / generic transfer
+  rows.push({ label: "Action", value: intent === "x402_pay" ? "x402 Payment" : "Transfer" });
+  if (d.token) rows.push({ label: "Asset", value: d.token });
+  if (d.amount) rows.push({ label: "Amount", value: d.amount });
+  if (d.to) rows.push({ label: "Recipient", value: d.to });
   }
 
   if (steps) rows.push({ label: "Steps", value: steps });
@@ -182,7 +190,7 @@ function buildPendingTx(intent: string, intentData: unknown, transactions: Prepa
 function rowsFrom(pairs: [string, unknown, CardColor?][]): ResultCardData["data"] {
   return pairs
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
-    .map(([label, value, color]) => ({ label, value: String(value), color }));
+    .map(([label, value, color]) => ({ label, value: formatForDisplay(value), color }));
 }
 
 /** Best-effort: turn structured intentData into a result card. Returns undefined for text-only intents. */
@@ -205,7 +213,7 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
         data: items.map((it) => {
           const t = it as Record<string, unknown>;
           const usd = t.usdValue ? ` ($${t.usdValue})` : "";
-          return { label: String(t.symbol ?? t.name ?? "Token"), value: `${t.balance ?? "?"}${usd}` };
+          return { label: formatForDisplay(t.symbol ?? t.name ?? "Token"), value: `${t.balance ?? "?"}${usd}` };
         }),
       };
     }
@@ -242,7 +250,7 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
         title: intent === "market_trending" ? "Trending Celo Tokens" : "Recently Launched",
         data: items.map((it) => {
           const t = it as Record<string, unknown>;
-          return { label: String(t.name ?? t.symbol ?? "Pool"), value: t.priceUsd ? `$${t.priceUsd}` : "—" };
+          return { label: formatForDisplay(t.name ?? t.symbol ?? "Pool"), value: t.priceUsd ? `$${t.priceUsd}` : "—" };
         }),
       };
     }
@@ -252,8 +260,8 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
       return {
         title: "Swap Quote",
         data: rowsFrom([
-          ["From", `${q.amountIn} ${q.fromToken}`],
-          ["To (est.)", `${q.amountOut} ${q.toToken}`, "green"],
+          ["From", `${formatForDisplay(q.amountIn)} ${formatForDisplay(q.fromToken)}`],
+          ["To (est.)", `${formatForDisplay(q.amountOut)} ${formatForDisplay(q.toToken)}`, "green"],
           ["Route", q.route],
           ["Rate", typeof q.rate === "number" ? `1 ${q.fromToken} ≈ ${(q.rate as number).toFixed(6)} ${q.toToken}` : undefined],
         ]),
@@ -313,7 +321,7 @@ function buildResultCard(intent: string, intentData: unknown): ResultCardData | 
               (w.address && typeof w.address === "object" ? (w.address as Record<string, unknown>).hash : w.address) ??
               w.wallet ?? w.holder ?? w.name;
             const val = w.value ?? w.balance ?? w.usdValue ?? w.amount ?? w.total;
-            return { label: `${i + 1}. ${short(String(addrRaw ?? "unknown"))}`, value: val ? String(val) : "—" };
+            return { label: `${i + 1}. ${short(String(addrRaw ?? "unknown"))}`, value: val ? formatForDisplay(val) : "—" };
           }),
         };
       }

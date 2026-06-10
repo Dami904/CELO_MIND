@@ -300,12 +300,24 @@ function unwrapEnvelope(data: unknown): { payload: unknown; source?: string } {
   return { payload: data };
 }
 
+function formatForDisplay(x: unknown): string {
+  if (x === null || x === undefined) return "";
+  if (typeof x === "string") return x;
+  if (typeof x === "number" || typeof x === "boolean") return String(x);
+  if (x instanceof Error) return x.message;
+  try {
+    return JSON.stringify(x);
+  } catch {
+    return String(x);
+  }
+}
+
 function formatFallbackAnswer(intent: Intent, data: unknown): string {
   if (intent === "unsupported") {
     return "I focus on the Celo ecosystem — ask me about Celo tokens, prices, wallets, swaps, DeFi, whales, or security and I'll help.";
   }
   if (!data) return "I could not find enough live data for that request yet. Try adding a wallet address, token address, or transaction hash.";
-  if (typeof data === "object" && data !== null && "note" in data) return String((data as { note: unknown }).note);
+  if (typeof data === "object" && data !== null && "note" in data) return formatForDisplay((data as { note: unknown }).note);
 
   const { payload, source } = unwrapEnvelope(data);
   const srcLine = (fallback: string) => `Source: ${source ?? fallback}.`;
@@ -503,8 +515,14 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       if (p.celoPriceUsd != null) bits.push(`CELO $${Number(p.celoPriceUsd).toFixed(4)}`);
       if (p.gas?.gasPriceGwei) bits.push(`gas ${p.gas.gasPriceGwei} Gwei`);
       if (bits.length) lines.push(`• ${bits.join(" · ")}`);
-      if (p.trendingTokens?.length) lines.push(`Trending: ${p.trendingTokens.slice(0, 5).map((t) => String(t.symbol ?? t.name ?? "?")).join(", ")}`);
-      if (p.topYields?.length) lines.push(`Top yields: ${p.topYields.slice(0, 3).map((y) => `${String(y.symbol ?? y.pool ?? "?")}${y.apy != null ? ` ${Number(y.apy).toFixed(1)}%` : ""}`).join(", ")}`);
+      if (p.trendingTokens?.length) lines.push(`Trending: ${p.trendingTokens
+        .slice(0, 5)
+        .map((t) => formatForDisplay(((t as Record<string, unknown>).symbol ?? (t as Record<string, unknown>).name ?? "?") as unknown))
+        .join(", ")}`);
+      if (p.topYields?.length) lines.push(`Top yields: ${p.topYields
+        .slice(0, 3)
+        .map((y) => `${formatForDisplay(((y as Record<string, unknown>).symbol ?? (y as Record<string, unknown>).pool ?? "?") as unknown)}${(y as any).apy != null ? ` ${Number((y as any).apy).toFixed(1)}%` : ""}`)
+        .join(", ")}`);
       lines.push(`Source: ${source ?? "Blockscout + DefiLlama + CoinGecko"}.`);
       return lines.join("\n");
     }

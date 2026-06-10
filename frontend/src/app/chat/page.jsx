@@ -124,7 +124,7 @@ const suggestions = {
   ],
   'Market': [
     'What are trending tokens?',
-    'Show whale wallet activity',
+    'who are the top 10 whales on celo today',
     'Best yield opportunities',
     'Top liquidity pools today',
   ],

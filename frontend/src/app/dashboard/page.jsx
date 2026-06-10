@@ -191,7 +191,10 @@ export default function DashboardPage() {
     apiGet('/api/dashboard/metrics').then((d) => {
       if (d?.celoPrice) setCeloPrice(d.celoPrice);
       if (d?.tvl?.usd) setCeloTvl((d.tvl.usd / 1e6).toFixed(1));
-      if (d?.gasPrice)  setGasPrice(parseFloat(d.gasPrice).toFixed(4));
+      if (d?.gasPrice) {
+        const n = parseFloat(String(d.gasPrice));
+        if (Number.isFinite(n)) setGasPrice(n.toFixed(4));
+      }
     }).catch(() => {});
   }, []);
 
