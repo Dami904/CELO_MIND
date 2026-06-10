@@ -18,6 +18,8 @@
  *   DRY_RUN=1 npx tsx scripts/register-8004.ts        # build + print card, no tx
  *   FINALIZE=1 CELO_PRIVATE_KEY=0x... npx tsx scripts/register-8004.ts  # also embed self-reference
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   createPublicClient,
   createWalletClient,
@@ -27,6 +29,28 @@ import {
   type Address,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+
+// ─── Auto-load register-8004.env (sibling file) into process.env ─────────────
+// Dependency-free: parses KEY=value lines, skips comments/blanks, strips
+// surrounding quotes and trailing inline `# comments`. Real env vars win.
+function loadEnvFile() {
+  try {
+    const text = readFileSync(join(__dirname, "register-8004.env"), "utf8");
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq < 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      const quoted = /^(['"]).*\1$/.test(val);
+      if (quoted) val = val.slice(1, -1);
+      else { const h = val.indexOf(" #"); if (h >= 0) val = val.slice(0, h).trim(); }
+      if (key && process.env[key] === undefined) process.env[key] = val;
+    }
+  } catch { /* no env file — rely on real process.env */ }
+}
+loadEnvFile();
 
 // ─── On-chain constants (Celo Mainnet) ──────────────────────────────────────
 const CHAIN_ID = 42220;
@@ -59,7 +83,7 @@ const FINALIZE = !!process.env.FINALIZE;
 
 const AGENT_NAME = process.env.AGENT_NAME || "CeloMind";
 const AGENT_DESCRIPTION = process.env.AGENT_DESCRIPTION ||
-  "AI assistant for the Celo network. 75 MCP tools for wallet intelligence, token/DeFi " +
+  "AI assistant for the Celo network. 76 MCP tools for wallet intelligence, token/DeFi " +
   "market data, swaps & sends (wallet-confirmed), Aave & Mento, GoodDollar UBI, governance, " +
   "Carbon DeFi, whale tracking, and token/contract risk checks.";
 const AGENT_IMAGE = process.env.AGENT_IMAGE ||

@@ -215,6 +215,16 @@ function compactText(value: string, maxChars: number): string {
   return `${cleaned.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
 
+/** Format a wei amount (as a decimal string) to a trimmed CELO string, e.g. "4.7684008902". */
+function weiToCelo(wei: string): string {
+  let n: bigint;
+  try { n = BigInt(wei); } catch { return "0"; }
+  const base = 10n ** 18n;
+  const whole = n / base;
+  const frac = (n % base).toString().padStart(18, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : whole.toString();
+}
+
 function buildSummaryFallback(previousSummary: string | null, recentTurns: AIMessage[], userMessage: string, assistantReply: string): string {
   const parts: string[] = [];
   if (previousSummary?.trim()) parts.push(previousSummary.trim());
@@ -785,7 +795,22 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         if (!r.data) return r.pending
           ? { note: `Transaction ${hash} was submitted but hasn't been indexed by Blockscout yet. Wait a few seconds and try again — it should appear shortly.` }
           : { note: `Transaction ${hash} was not found on Blockscout. Double-check the hash is correct.` };
-        return { result: r.data, source: r.source, txHash: hash };
+        // Enrich with a pre-formatted, unambiguous value so the synthesis model never
+        // has to convert raw wei itself (which is where "[object Object]"/garbage crept in).
+        const tx = r.data as Record<string, unknown>;
+        const valueWei = typeof tx.value === "string" ? tx.value : "0";
+        const valueCelo = weiToCelo(valueWei);
+        const isNativeTransfer = (tx.rawInput === "0x" || !tx.rawInput) && valueWei !== "0";
+        return {
+          result: {
+            ...tx,
+            valueWei,
+            valueCelo: `${valueCelo} CELO`,
+            transferType: isNativeTransfer ? "native CELO transfer (no contract interaction)" : "contract interaction",
+          },
+          source: r.source,
+          txHash: hash,
+        };
       }
 
       case "filtered_transactions": {
@@ -1368,6 +1393,17 @@ export async function chatRoutes(app: FastifyInstance) {
 
       currentIntent = nextIntentRaw;
       currentArgs = nextArgs;
+    }
+
+    // Never return a blank bubble: if the model produced nothing usable, fall back
+    // to the deterministic formatter for the data we already have.
+    if (!aiResponse || !aiResponse.trim()) {
+      aiResponse = formatFallbackAnswer(intent, intentData);
+      if (!aiResponse || !aiResponse.trim()) {
+        aiResponse = "I couldn't put together an answer for that just now. Try rephrasing, or ask me something else about Celo.";
+      }
+      aiProvider = "fallback";
+      fallback = true;
     }
 
     void recordChatRequest({

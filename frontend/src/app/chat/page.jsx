@@ -152,17 +152,36 @@ function TypingDots() {
 
 
 const GREETING = "Hi! I'm CeloMind — your AI guide to the Celo network. Ask me to check your balance, swap tokens, look up prices, or check if something looks risky. What would you like to do?";
-const HISTORY_KEY = 'celomind_chat_history';
+// History is scoped per connected wallet, with a shared "guest" bucket for the
+// not-connected state. Each wallet only ever sees its own history (no cross-wallet
+// leakage on a shared browser); connecting a wallet folds the guest history into it.
+const HISTORY_PREFIX = 'celomind_chat_history__';
+const LEGACY_HISTORY_KEY = 'celomind_chat_history'; // pre-scope global key — migrated into guest
 const MAX_HISTORY = 20;
 
-function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; }
+function scopeOf(walletAddress) {
+  return walletAddress ? `w_${walletAddress.toLowerCase()}` : 'guest';
 }
-function saveHistory(history) {
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY))); } catch {}
+function loadHistory(scope) {
+  try { return JSON.parse(localStorage.getItem(HISTORY_PREFIX + scope) ?? '[]'); } catch { return []; }
+}
+function saveHistory(scope, history) {
+  try { localStorage.setItem(HISTORY_PREFIX + scope, JSON.stringify(history.slice(0, MAX_HISTORY))); } catch {}
+}
+// Merge two history lists, dedupe by id (keep the newer entry), newest-first, capped.
+function mergeHistories(a, b) {
+  const byId = new Map();
+  for (const e of [...(a ?? []), ...(b ?? [])]) {
+    if (!e?.id) continue;
+    const prev = byId.get(e.id);
+    if (!prev || new Date(e.ts) > new Date(prev.ts)) byId.set(e.id, e);
+  }
+  return [...byId.values()].sort((x, y) => new Date(y.ts) - new Date(x.ts)).slice(0, MAX_HISTORY);
 }
 
 // Per-conversation message persistence so a chat can be resumed from history.
+// Message blobs are keyed by conversationId (globally unique), so they're shared
+// across scopes — visibility is controlled entirely by the per-scope history index.
 const MSGS_PREFIX = 'celomind_chat_msgs_';
 function loadMessages(id) {
   try {
@@ -174,10 +193,21 @@ function loadMessages(id) {
 function saveMessages(id, messages) {
   try { localStorage.setItem(MSGS_PREFIX + id, JSON.stringify(messages)); } catch {}
 }
-// Drop stored messages for conversations no longer in history (keeps localStorage bounded).
-function pruneMessages(keepIds) {
+// Drop message blobs not referenced by ANY scope's history (+ the active conversation),
+// so localStorage stays bounded without wiping other wallets' stored chats.
+function pruneMessages(activeId) {
   try {
-    const keep = new Set(keepIds.map((id) => MSGS_PREFIX + id));
+    const keep = new Set();
+    if (activeId) keep.add(MSGS_PREFIX + activeId);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(HISTORY_PREFIX)) continue;
+      try {
+        for (const e of JSON.parse(localStorage.getItem(k) ?? '[]')) {
+          if (e?.id) keep.add(MSGS_PREFIX + e.id);
+        }
+      } catch { /* skip unparseable bucket */ }
+    }
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
       if (k && k.startsWith(MSGS_PREFIX) && !keep.has(k)) localStorage.removeItem(k);
@@ -274,8 +304,34 @@ function ChatInner() {
   const [historyOpen, setHistoryOpen] = useState(true);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
-  // Load history from localStorage on mount
-  useEffect(() => { setHistory(loadHistory()); setHistoryLoaded(true); }, []);
+  // Which history bucket is active: the connected wallet, or the shared guest bucket.
+  const currentScope = scopeOf(isConnected && address ? address : undefined);
+  const scopeRef = useRef(currentScope);   // latest scope, read inside callbacks
+  const prevScopeRef = useRef(null);        // to detect guest -> wallet transitions
+
+  // Load the right history bucket whenever the wallet scope changes. On the guest -> wallet
+  // transition, fold the guest history into the wallet bucket (compound), then clear guest so
+  // it can't later leak into a different wallet on the same browser.
+  useEffect(() => {
+    // One-time migration of the old global (pre-scope) history into the guest bucket.
+    try {
+      const legacy = localStorage.getItem(LEGACY_HISTORY_KEY);
+      if (legacy) {
+        saveHistory('guest', mergeHistories(loadHistory('guest'), JSON.parse(legacy)));
+        localStorage.removeItem(LEGACY_HISTORY_KEY);
+      }
+    } catch { /* ignore */ }
+
+    const prev = prevScopeRef.current;
+    if (prev === 'guest' && currentScope !== 'guest') {
+      saveHistory(currentScope, mergeHistories(loadHistory(currentScope), loadHistory('guest')));
+      saveHistory('guest', []);
+    }
+    prevScopeRef.current = currentScope;
+    scopeRef.current = currentScope;
+    setHistory(loadHistory(currentScope));
+    setHistoryLoaded(true);
+  }, [currentScope]);
 
   // Persist the current conversation's messages so it can be resumed later.
   useEffect(() => {
@@ -283,11 +339,11 @@ function ChatInner() {
     saveMessages(conversationId, messages);
   }, [messages, conversationId]);
 
-  // Keep stored messages bounded to conversations still in history (+ the active one).
+  // Keep stored messages bounded to conversations still referenced by any scope (+ the active one).
   // Guarded so it never runs before history has loaded (which would wipe stored chats).
   useEffect(() => {
     if (!historyLoaded) return;
-    pruneMessages([...history.map((h) => h.id), conversationId]);
+    pruneMessages(conversationId);
   }, [historyLoaded, history, conversationId]);
 
   // Sidebar opens by default on desktop; on mobile it stays closed and overlays.
@@ -352,7 +408,7 @@ function ChatInner() {
     setHistory((prev) => {
       const filtered = prev.filter((h) => h.id !== currentId);
       const next = [entry, ...filtered];
-      saveHistory(next);
+      saveHistory(scopeRef.current, next);
       return next;
     });
   }, []);
@@ -394,7 +450,7 @@ function ChatInner() {
       const entry = { id: conversationId, title: content.slice(0, 60), ts: new Date().toISOString() };
       setHistory((prev) => {
         const next = [entry, ...prev.filter((h) => h.id !== conversationId)];
-        saveHistory(next);
+        saveHistory(scopeRef.current, next);
         return next;
       });
     }
@@ -674,7 +730,7 @@ function ChatInner() {
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-5 max-w-2xl w-full mx-auto relative">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-5 max-w-3xl w-full mx-auto relative">
 
 
           {messages.map((msg, i) => (
@@ -694,7 +750,11 @@ function ChatInner() {
                       : 'bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 shadow-sm text-slate-600 dark:text-slate-300 rounded-bl-md'
                   }`}
                 >
-                  <MessageText content={msg.content} />
+                  {msg.role === 'user' ? (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                  ) : (
+                    <MessageText content={msg.content} />
+                  )}
                   <span className={`text-[11px] mt-1.5 block ${msg.role === 'user' ? 'text-white/55 dark:text-slate-900/50' : 'text-slate-400 dark:text-slate-500'}`}>
                     {fmtTime(msg.ts)}
                   </span>
@@ -754,7 +814,7 @@ function ChatInner() {
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] px-4 pt-3 pb-5 max-w-2xl w-full mx-auto self-center relative">
+        <div className="shrink-0 border-t border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] px-4 pt-3 pb-5 max-w-3xl w-full mx-auto self-center relative">
 
           {/* Slash command popover */}
           {slashOpen && slashCmds.length > 0 && (

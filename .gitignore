@@ -28,3 +28,7 @@ npm-debug.log*
 .DS_Store
 .idea/
 *.swp
+
+
+# registration
+register-8004.env
