@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { createWalletClient, custom } from 'viem';
 import { celo } from 'viem/chains';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiClient } from '@/lib/api';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ResultCard from '@/components/ui/ResultCard';
@@ -55,14 +57,54 @@ function CopyableHex({ value }) {
   );
 }
 
+function InlineText({ children }) {
+  const text = String(children);
+  const parts = text.split(HEX_RE);
+  if (parts.length === 1) return <>{text}</>;
+  return <>{parts.map((p, i) => isHex(p) ? <CopyableHex key={i} value={p} /> : p)}</>;
+}
+
 function MessageText({ content }) {
-  const parts = content.split(HEX_RE);
   return (
-    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-inherit">
-      {parts.map((part, i) =>
-        isHex(part) ? <CopyableHex key={i} value={part} /> : part
-      )}
-    </p>
+    <div className="text-sm leading-relaxed break-words text-inherit space-y-1.5">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => (
+            <p className="mb-1 last:mb-0 whitespace-pre-wrap"><InlineText>{children}</InlineText></p>
+          ),
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          h1: ({ children }) => <h1 className="text-base font-bold mt-2 mb-1">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-base font-semibold mt-2 mb-1">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-sm font-semibold mt-1.5 mb-0.5">{children}</h3>,
+          ul: ({ children }) => <ul className="list-disc pl-4 space-y-0.5 my-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 space-y-0.5 my-1">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          code: ({ children, className }) => {
+            const text = String(children).trim();
+            const isBlock = !!className;
+            if (!isBlock && isHex(text)) return <CopyableHex value={text} />;
+            if (!isBlock) return (
+              <code className="font-mono text-[11px] bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded px-1 py-0.5">{children}</code>
+            );
+            return <code className="block font-mono text-[11px] overflow-x-auto">{children}</code>;
+          },
+          pre: ({ children }) => (
+            <pre className="bg-slate-100 dark:bg-white/8 rounded-lg px-3 py-2 overflow-x-auto my-1.5 text-[11px] font-mono">{children}</pre>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#FCBE00] underline underline-offset-2 hover:text-[#C49200]">{children}</a>
+          ),
+          hr: () => <hr className="border-slate-200 dark:border-white/10 my-2" />,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-[#FCBE00]/60 pl-3 text-slate-500 dark:text-slate-400 italic my-1">{children}</blockquote>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
 
@@ -152,6 +194,68 @@ function relativeTime(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function humanizeWalletError(err) {
+  const code = err?.code ?? err?.cause?.code;
+  const raw = (err?.message ?? err?.cause?.message ?? '').toLowerCase();
+
+  // User explicitly cancelled in wallet
+  if (code === 4001 || code === 'ACTION_REJECTED' || raw.includes('user rejected') || raw.includes('user denied') || raw.includes('rejected the request')) {
+    return "You cancelled the transaction — nothing was sent.";
+  }
+  // Insufficient funds
+  if (raw.includes('insufficient funds') || raw.includes('insufficient balance') || raw.includes('exceeds balance')) {
+    return "Your wallet doesn't have enough funds to cover this transaction and gas fees.";
+  }
+  // Chain / network mismatch
+  if (raw.includes('wrong network') || raw.includes('chain mismatch') || raw.includes('unsupported chain') || raw.includes('switch') && raw.includes('chain')) {
+    return "Your wallet is on the wrong network. Switch to Celo Mainnet and try again.";
+  }
+  // Contract execution reverted
+  if (raw.includes('revert') || raw.includes('execution reverted') || raw.includes('contract call reverted')) {
+    return "The transaction was rejected by the contract — this can happen if parameters are invalid or you lack permission.";
+  }
+  // Gas estimation failed
+  if (raw.includes('gas') && (raw.includes('estimat') || raw.includes('exceeds') || raw.includes('limit'))) {
+    return "Couldn't estimate gas for this transaction. Check your balance and try again.";
+  }
+  // Nonce issues
+  if (raw.includes('nonce') || raw.includes('replacement transaction')) {
+    return "There's a pending transaction on your wallet. Wait for it to confirm, then try again.";
+  }
+  // Wallet not connected / locked
+  if (raw.includes('no account') || raw.includes('not connected') || raw.includes('wallet locked') || raw.includes('provider is not set')) {
+    return "Your wallet isn't connected. Reconnect and try again.";
+  }
+  // RPC / network error
+  if (raw.includes('network error') || raw.includes('failed to fetch') || raw.includes('rpc') || raw.includes('timeout')) {
+    return "Couldn't reach the Celo network right now. Check your connection and try again.";
+  }
+  // Generic fallback — hide the technical details
+  return "The transaction couldn't be completed. Please check your wallet and try again.";
+}
+
+// ── Slash command palette ──────────────────────────────────────────────────────
+const SLASH_COMMANDS = [
+  { cmd: 'balance',    icon: '💰', label: 'Balance',            desc: 'Check your CELO or token balance',                      prompt: 'What is my CELO balance?' },
+  { cmd: 'price',      icon: '📊', label: 'Token price',        desc: 'Live price for CELO or any supported token',            prompt: 'What is the current price of CELO?' },
+  { cmd: 'portfolio',  icon: '💼', label: 'Portfolio',          desc: 'All token holdings for a wallet',                      prompt: 'Show my portfolio' },
+  { cmd: 'swap',       icon: '🔄', label: 'Swap tokens',        desc: 'Get a quote or execute a token swap',                   prompt: 'Swap 10 CELO to cUSD' },
+  { cmd: 'send',       icon: '📤', label: 'Send tokens',        desc: 'Transfer CELO or tokens to an address',                 prompt: 'Send 1 CELO to ' },
+  { cmd: 'launch',     icon: '🚀', label: 'Launch token',       desc: 'Deploy a new ERC-20 token on Celo',                    prompt: 'Launch a token called ' },
+  { cmd: 'whales',     icon: '🐋', label: 'Whale leaderboard',  desc: 'Top CELO large-holders ranked by balance',             prompt: 'Show me the top CELO whale leaderboard' },
+  { cmd: 'trending',   icon: '🔥', label: 'Trending tokens',    desc: 'High-volume tokens on Celo right now',                 prompt: 'What are the trending tokens on Celo?' },
+  { cmd: 'pulse',      icon: '🌐', label: 'Network pulse',      desc: 'Live Celo stats: gas, price, trending, yields',        prompt: "What's happening on Celo today?" },
+  { cmd: 'gas',        icon: '⛽', label: 'Gas price',          desc: 'Current Celo network gas fee',                         prompt: 'What is the current gas price on Celo?' },
+  { cmd: 'risk',       icon: '🛡️', label: 'Risk scan',          desc: 'Honeypot and rug-pull check for a token or contract',  prompt: 'Is this token safe to buy: ' },
+  { cmd: 'staking',    icon: '🔒', label: 'Staking',            desc: 'Locked CELO, active votes, pending stakes',            prompt: 'Show my staking balances and locked CELO' },
+  { cmd: 'yield',      icon: '💸', label: 'Best yield',         desc: 'Top APY across Celo lending and liquidity pools',      prompt: 'What are the best yield opportunities on Celo?' },
+  { cmd: 'nfts',       icon: '🖼️', label: 'My NFTs',            desc: 'ERC-721 and ERC-1155 NFTs held by your wallet',        prompt: 'Show my NFT holdings' },
+  { cmd: 'governance', icon: '🗳️', label: 'Governance',         desc: 'Active CGPs with vote tallies and deadlines',          prompt: 'Show me active Celo governance proposals' },
+  { cmd: 'history',    icon: '📜', label: 'Transaction history', desc: 'Recent on-chain activity for a wallet',               prompt: 'Show my recent transactions' },
+  { cmd: 'compare',    icon: '🔍', label: 'Compare wallets',    desc: 'Side-by-side token portfolio of two addresses',        prompt: 'Compare wallet ' },
+  { cmd: 'gooddollar', icon: '🤑', label: 'GoodDollar UBI',     desc: 'Check claimable G$ amount and whitelist status',       prompt: 'Check my GoodDollar UBI claim' },
+];
+
 // ── Main chat component ────────────────────────────────────────────────────────
 function ChatInner() {
   const searchParams = useSearchParams();
@@ -195,8 +299,12 @@ function ChatInner() {
   const [pendingTx, setPendingTx] = useState(null);
   const [isSigning, setIsSigning] = useState(false);
 
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashHighlight, setSlashHighlight] = useState(0);
+
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const slashMenuRef = useRef(null);
   const scrollRef = useRef(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -318,8 +426,16 @@ function ChatInner() {
         resultCard: response.data?.resultCard ?? null,
         pendingTx: response.data?.pendingTx ?? null,
       });
-    } catch {
-      addMessage({ role: 'assistant', content: 'Something went wrong. Please try again.', ts: new Date(), error: true });
+    } catch (err) {
+      const isNetwork = /fetch|network|timeout/i.test(err?.message ?? '');
+      addMessage({
+        role: 'assistant',
+        content: isNetwork
+          ? "Couldn't reach CeloMind right now — check your connection and try again."
+          : "Something went wrong on our end. Please try again.",
+        ts: new Date(),
+        error: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -352,7 +468,7 @@ function ChatInner() {
     } catch (err) {
       addMessage({
         role: 'assistant',
-        content: err?.code === 4001 ? 'Transaction cancelled.' : `Signing failed: ${err?.message ?? 'unknown error'}`,
+        content: humanizeWalletError(err),
         ts: new Date(),
         error: true,
       });
@@ -362,8 +478,40 @@ function ChatInner() {
     }
   };
 
+  const slashFilter = slashOpen && input.startsWith('/') ? input.slice(1).toLowerCase() : '';
+  const slashCmds = SLASH_COMMANDS.filter((c) =>
+    !slashFilter || c.cmd.startsWith(slashFilter) || c.label.toLowerCase().startsWith(slashFilter)
+  );
+
+  const selectSlashCmd = (cmd) => {
+    setInput(cmd.prompt);
+    setSlashOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   const handleKey = (e) => {
+    if (slashOpen && slashCmds.length > 0) {
+      if (e.key === 'ArrowDown')  { e.preventDefault(); setSlashHighlight((h) => Math.min(h + 1, slashCmds.length - 1)); return; }
+      if (e.key === 'ArrowUp')    { e.preventDefault(); setSlashHighlight((h) => Math.max(h - 1, 0)); return; }
+      if (e.key === 'Escape')     { e.preventDefault(); setSlashOpen(false); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && slashOpen)) {
+        e.preventDefault();
+        selectSlashCmd(slashCmds[slashHighlight] ?? slashCmds[0]);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInput(val);
+    if (val === '/' || (val.startsWith('/') && !val.includes(' '))) {
+      setSlashOpen(true);
+      setSlashHighlight(0);
+    } else {
+      setSlashOpen(false);
+    }
   };
 
   const fmtTime = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -606,18 +754,55 @@ function ChatInner() {
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] px-4 pt-3 pb-5 max-w-2xl w-full mx-auto self-center">
-          <div className={`flex items-end gap-2 bg-stone-100 dark:bg-white/6 rounded-2xl px-4 py-2.5 border transition-colors ${input ? 'border-[#FCBE00]' : 'border-stone-200 dark:border-white/8'}`}>
+        <div className="shrink-0 border-t border-slate-200 dark:border-white/8 bg-white dark:bg-[#131210] px-4 pt-3 pb-5 max-w-2xl w-full mx-auto self-center relative">
+
+          {/* Slash command popover */}
+          {slashOpen && slashCmds.length > 0 && (
+            <div
+              ref={slashMenuRef}
+              className="absolute bottom-full left-4 right-4 mb-2 bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+            >
+              <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Tools</span>
+                <span className="text-[10px] text-slate-300 dark:text-slate-600 ml-auto">↑↓ navigate · Enter to select · Esc to close</span>
+              </div>
+              <ul className="max-h-72 overflow-y-auto py-1">
+                {slashCmds.map((c, i) => (
+                  <li key={c.cmd}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); selectSlashCmd(c); }}
+                      onMouseEnter={() => setSlashHighlight(i)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                        i === slashHighlight
+                          ? 'bg-[#FCBE00]/15 dark:bg-[#FCBE00]/10'
+                          : 'hover:bg-slate-50 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="text-lg w-6 shrink-0 text-center">{c.icon}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-slate-800 dark:text-white">{c.label}</span>
+                        <span className="block text-xs text-slate-400 dark:text-slate-500 truncate">{c.desc}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-300 dark:text-slate-600 shrink-0">/{c.cmd}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={`flex items-end gap-2 bg-stone-100 dark:bg-[#1C1C1E] rounded-2xl px-4 py-2.5 border transition-colors ${input ? 'border-[#FCBE00]' : 'border-stone-200 dark:border-white/10'}`}>
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKey}
               placeholder={isConnected ? '"What\'s my balance?" or "Swap 5 CELO for cUSD"' : '"Show me CELO price" or paste a wallet address…'}
               rows={1}
               disabled={loading}
-              style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)', caretColor: 'var(--celo-gold)' }}
-              className="flex-1 bg-transparent text-sm placeholder:text-[color:var(--text-tertiary)] outline-none resize-none leading-relaxed max-h-40 overflow-y-auto disabled:opacity-50"
+              style={{ caretColor: '#FCBE00' }}
+              className="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none resize-none leading-relaxed max-h-40 overflow-y-auto disabled:opacity-50"
             />
             <button
               onClick={() => sendMessage()}
