@@ -8,11 +8,11 @@ import { apiGet } from '@/lib/api';
 const MCP_URL = 'https://celo-mind-nmk2.onrender.com/mcp';
 
 const MCP_CLIENTS = [
-  { id: 'claude',   label: 'Claude Desktop', sublabel: 'Mac / Windows', icon: '🤖', desc: 'Three methods: Settings UI connector, JSON config file, or npx legacy fallback for older versions.' },
-  { id: 'cursor',   label: 'Cursor IDE',     sublabel: null,            icon: '⌨️', desc: 'Add via Cursor Settings → MCP, or paste the config into ~/.cursor/mcp.json and restart.' },
-  { id: 'windsurf', label: 'Windsurf',       sublabel: null,            icon: '🏄', desc: 'Open the Cascade panel → Plugin settings, or edit your mcp_config.json directly.' },
-  { id: 'vscode',   label: 'VS Code',        sublabel: 'Copilot',       icon: '💻', desc: 'Requires GitHub Copilot ≥ v1.99. Create .vscode/mcp.json in your project, then use Agent mode.' },
-  { id: 'web',      label: 'Web chat',       sublabel: 'no config',     icon: '🌐', desc: 'Already connected. Open the chat and start asking — 76 tools available instantly, zero setup.' },
+  { id: 'claude', label: 'Claude Desktop', sublabel: 'Mac / Windows', icon: '🤖', desc: 'Three methods: Settings UI connector, JSON config file, or npx legacy fallback for older versions.' },
+  { id: 'cursor', label: 'Cursor IDE', sublabel: null, icon: '⌨️', desc: 'Add via Cursor Settings → MCP, or paste the config into ~/.cursor/mcp.json and restart.' },
+  { id: 'windsurf', label: 'Windsurf', sublabel: null, icon: '🏄', desc: 'Open the Cascade panel → Plugin settings, or edit your mcp_config.json directly.' },
+  { id: 'vscode', label: 'VS Code', sublabel: 'Copilot', icon: '💻', desc: 'Requires GitHub Copilot ≥ v1.99. Create .vscode/mcp.json in your project, then use Agent mode.' },
+  { id: 'web', label: 'Web chat', sublabel: 'no config', icon: '🌐', desc: 'Already connected. Open the chat and start asking — 76 tools available instantly, zero setup.' },
 ];
 
 function StickyScrollSection({ items, outerClass = '', leftClass = '', rightClass = '' }) {
@@ -144,7 +144,7 @@ export default function HomePage() {
   useEffect(() => {
     apiGet('/api/dashboard/metrics').then((d) => {
       const price = d?.celoPrice?.usd != null ? `$${Number(d.celoPrice.usd).toFixed(3)}` : null;
-      const tvl   = d?.tvl?.usd  != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
+      const tvl = d?.tvl?.usd != null ? `$${(d.tvl.usd / 1e6).toFixed(0)}M` : null;
       const gas = (() => {
         const raw = d?.gasPrice;
         if (raw == null) return null;
@@ -159,17 +159,17 @@ export default function HomePage() {
         { value: '100%', label: 'Open source' },
       ]);
       setTicker(t => ({ ...t, price, tvl, gas, change }));
-    }).catch(() => {});
+    }).catch(() => { });
     apiGet('/api/metrics/overview').then((d) => {
       if (d?.totals?.chatRequests) setTicker(t => ({ ...t, chats: d.totals.chatRequests }));
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   function copyText(text, key) {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(key);
       setTimeout(() => setCopied(''), 2000);
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   return (
@@ -257,14 +257,14 @@ export default function HomePage() {
       {(() => {
         const changeUp = typeof ticker.change === 'number' && ticker.change >= 0;
         const items = [
-          { value: ticker.price ?? '—',  label: 'CELO',          accent: true, badge: ticker.change != null ? `${changeUp ? '▲' : '▼'} ${Math.abs(ticker.change).toFixed(2)}%` : null, badgeUp: changeUp },
-          { value: ticker.tvl   ?? '—',  label: 'Ecosystem TVL' },
-          { value: ticker.gas   ?? '—',  label: 'Gas' },
-          { value: '75',                 label: 'AI tools' },
+          { value: ticker.price ?? '—', label: 'CELO', accent: true, badge: ticker.change != null ? `${changeUp ? '▲' : '▼'} ${Math.abs(ticker.change).toFixed(2)}%` : null, badgeUp: changeUp },
+          { value: ticker.tvl ?? '—', label: 'Ecosystem TVL' },
+          { value: ticker.gas ?? '—', label: 'Gas' },
+          { value: '75', label: 'AI tools' },
           { value: ticker.chats ? `${ticker.chats}+` : '167+', label: 'Conversations' },
-          { value: '< 1s',               label: 'Avg response' },
-          { value: '100%',               label: 'Open source' },
-          { value: 'Mainnet',            label: 'Celo network' },
+          { value: '< 1s', label: 'Avg response' },
+          { value: '100%', label: 'Open source' },
+          { value: 'Mainnet', label: 'Celo network' },
         ];
         return (
           <div className="border-y border-stone-200 dark:border-white/8 bg-white dark:bg-[#0D0C0A] overflow-hidden select-none">
@@ -474,26 +474,26 @@ export default function HomePage() {
 
       {/* ── Prompt chips ── */}
       <section className="bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
-      <div className="max-w-5xl mx-auto px-4 py-16 md:py-20">
-        <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
-          <span className="w-5 h-px bg-current inline-block opacity-50" />
-          Try these
-        </p>
-        <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Things to ask CeloMind</h2>
+        <div className="max-w-5xl mx-auto px-4 py-16 md:py-20">
+          <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
+            <span className="w-5 h-px bg-current inline-block opacity-50" />
+            Try these
+          </p>
+          <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Things to ask CeloMind</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {prompts.map((p) => (
-            <Link
-              key={p}
-              href={`/chat?q=${encodeURIComponent(p)}`}
-              className="flex items-center justify-between gap-3 bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 rounded-xl px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:border-[#FCBE00] hover:bg-[#FFF8D6] dark:hover:bg-[#2A2510] dark:hover:border-amber-500/50 hover:-translate-y-0.5 hover:shadow-md transition-all duration-150 group"
-            >
-              <span>{p}</span>
-              <span className="text-slate-300 group-hover:text-amber-600 group-hover:translate-x-1 transition-all duration-150 shrink-0">→</span>
-            </Link>
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {prompts.map((p) => (
+              <Link
+                key={p}
+                href={`/chat?q=${encodeURIComponent(p)}`}
+                className="flex items-center justify-between gap-3 bg-white dark:bg-[#1A1916] border border-slate-200 dark:border-white/8 rounded-xl px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:border-[#FCBE00] hover:bg-[#FFF8D6] dark:hover:bg-[#2A2510] dark:hover:border-amber-500/50 hover:-translate-y-0.5 hover:shadow-md transition-all duration-150 group"
+              >
+                <span>{p}</span>
+                <span className="text-slate-300 group-hover:text-amber-600 group-hover:translate-x-1 transition-all duration-150 shrink-0">→</span>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
       </section>
 
       {/* ── 75 Tools Marquee ── */}
@@ -526,184 +526,184 @@ export default function HomePage() {
       {/* ── MCP Connect ── */}
       <section className="px-4 py-8 md:py-12 bg-stone-100/60 dark:bg-[#1A1916]/60 border-y border-stone-200 dark:border-white/8 transition-colors duration-200">
         <Reveal delay={0}>
-        <div className="max-w-5xl mx-auto">
-          <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Connect</p>
-          <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Use CeloMind in your AI client</h2>
-          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D0C0A] shadow-sm">
-            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] items-start">
+          <div className="max-w-5xl mx-auto">
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Connect</p>
+            <h2 className="font-display text-3xl font-light text-slate-900 dark:text-slate-100 mb-8">Use CeloMind in your AI client</h2>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D0C0A] shadow-sm">
+              <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] items-start">
 
-              {/* Left — compact client list */}
-              <div className="border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/8 p-5 flex flex-col gap-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-3 px-2">Pick your platform</p>
-                {MCP_CLIENTS.map((c) => {
-                  const isActive = mcpClient === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setMcpClient(c.id)}
-                      className={`flex items-center gap-3 rounded-xl px-3.5 pt-3 pb-4 text-left transition-all duration-300 w-full relative overflow-hidden ${isActive ? 'bg-stone-100 dark:bg-white/[0.07]' : 'bg-transparent'}`}
-                    >
-                      {/* Active left bar */}
-                      <span
-                        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-amber-400 transition-all duration-500"
-                        style={{ opacity: isActive ? 1 : 0, transform: isActive ? 'scaleY(1)' : 'scaleY(0)' }}
-                      />
-                      <span className="text-lg shrink-0 w-7 text-center">{c.icon}</span>
-                      <div className="min-w-0">
-                        <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/40'}`}>
-                          {c.label}
-                        </p>
-                        {c.sublabel && (
-                          <p className={`text-[10px] mt-0.5 transition-colors duration-300 ${isActive ? 'text-slate-500 dark:text-white/35' : 'text-slate-400 dark:text-white/20'}`}>
-                            {c.sublabel}
+                {/* Left — compact client list */}
+                <div className="border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/8 p-5 flex flex-col gap-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-3 px-2">Pick your platform</p>
+                  {MCP_CLIENTS.map((c) => {
+                    const isActive = mcpClient === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setMcpClient(c.id)}
+                        className={`flex items-center gap-3 rounded-xl px-3.5 pt-3 pb-4 text-left transition-all duration-300 w-full relative overflow-hidden ${isActive ? 'bg-stone-100 dark:bg-white/[0.07]' : 'bg-transparent'}`}
+                      >
+                        {/* Active left bar */}
+                        <span
+                          className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-amber-400 transition-all duration-500"
+                          style={{ opacity: isActive ? 1 : 0, transform: isActive ? 'scaleY(1)' : 'scaleY(0)' }}
+                        />
+                        <span className="text-lg shrink-0 w-7 text-center">{c.icon}</span>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/40'}`}>
+                            {c.label}
                           </p>
-                        )}
-                      </div>
-                      {/* Progress bar */}
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-white/6">
-                        {isActive && (
-                          <div
-                            key={mcpClient}
-                            className="h-full bg-amber-400"
-                            style={{ animation: 'progressFill 3.5s linear forwards' }}
-                            onAnimationEnd={() => {
-                              const idx = MCP_CLIENTS.findIndex(x => x.id === mcpClient);
-                              setMcpClient(MCP_CLIENTS[(idx + 1) % MCP_CLIENTS.length].id);
-                            }}
-                          />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-                <p className="text-[10px] text-slate-400 dark:text-white/20 leading-relaxed mt-4 px-2">
-                  Free &amp; public — no token or signup required.
-                </p>
-              </div>
+                          {c.sublabel && (
+                            <p className={`text-[10px] mt-0.5 transition-colors duration-300 ${isActive ? 'text-slate-500 dark:text-white/35' : 'text-slate-400 dark:text-white/20'}`}>
+                              {c.sublabel}
+                            </p>
+                          )}
+                        </div>
+                        {/* Progress bar */}
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-white/6">
+                          {isActive && (
+                            <div
+                              key={mcpClient}
+                              className="h-full bg-amber-400"
+                              style={{ animation: 'progressFill 3.5s linear forwards' }}
+                              onAnimationEnd={() => {
+                                const idx = MCP_CLIENTS.findIndex(x => x.id === mcpClient);
+                                setMcpClient(MCP_CLIENTS[(idx + 1) % MCP_CLIENTS.length].id);
+                              }}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  <p className="text-[10px] text-slate-400 dark:text-white/20 leading-relaxed mt-4 px-2">
+                    Free &amp; public — no token or signup required.
+                  </p>
+                </div>
 
-              {/* Right — config panel */}
-              <div key={mcpClient} className="p-7 flex flex-col gap-5 min-w-0" style={{ animation: 'slideRight 0.55s ease both' }}>
+                {/* Right — config panel */}
+                <div key={mcpClient} className="p-7 flex flex-col gap-5 min-w-0" style={{ animation: 'slideRight 0.55s ease both' }}>
 
-                {mcpClient === 'claude' && (
-                  <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">1 — EASIEST</span>
-                        <span className="text-sm font-medium text-slate-700 dark:text-white/70">Settings UI — no config editing</span>
+                  {mcpClient === 'claude' && (
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">1 — EASIEST</span>
+                          <span className="text-sm font-medium text-slate-700 dark:text-white/70">Settings UI — no config editing</span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                          Claude Desktop → Settings → Connectors → Add custom connector → paste this URL:
+                        </p>
+                        <div className="flex items-center gap-2 bg-slate-900 dark:bg-black/30 border border-slate-700 dark:border-white/10 rounded-xl px-4 py-2.5">
+                          <span className="font-mono text-sm text-slate-100 dark:text-white/80 flex-1 truncate">{MCP_URL}</span>
+                          <button onClick={() => copyText(MCP_URL, 'url1')} className="shrink-0 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                            {copied === 'url1' ? '✓ Copied' : 'Copy URL'}
+                          </button>
+                        </div>
                       </div>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50 px-2 py-0.5 rounded">2 — RECOMMENDED</span>
+                          <span className="text-sm font-medium text-slate-700 dark:text-white/70">Config file — modern</span>
+                        </div>
+                        <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2)}</pre>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2), 'cfg1')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                            {copied === 'cfg1' ? '✓ Copied' : 'Copy'}
+                          </button>
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-400 dark:bg-white/6 dark:text-white/35 px-2 py-0.5 rounded">3 — LEGACY FALLBACK</span>
+                          <span className="text-sm font-medium text-slate-500 dark:text-white/50">Config file — requires Node.js</span>
+                        </div>
+                        <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2)}</pre>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2), 'cfg2')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
+                            {copied === 'cfg2' ? '✓ Copied' : 'Copy'}
+                          </button>
+                          <span className="text-[10px] text-slate-400 dark:text-white/25">Use this if Method 2 shows &quot;not valid MCP server configurations&quot;.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {mcpClient === 'cursor' && (
+                    <div className="flex flex-col gap-4">
                       <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
-                        Claude Desktop → Settings → Connectors → Add custom connector → paste this URL:
+                        Open <span className="text-slate-700 dark:text-white/75 font-medium">Cursor Settings → MCP</span> and add a new server, or paste into{' '}
+                        <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">~/.cursor/mcp.json</code>
                       </p>
-                      <div className="flex items-center gap-2 bg-slate-900 dark:bg-black/30 border border-slate-700 dark:border-white/10 rounded-xl px-4 py-2.5">
-                        <span className="font-mono text-sm text-slate-100 dark:text-white/80 flex-1 truncate">{MCP_URL}</span>
-                        <button onClick={() => copyText(MCP_URL, 'url1')} className="shrink-0 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                          {copied === 'url1' ? '✓ Copied' : 'Copy URL'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50 px-2 py-0.5 rounded">2 — RECOMMENDED</span>
-                        <span className="text-sm font-medium text-slate-700 dark:text-white/70">Config file — modern</span>
-                      </div>
-                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2)}</pre>
+                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2)}</pre>
+                      <p className="text-xs text-slate-400 dark:text-white/30">No token required. Restart Cursor after saving.</p>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL } } }, null, 2), 'cfg1')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
-                          {copied === 'cfg1' ? '✓ Copied' : 'Copy'}
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2), 'cursor')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
+                          {copied === 'cursor' ? '✓ Copied' : 'Copy config'}
                         </button>
-                        <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">%APPDATA%\Cursor\User\globalStorage\cursor.mcp\mcp.json</span>
+                      </div>
+                      <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Linux</p>
+                        <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">~/.cursor/mcp.json</code>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-400 dark:bg-white/6 dark:text-white/35 px-2 py-0.5 rounded">3 — LEGACY FALLBACK</span>
-                        <span className="text-sm font-medium text-slate-500 dark:text-white/50">Config file — requires Node.js</span>
-                      </div>
-                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2)}</pre>
+                  )}
+
+                  {mcpClient === 'windsurf' && (
+                    <div className="flex flex-col gap-4">
+                      <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                        Open <span className="text-slate-700 dark:text-white/75 font-medium">Windsurf → Cascade panel → Plugin settings</span>, or edit the config file directly:
+                      </p>
+                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2)}</pre>
+                      <p className="text-xs text-slate-400 dark:text-white/30">Reload the Windsurf window after saving.</p>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { command: 'npx', args: ['-y', 'mcp-remote', MCP_URL] } } }, null, 2), 'cfg2')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-1.5 rounded-lg transition-colors">
-                          {copied === 'cfg2' ? '✓ Copied' : 'Copy'}
+                        <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2), 'windsurf')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
+                          {copied === 'windsurf' ? '✓ Copied' : 'Copy config'}
                         </button>
-                        <span className="text-[10px] text-slate-400 dark:text-white/25">Use this if Method 2 shows &quot;not valid MCP server configurations&quot;.</span>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/.codeium/windsurf/mcp_config.json</span>
+                      </div>
+                      <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Windows</p>
+                        <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">%APPDATA%\Codeium\windsurf\mcp_config.json</code>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {mcpClient === 'cursor' && (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
-                      Open <span className="text-slate-700 dark:text-white/75 font-medium">Cursor Settings → MCP</span> and add a new server, or paste into{' '}
-                      <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">~/.cursor/mcp.json</code>
-                    </p>
-                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2)}</pre>
-                    <p className="text-xs text-slate-400 dark:text-white/30">No token required. Restart Cursor after saving.</p>
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { url: MCP_URL, type: 'http' } } }, null, 2), 'cursor')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
-                        {copied === 'cursor' ? '✓ Copied' : 'Copy config'}
-                      </button>
-                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">%APPDATA%\Cursor\User\globalStorage\cursor.mcp\mcp.json</span>
+                  {mcpClient === 'vscode' && (
+                    <div className="flex flex-col gap-4">
+                      <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
+                        Requires <span className="text-slate-700 dark:text-white/75 font-medium">GitHub Copilot + VS Code ≥ 1.99</span>. Create{' '}
+                        <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">.vscode/mcp.json</code> in your project:
+                      </p>
+                      <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2)}</pre>
+                      <p className="text-xs text-slate-400 dark:text-white/30">Open Copilot Chat → Agent mode to access CeloMind tools.</p>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <button onClick={() => copyText(JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2), 'vscode')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
+                          {copied === 'vscode' ? '✓ Copied' : 'Copy config'}
+                        </button>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-white/25">.vscode/mcp.json</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Linux</p>
-                      <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">~/.cursor/mcp.json</code>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {mcpClient === 'windsurf' && (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
-                      Open <span className="text-slate-700 dark:text-white/75 font-medium">Windsurf → Cascade panel → Plugin settings</span>, or edit the config file directly:
-                    </p>
-                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2)}</pre>
-                    <p className="text-xs text-slate-400 dark:text-white/30">Reload the Windsurf window after saving.</p>
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ mcpServers: { celomind: { serverUrl: MCP_URL } } }, null, 2), 'windsurf')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
-                        {copied === 'windsurf' ? '✓ Copied' : 'Copy config'}
-                      </button>
-                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25 truncate">~/.codeium/windsurf/mcp_config.json</span>
+                  {mcpClient === 'web' && (
+                    <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                      <span className="text-5xl">🌐</span>
+                      <div>
+                        <p className="text-slate-700 dark:text-white/80 font-medium mb-1">No setup needed</p>
+                        <p className="text-sm text-slate-500 dark:text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 76 tools, zero config.</p>
+                      </div>
+                      <Link href="/chat" className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-medium text-sm px-6 py-2.5 rounded-full transition-colors">
+                        Open web chat →
+                      </Link>
                     </div>
-                    <div className="flex flex-col gap-1 pt-2 border-t border-slate-200 dark:border-white/6">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/25 mb-1">Windows</p>
-                      <code className="font-mono text-[10px] text-slate-400 dark:text-white/35">%APPDATA%\Codeium\windsurf\mcp_config.json</code>
-                    </div>
-                  </div>
-                )}
-
-                {mcpClient === 'vscode' && (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-xs text-slate-500 dark:text-white/45 leading-relaxed">
-                      Requires <span className="text-slate-700 dark:text-white/75 font-medium">GitHub Copilot + VS Code ≥ 1.99</span>. Create{' '}
-                      <code className="bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-white/65 font-mono">.vscode/mcp.json</code> in your project:
-                    </p>
-                    <pre className="bg-slate-900 dark:bg-black/40 border border-slate-700 dark:border-white/8 rounded-xl p-4 text-xs font-mono text-emerald-400 leading-relaxed overflow-x-auto">{JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2)}</pre>
-                    <p className="text-xs text-slate-400 dark:text-white/30">Open Copilot Chat → Agent mode to access CeloMind tools.</p>
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <button onClick={() => copyText(JSON.stringify({ servers: { celomind: { type: 'http', url: MCP_URL } } }, null, 2), 'vscode')} className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white/70 px-4 py-2 rounded-lg transition-colors">
-                        {copied === 'vscode' ? '✓ Copied' : 'Copy config'}
-                      </button>
-                      <span className="font-mono text-[10px] text-slate-400 dark:text-white/25">.vscode/mcp.json</span>
-                    </div>
-                  </div>
-                )}
-
-                {mcpClient === 'web' && (
-                  <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
-                    <span className="text-5xl">🌐</span>
-                    <div>
-                      <p className="text-slate-700 dark:text-white/80 font-medium mb-1">No setup needed</p>
-                      <p className="text-sm text-slate-500 dark:text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 76 tools, zero config.</p>
-                    </div>
-                    <Link href="/chat" className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-medium text-sm px-6 py-2.5 rounded-full transition-colors">
-                      Open web chat →
-                    </Link>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
         </Reveal>
       </section>
 

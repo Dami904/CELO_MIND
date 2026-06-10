@@ -1162,10 +1162,10 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         const to = req.toolArgs?.to ?? req.toolArgs?.recipientAddress;
         const parsed = to && req.toolArgs?.amount
           ? {
-              to: String(to),
-              amount: String(req.toolArgs.amount),
-              token: String(plannedTokenArg(req.toolArgs) ?? "CELO"),
-            }
+            to: String(to),
+            amount: String(req.toolArgs.amount),
+            token: String(plannedTokenArg(req.toolArgs) ?? "CELO"),
+          }
           : parseSendRequest(req.message);
         if (!parsed) return { note: "Tell me the amount, token, and recipient, e.g. \"send 5 cUSD to 0x…\"." };
         const strict = CeloTransferParamsSchema.safeParse({
@@ -1332,11 +1332,11 @@ export async function chatRoutes(app: FastifyInstance) {
       const fetched = canReusePrefetch
         ? prefetchedData
         : await fetchIntentData(currentIntent, {
-            message: chatReq.message,
-            walletAddress: chatReq.walletAddress,
-            selectedTool: chatReq.selectedTool,
-            toolArgs: currentArgs,
-          });
+          message: chatReq.message,
+          walletAddress: chatReq.walletAddress,
+          selectedTool: chatReq.selectedTool,
+          toolArgs: currentArgs,
+        });
       intentData = fetched;
       accumulatedData.push({ intent: currentIntent, data: fetched });
 

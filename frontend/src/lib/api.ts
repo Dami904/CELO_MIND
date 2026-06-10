@@ -146,29 +146,29 @@ function buildPendingTx(intent: string, intentData: unknown, transactions: Prepa
   const steps = transactions.map((t) => t.type ?? "tx").join(" → ");
 
   if (intent === "swap_execute" && isObj(d.quote)) {
-  const q = d.quote as Record<string, unknown>;
-  rows.push({ label: "Action", value: "Swap Tokens" });
-  rows.push({ label: "From", value: `${formatForDisplay(q.amountIn ?? "?")} ${formatForDisplay(q.fromToken ?? "")}` });
-  rows.push({ label: "To (est.)", value: `${formatForDisplay(q.amountOut ?? "?")} ${formatForDisplay(q.toToken ?? "")}` });
-  if (q.route) rows.push({ label: "Route", value: q.route });
-  if (d.minAmountOut) rows.push({ label: "Min received", value: d.minAmountOut });
+    const q = d.quote as Record<string, unknown>;
+    rows.push({ label: "Action", value: "Swap Tokens" });
+    rows.push({ label: "From", value: `${formatForDisplay(q.amountIn ?? "?")} ${formatForDisplay(q.fromToken ?? "")}` });
+    rows.push({ label: "To (est.)", value: `${formatForDisplay(q.amountOut ?? "?")} ${formatForDisplay(q.toToken ?? "")}` });
+    if (q.route) rows.push({ label: "Route", value: formatForDisplay(q.route) });
+    if (d.minAmountOut) rows.push({ label: "Min received", value: formatForDisplay(d.minAmountOut) });
   } else if (intent === "aave_supply") {
-  rows.push({ label: "Action", value: "Supply to Aave V3" });
-  rows.push({ label: "Asset", value: d.asset });
-  rows.push({ label: "Amount", value: d.amount });
+    rows.push({ label: "Action", value: "Supply to Aave V3" });
+    rows.push({ label: "Asset", value: formatForDisplay(d.asset) });
+    rows.push({ label: "Amount", value: formatForDisplay(d.amount) });
   } else if (intent === "launch_token") {
-  const tok = isObj(d.token) ? (d.token as Record<string, unknown>) : {};
-  rows.push({ label: "Action", value: "Deploy new ERC-20" });
-  rows.push({ label: "Name", value: tok.name });
-  rows.push({ label: "Symbol", value: tok.symbol });
-  rows.push({ label: "Supply", value: `${tok.totalSupply ?? "?"} (${tok.decimals ?? 18} decimals)` });
-  rows.push({ label: "Type", value: d.kind ?? "fixed-supply" });
+    const tok = isObj(d.token) ? (d.token as Record<string, unknown>) : {};
+    rows.push({ label: "Action", value: "Deploy new ERC-20" });
+    rows.push({ label: "Name", value: formatForDisplay(tok.name) });
+    rows.push({ label: "Symbol", value: formatForDisplay(tok.symbol) });
+    rows.push({ label: "Supply", value: `${tok.totalSupply ?? "?"} (${tok.decimals ?? 18} decimals)` });
+    rows.push({ label: "Type", value: formatForDisplay(d.kind ?? "fixed-supply") });
   } else {
-  // send / x402_pay / generic transfer
-  rows.push({ label: "Action", value: intent === "x402_pay" ? "x402 Payment" : "Transfer" });
-  if (d.token) rows.push({ label: "Asset", value: d.token });
-  if (d.amount) rows.push({ label: "Amount", value: d.amount });
-  if (d.to) rows.push({ label: "Recipient", value: d.to });
+    // send / x402_pay / generic transfer
+    rows.push({ label: "Action", value: intent === "x402_pay" ? "x402 Payment" : "Transfer" });
+    if (d.token) rows.push({ label: "Asset", value: formatForDisplay(d.token) });
+    if (d.amount) rows.push({ label: "Amount", value: formatForDisplay(d.amount) });
+    if (d.to) rows.push({ label: "Recipient", value: formatForDisplay(d.to) });
   }
 
   if (steps) rows.push({ label: "Steps", value: steps });

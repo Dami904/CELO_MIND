@@ -10,75 +10,75 @@ const toolGroups = [
   {
     label: 'Wallet',
     tools: [
-      { id: 'celo_get_balance',            title: 'Check balance',   desc: 'See how much CELO you hold' },
-      { id: 'celo_get_token_balance',       title: 'Token balances',  desc: 'Check any specific token' },
-      { id: 'get_celo_wallet_portfolio',    title: 'Full portfolio',  desc: 'Overview of all your assets' },
-      { id: 'get_celo_recent_transactions', title: 'Recent txns',     desc: 'Your last transactions' },
-      { id: 'get_celo_nft_balances',        title: 'NFT collection',  desc: 'Digital items you own' },
+      { id: 'celo_get_balance', title: 'Check balance', desc: 'See how much CELO you hold' },
+      { id: 'celo_get_token_balance', title: 'Token balances', desc: 'Check any specific token' },
+      { id: 'get_celo_wallet_portfolio', title: 'Full portfolio', desc: 'Overview of all your assets' },
+      { id: 'get_celo_recent_transactions', title: 'Recent txns', desc: 'Your last transactions' },
+      { id: 'get_celo_nft_balances', title: 'NFT collection', desc: 'Digital items you own' },
     ],
   },
   {
     label: 'Swap',
     tools: [
-      { id: 'celo_send',         title: 'Send tokens',  desc: 'Transfer CELO or tokens to anyone' },
-      { id: 'celo_swap_quote',   title: 'Swap quote',   desc: 'See exchange rate before you swap' },
+      { id: 'celo_send', title: 'Send tokens', desc: 'Transfer CELO or tokens to anyone' },
+      { id: 'celo_swap_quote', title: 'Swap quote', desc: 'See exchange rate before you swap' },
       { id: 'celo_swap_execute', title: 'Execute swap', desc: 'Trade one token for another' },
     ],
   },
   {
     label: 'Market',
     tools: [
-      { id: 'get_celo_token_price',         title: 'Token price',    desc: 'Current price of any token' },
-      { id: 'get_trending_celo_tokens',     title: 'Trending',       desc: "What's hot on Celo right now" },
-      { id: 'get_celo_top_pools',           title: 'Top pools',      desc: 'Where traders are putting money' },
-      { id: 'get_celo_yield_opportunities', title: 'Earn yield',     desc: 'Best APY on Celo right now' },
+      { id: 'get_celo_token_price', title: 'Token price', desc: 'Current price of any token' },
+      { id: 'get_trending_celo_tokens', title: 'Trending', desc: "What's hot on Celo right now" },
+      { id: 'get_celo_top_pools', title: 'Top pools', desc: 'Where traders are putting money' },
+      { id: 'get_celo_yield_opportunities', title: 'Earn yield', desc: 'Best APY on Celo right now' },
     ],
   },
   {
     label: 'Safety',
     tools: [
-      { id: 'check_malicious_transaction', title: 'Check tx',       desc: 'Is this transaction safe?' },
-      { id: 'check_contract_risk',         title: 'Check contract', desc: 'Trustworthy smart contract?' },
-      { id: 'check_token_risk',            title: 'Check token',    desc: 'Is this token a scam?' },
-      { id: 'get_whale_wallet_activity',   title: 'Whale watch',    desc: 'Watch big wallets move' },
+      { id: 'check_malicious_transaction', title: 'Check tx', desc: 'Is this transaction safe?' },
+      { id: 'check_contract_risk', title: 'Check contract', desc: 'Trustworthy smart contract?' },
+      { id: 'check_token_risk', title: 'Check token', desc: 'Is this token a scam?' },
+      { id: 'get_whale_wallet_activity', title: 'Whale watch', desc: 'Watch big wallets move' },
     ],
   },
   {
     label: 'GoodDollar',
     tools: [
-      { id: 'get_gooddollar_whitelisting_info', title: 'UBI eligibility',   desc: 'Is this address eligible for GoodDollar UBI?' },
-      { id: 'get_gooddollar_ubi_entitlement',   title: 'Claimable G$',      desc: 'How much G$ can this wallet claim today?' },
-      { id: 'get_gooddollar_reserve_quote',     title: 'Reserve quote',     desc: 'Quote a G$ swap via the GoodDollar reserve' },
-      { id: 'claim_daily_gooddollar_ubi',       title: 'Claim UBI',         desc: 'Claim your daily GoodDollar UBI on-chain' },
+      { id: 'get_gooddollar_whitelisting_info', title: 'UBI eligibility', desc: 'Is this address eligible for GoodDollar UBI?' },
+      { id: 'get_gooddollar_ubi_entitlement', title: 'Claimable G$', desc: 'How much G$ can this wallet claim today?' },
+      { id: 'get_gooddollar_reserve_quote', title: 'Reserve quote', desc: 'Quote a G$ swap via the GoodDollar reserve' },
+      { id: 'claim_daily_gooddollar_ubi', title: 'Claim UBI', desc: 'Claim your daily GoodDollar UBI on-chain' },
     ],
   },
   {
     label: 'Governance',
     tools: [
-      { id: 'get_governance_proposals', title: 'Proposals',       desc: 'Live Celo governance proposals' },
-      { id: 'get_staking_balances',     title: 'Staking info',    desc: 'Locked CELO and votes' },
-      { id: 'get_activatable_stakes',   title: 'Activate stakes', desc: 'Pending stakes to activate' },
-      { id: 'get_validator_groups',     title: 'Validators',      desc: 'Top validator groups' },
-      { id: 'get_total_staking_info',   title: 'Network staking', desc: 'Total CELO locked network-wide' },
+      { id: 'get_governance_proposals', title: 'Proposals', desc: 'Live Celo governance proposals' },
+      { id: 'get_staking_balances', title: 'Staking info', desc: 'Locked CELO and votes' },
+      { id: 'get_activatable_stakes', title: 'Activate stakes', desc: 'Pending stakes to activate' },
+      { id: 'get_validator_groups', title: 'Validators', desc: 'Top validator groups' },
+      { id: 'get_total_staking_info', title: 'Network staking', desc: 'Total CELO locked network-wide' },
     ],
   },
   {
     label: 'Carbon',
     tools: [
-      { id: 'get_carbon_strategies',     title: 'AMM strategies', desc: 'Active Carbon DeFi strategies' },
-      { id: 'get_carbon_trade_quote',    title: 'Trade quote',    desc: 'Carbon DeFi quote for a pair' },
-      { id: 'find_carbon_opportunities', title: 'Opportunities',  desc: 'Trading opportunities on Carbon' },
+      { id: 'get_carbon_strategies', title: 'AMM strategies', desc: 'Active Carbon DeFi strategies' },
+      { id: 'get_carbon_trade_quote', title: 'Trade quote', desc: 'Carbon DeFi quote for a pair' },
+      { id: 'find_carbon_opportunities', title: 'Opportunities', desc: 'Trading opportunities on Carbon' },
       { id: 'get_carbon_protocol_stats', title: 'Protocol stats', desc: 'Carbon DeFi overview' },
     ],
   },
   {
     label: 'Chain',
     tools: [
-      { id: 'get_celo_block',            title: 'Get block',      desc: 'Fetch a block by number' },
-      { id: 'get_celo_latest_blocks',    title: 'Latest blocks',  desc: 'Last N blocks on-chain' },
-      { id: 'get_celo_fee_data',         title: 'Fee data',       desc: 'Gas price and base fee' },
-      { id: 'resolve_ens_name',          title: 'Resolve ENS',    desc: 'Map a .eth name to address' },
-      { id: 'get_nft_balance',           title: 'NFT balance',    desc: 'ERC-721 balance for a wallet' },
+      { id: 'get_celo_block', title: 'Get block', desc: 'Fetch a block by number' },
+      { id: 'get_celo_latest_blocks', title: 'Latest blocks', desc: 'Last N blocks on-chain' },
+      { id: 'get_celo_fee_data', title: 'Fee data', desc: 'Gas price and base fee' },
+      { id: 'resolve_ens_name', title: 'Resolve ENS', desc: 'Map a .eth name to address' },
+      { id: 'get_nft_balance', title: 'NFT balance', desc: 'ERC-721 balance for a wallet' },
     ],
   },
 ];
@@ -86,16 +86,16 @@ const toolGroups = [
 // Context-aware action cards
 const JUMPINS = {
   disconnected: [
-    { icon: '💼', title: 'Check any wallet',       desc: 'Paste an address — see every token, NFT, and recent transaction in seconds.',  prompt: 'Show me the portfolio for 0x' },
-    { icon: '🛡️', title: 'Scan a token for risk',  desc: 'Honeypots, rug-pull traps, ownership red flags — the AI checks all of them.', prompt: 'Is this token safe to buy: ' },
-    { icon: '📈', title: 'What is trending today',  desc: 'Volume leaders, newly launched pools, and where the liquidity is moving.',      prompt: "What are the trending tokens on Celo right now?" },
-    { icon: '🗳️', title: 'Governance proposals',   desc: 'Active CGPs with titles, vote tallies, and deadline — straight from on-chain.',  prompt: 'Show me active Celo governance proposals' },
+    { icon: '💼', title: 'Check any wallet', desc: 'Paste an address — see every token, NFT, and recent transaction in seconds.', prompt: 'Show me the portfolio for 0x' },
+    { icon: '🛡️', title: 'Scan a token for risk', desc: 'Honeypots, rug-pull traps, ownership red flags — the AI checks all of them.', prompt: 'Is this token safe to buy: ' },
+    { icon: '📈', title: 'What is trending today', desc: 'Volume leaders, newly launched pools, and where the liquidity is moving.', prompt: "What are the trending tokens on Celo right now?" },
+    { icon: '🗳️', title: 'Governance proposals', desc: 'Active CGPs with titles, vote tallies, and deadline — straight from on-chain.', prompt: 'Show me active Celo governance proposals' },
   ],
   connected: [
-    { icon: '🚀', title: 'Launch a token',          desc: 'Deploy your own ERC-20 on Celo — name, symbol, supply, fixed or mintable.',    prompt: 'Launch a token called ' },
-    { icon: '🔒', title: 'Your staking position',  desc: 'Locked CELO, active votes, and any stakes waiting to be activated.',           prompt: 'Show my staking balances and locked CELO' },
-    { icon: '💸', title: 'Best yield right now',    desc: 'Top APY across Celo lending, liquidity, and GoodDollar — updated live.',       prompt: 'What are the best yield opportunities on Celo?' },
-    { icon: '🔄', title: 'Swap at the best rate',  desc: 'Quotes Mento and Uniswap V3 in parallel — picks the higher output for you.',   prompt: 'Get me the best swap quote for 10 CELO to cUSD' },
+    { icon: '🚀', title: 'Launch a token', desc: 'Deploy your own ERC-20 on Celo — name, symbol, supply, fixed or mintable.', prompt: 'Launch a token called ' },
+    { icon: '🔒', title: 'Your staking position', desc: 'Locked CELO, active votes, and any stakes waiting to be activated.', prompt: 'Show my staking balances and locked CELO' },
+    { icon: '💸', title: 'Best yield right now', desc: 'Top APY across Celo lending, liquidity, and GoodDollar — updated live.', prompt: 'What are the best yield opportunities on Celo?' },
+    { icon: '🔄', title: 'Swap at the best rate', desc: 'Quotes Mento and Uniswap V3 in parallel — picks the higher output for you.', prompt: 'Get me the best swap quote for 10 CELO to cUSD' },
   ],
 };
 
@@ -171,20 +171,20 @@ export default function DashboardPage() {
 
   const [activeGroup, setActiveGroup] = useState(0);
 
-  const [celoPrice, setCeloPrice]   = useState(null);
-  const [celoTvl, setCeloTvl]       = useState(null);
-  const [gasPrice, setGasPrice]     = useState(null);
+  const [celoPrice, setCeloPrice] = useState(null);
+  const [celoTvl, setCeloTvl] = useState(null);
+  const [gasPrice, setGasPrice] = useState(null);
 
   const [metricsOverview, setMetricsOverview] = useState(null);
-  const [metricsTools, setMetricsTools]       = useState(null);
-  const [metricsToday, setMetricsToday]       = useState(null);
-  const [avgLatencyMs, setAvgLatencyMs]       = useState(null);
-  const [timeseries7d, setTimeseries7d]       = useState([]);
-  const [selectedDay, setSelectedDay]         = useState(null); // chart day focus (null = today)
-  const [metricsLoading, setMetricsLoading]   = useState(true);
+  const [metricsTools, setMetricsTools] = useState(null);
+  const [metricsToday, setMetricsToday] = useState(null);
+  const [avgLatencyMs, setAvgLatencyMs] = useState(null);
+  const [timeseries7d, setTimeseries7d] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null); // chart day focus (null = today)
+  const [metricsLoading, setMetricsLoading] = useState(true);
 
-  const [portfolio, setPortfolio]       = useState(null);
-  const [recentTxs, setRecentTxs]       = useState(null);
+  const [portfolio, setPortfolio] = useState(null);
+  const [recentTxs, setRecentTxs] = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
 
   useEffect(() => {
@@ -195,7 +195,7 @@ export default function DashboardPage() {
         const n = parseFloat(String(d.gasPrice));
         if (Number.isFinite(n)) setGasPrice(n.toFixed(4));
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -217,7 +217,7 @@ export default function DashboardPage() {
         const vals = Object.values(models.avgLatencyMs).filter(v => v > 0);
         if (vals.length) setAvgLatencyMs(Math.round(vals.reduce((a, b) => a + b, 0) / vals.length));
       }
-    }).catch(() => {}).finally(() => setMetricsLoading(false));
+    }).catch(() => { }).finally(() => setMetricsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function DashboardPage() {
     ]).then(([b, t]) => {
       setPortfolio(Array.isArray(b?.balances) ? b.balances : null);
       setRecentTxs(Array.isArray(t?.transactions) ? t.transactions : null);
-    }).catch(() => {}).finally(() => setWalletLoading(false));
+    }).catch(() => { }).finally(() => setWalletLoading(false));
   }, [isConnected, address]);
 
   const change = celoPrice?.usd_24h_change;
@@ -262,80 +262,80 @@ export default function DashboardPage() {
 
       {/* ── Command card — dark even in light mode ── */}
       <Reveal delay={60}>
-      <div className="relative rounded-2xl overflow-hidden bg-stone-900 dark:bg-[#111009] border border-white/8">
+        <div className="relative rounded-2xl overflow-hidden bg-stone-900 dark:bg-[#111009] border border-white/8">
 
-        {/* eyehand decorative */}
-        <div className="pointer-events-none absolute right-0 top-0 w-56 h-full hidden sm:block" aria-hidden>
-          <Image
-            src="/eyehand.png"
-            alt=""
-            fill
-            className="object-cover object-right opacity-15 mix-blend-luminosity"
-            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+          {/* eyehand decorative */}
+          <div className="pointer-events-none absolute right-0 top-0 w-56 h-full hidden sm:block" aria-hidden>
+            <Image
+              src="/eyehand.png"
+              alt=""
+              fill
+              className="object-cover object-right opacity-15 mix-blend-luminosity"
+              style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+            />
+          </div>
+
+          {/* ambient gold glow */}
+          <div className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.12) 0%, transparent 70%)' }}
+            aria-hidden
           />
-        </div>
 
-        {/* ambient gold glow */}
-        <div className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(252,190,0,0.12) 0%, transparent 70%)' }}
-          aria-hidden
-        />
+          <div className="relative z-10 p-6 md:p-8">
+            {/* CELO price — large */}
+            <div className="flex flex-wrap items-end gap-4 mb-6">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-white/40 mb-1">CELO · Mainnet</p>
+                {celoPrice ? (
+                  <div className="flex items-end gap-3 animate-fade-in">
+                    <p className="font-display text-5xl font-light text-white leading-none">
+                      ${Number(celoPrice.usd).toFixed(4)}
+                    </p>
+                    {typeof change === 'number' && (
+                      <span className={`text-sm font-medium pb-1 ${changeUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {changeUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}% today
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="skeleton h-12 w-48" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                )}
+              </div>
+            </div>
 
-        <div className="relative z-10 p-6 md:p-8">
-          {/* CELO price — large */}
-          <div className="flex flex-wrap items-end gap-4 mb-6">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-white/40 mb-1">CELO · Mainnet</p>
-              {celoPrice ? (
-                <div className="flex items-end gap-3 animate-fade-in">
-                  <p className="font-display text-5xl font-light text-white leading-none">
-                    ${Number(celoPrice.usd).toFixed(4)}
-                  </p>
-                  {typeof change === 'number' && (
-                    <span className={`text-sm font-medium pb-1 ${changeUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {changeUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}% today
-                    </span>
-                  )}
+            {/* Inline secondary stats */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              {[
+                { label: 'TVL', value: celoTvl ? `$${celoTvl}M` : null },
+                { label: 'Gas', value: gasPrice ? `${gasPrice} Gwei` : null },
+                { label: 'AI tools', value: '76 loaded' },
+                { label: 'Success rate', value: successRate !== null ? `${successRate}%` : null },
+                { label: 'Avg response', value: avgLatencyMs !== null ? `${(avgLatencyMs / 1000).toFixed(1)}s` : null },
+              ].map((s, i) => (
+                <div key={s.label} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-white/15 hidden sm:block">·</span>}
+                  <span className="text-white/40 text-xs">{s.label}</span>
+                  {s.value
+                    ? <span className="text-white/80 font-medium">{s.value}</span>
+                    : <span className="inline-block h-3 w-12 rounded bg-white/10 animate-pulse" />
+                  }
                 </div>
-              ) : (
-                <div className="skeleton h-12 w-48" style={{ background: 'rgba(255,255,255,0.08)' }} />
-              )}
+              ))}
             </div>
           </div>
-
-          {/* Inline secondary stats */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-            {[
-              { label: 'TVL', value: celoTvl ? `$${celoTvl}M` : null },
-              { label: 'Gas', value: gasPrice ? `${gasPrice} Gwei` : null },
-              { label: 'AI tools', value: '76 loaded' },
-              { label: 'Success rate', value: successRate !== null ? `${successRate}%` : null },
-              { label: 'Avg response', value: avgLatencyMs !== null ? `${(avgLatencyMs/1000).toFixed(1)}s` : null },
-            ].map((s, i) => (
-              <div key={s.label} className="flex items-center gap-2">
-                {i > 0 && <span className="text-white/15 hidden sm:block">·</span>}
-                <span className="text-white/40 text-xs">{s.label}</span>
-                {s.value
-                  ? <span className="text-white/80 font-medium">{s.value}</span>
-                  : <span className="inline-block h-3 w-12 rounded bg-white/10 animate-pulse" />
-                }
-              </div>
-            ))}
-          </div>
         </div>
-      </div>
       </Reveal>
 
       {/* ── Usage numbers — borderless, no individual cards ── */}
       <Reveal delay={80} className="bg-white dark:bg-[#1A1916] rounded-2xl border border-slate-200 dark:border-white/8 shadow-sm overflow-hidden">
         <div className="grid grid-cols-2 md:grid-cols-3 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-slate-100 dark:divide-white/6">
           {[
-            { label: 'Total chats',  value: metricsOverview?.totals.chatRequests, numeric: true },
-            { label: 'Tool calls',   value: metricsOverview?.totals.toolCalls,     numeric: true },
-            { label: 'MCP calls',    value: metricsOverview?.totals.mcpToolCalls,  numeric: true, amber: true },
-            { label: 'Sessions',     value: metricsOverview?.uniqueSessions,       numeric: true },
-            { label: 'Unique users', value: metricsOverview?.uniqueUsers,          numeric: true },
-            { label: 'Top intent',   value: metricsOverview?.topIntent,            numeric: false, amber: true },
+            { label: 'Total chats', value: metricsOverview?.totals.chatRequests, numeric: true },
+            { label: 'Tool calls', value: metricsOverview?.totals.toolCalls, numeric: true },
+            { label: 'MCP calls', value: metricsOverview?.totals.mcpToolCalls, numeric: true, amber: true },
+            { label: 'Sessions', value: metricsOverview?.uniqueSessions, numeric: true },
+            { label: 'Unique users', value: metricsOverview?.uniqueUsers, numeric: true },
+            { label: 'Top intent', value: metricsOverview?.topIntent, numeric: false, amber: true },
           ].map((s) => (
             <div key={s.label} className="px-6 py-5">
               <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">{s.label}</p>
@@ -354,10 +354,10 @@ export default function DashboardPage() {
         {/* Today strip */}
         <div className="border-t border-slate-100 dark:border-white/6 grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-slate-100 dark:divide-white/6 bg-stone-50/50 dark:bg-white/2">
           {[
-            { label: 'Chats today',       value: metricsToday?.chatRequests,   fmt: v => v.toLocaleString() },
-            { label: 'Models today',      value: metricsToday?.modelCalls,     fmt: v => v.toLocaleString() },
-            { label: 'Avg response',      value: avgLatencyMs,                 fmt: v => `${(v/1000).toFixed(1)}s` },
-            { label: 'Week total',        value: weekTotal || null,            fmt: v => `${v.toLocaleString()} chats` },
+            { label: 'Chats today', value: metricsToday?.chatRequests, fmt: v => v.toLocaleString() },
+            { label: 'Models today', value: metricsToday?.modelCalls, fmt: v => v.toLocaleString() },
+            { label: 'Avg response', value: avgLatencyMs, fmt: v => `${(v / 1000).toFixed(1)}s` },
+            { label: 'Week total', value: weekTotal || null, fmt: v => `${v.toLocaleString()} chats` },
           ].map((s) => (
             <div key={s.label} className="px-6 py-3 flex items-center justify-between">
               <p className="text-xs text-slate-400 dark:text-slate-500">{s.label}</p>
@@ -466,7 +466,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
-              {[1,2,3,4,5,6].map(n => (
+              {[1, 2, 3, 4, 5, 6].map(n => (
                 <div key={n} className="flex items-center gap-3">
                   <div className="skeleton h-2 w-3 shrink-0" />
                   <div className="flex-1">
@@ -506,21 +506,21 @@ export default function DashboardPage() {
                 <Image src="/devine.png" alt="" fill className="object-cover object-center" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
-              {jumpins.map((j) => (
-                <Link
-                  key={j.title}
-                  href={`/chat?q=${encodeURIComponent(j.prompt)}`}
-                  className="group relative flex gap-4 items-start bg-white dark:bg-[#111009] border border-slate-200 dark:border-white/8 shadow-sm rounded-2xl p-5 overflow-hidden hover:border-amber-500/40 hover:shadow-md transition-all duration-200"
-                >
-                  <div className="absolute left-0 top-4 bottom-4 w-0.5 bg-amber-400/60 rounded-r group-hover:bg-amber-400 transition-colors" />
-                  <span className="text-2xl shrink-0">{j.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 dark:text-white/90 mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors">{j.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-white/40 leading-relaxed">{j.desc}</p>
-                  </div>
-                  <span className="absolute right-4 bottom-4 text-slate-300 dark:text-white/20 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all text-xs">→</span>
-                </Link>
-              ))}
+                {jumpins.map((j) => (
+                  <Link
+                    key={j.title}
+                    href={`/chat?q=${encodeURIComponent(j.prompt)}`}
+                    className="group relative flex gap-4 items-start bg-white dark:bg-[#111009] border border-slate-200 dark:border-white/8 shadow-sm rounded-2xl p-5 overflow-hidden hover:border-amber-500/40 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="absolute left-0 top-4 bottom-4 w-0.5 bg-amber-400/60 rounded-r group-hover:bg-amber-400 transition-colors" />
+                    <span className="text-2xl shrink-0">{j.icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 dark:text-white/90 mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors">{j.title}</p>
+                      <p className="text-xs text-slate-500 dark:text-white/40 leading-relaxed">{j.desc}</p>
+                    </div>
+                    <span className="absolute right-4 bottom-4 text-slate-300 dark:text-white/20 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all text-xs">→</span>
+                  </Link>
+                ))}
               </div>{/* end grid */}
             </div>{/* end relative wrapper */}
           </div>
@@ -556,7 +556,7 @@ export default function DashboardPage() {
               </div>
             ) : walletLoading ? (
               <div className="flex flex-col gap-3">
-                {[1,2,3,4].map(n => (
+                {[1, 2, 3, 4].map(n => (
                   <div key={n} className="flex items-center justify-between">
                     <div className="flex gap-3 items-center">
                       <div className="skeleton w-8 h-8 rounded-full" />
@@ -607,7 +607,7 @@ export default function DashboardPage() {
               </div>
             ) : walletLoading ? (
               <div className="flex flex-col gap-4">
-                {[1,2,3].map(n => (
+                {[1, 2, 3].map(n => (
                   <div key={n} className="flex gap-3">
                     <div className="flex flex-col items-center gap-1 pt-1">
                       <div className="skeleton w-2 h-2 rounded-full" />
@@ -702,10 +702,10 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-col gap-2">
               {[
-                { label: 'Network',      value: 'Celo Mainnet',                    ok: true },
-                { label: 'AI provider',  value: 'Connected',                       ok: true },
-                { label: 'RPC latency',  value: gasPrice ? '< 5ms' : 'Checking…', ok: !!gasPrice },
-                { label: 'MCP tools',    value: '76 loaded',                       ok: true },
+                { label: 'Network', value: 'Celo Mainnet', ok: true },
+                { label: 'AI provider', value: 'Connected', ok: true },
+                { label: 'RPC latency', value: gasPrice ? '< 5ms' : 'Checking…', ok: !!gasPrice },
+                { label: 'MCP tools', value: '76 loaded', ok: true },
               ].map((s) => (
                 <div key={s.label} className="flex items-center justify-between">
                   <span className="text-xs text-slate-500 dark:text-slate-400">{s.label}</span>
