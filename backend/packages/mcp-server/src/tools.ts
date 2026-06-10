@@ -47,6 +47,7 @@ import { resolveEnsName, reverseEnsLookup } from "./ens.js";
 import { getNftBalance, getNftTokenInfo, getErc1155Balance } from "./nft.js";
 import { checkSelfAgentId } from "./self.js";
 import { prepareX402Payment } from "./x402.js";
+import { prepareTokenLaunch } from "./token-launcher.js";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
 const ADDRESS_Z = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid EVM address");
@@ -75,6 +76,7 @@ export const TOOLS = [
   // ─── Aave ──────────────────────────────────────────────────────────────────
   { name: "celo_aave_position", description: "Get Aave V3 lending/borrowing position for a wallet on Celo", inputSchema: { type: "object", properties: { walletAddress: { type: "string" } }, required: ["walletAddress"] } },
   { name: "celo_aave_supply", description: "Supply an asset to Aave V3 on Celo (requires CELO_PRIVATE_KEY)", inputSchema: { type: "object", properties: { asset: { type: "string" }, amount: { type: "string" } }, required: ["asset", "amount"] } },
+  { name: "launch_celo_token", description: "Prepare a signable transaction to deploy a NEW ERC-20 token on Celo (fixed-supply or mintable). Returns the deploy tx for the wallet to sign — nothing deploys automatically.", inputSchema: { type: "object", properties: { name: { type: "string" }, symbol: { type: "string" }, totalSupply: { type: "string" }, decimals: { type: "number" }, mintable: { type: "boolean" }, owner: { type: "string", pattern: "^0x[0-9a-fA-F]{40}$" } }, required: ["name", "symbol", "totalSupply"] } },
   { name: "get_aave_reserves", description: "List all Aave V3 reserve assets on Celo with live supply and borrow APR", inputSchema: { type: "object", properties: {} } },
   { name: "get_mento_rates", description: "Get current live exchange rates for all Mento stable-asset pairs (CELO, cUSD, cEUR, cREAL, USDC)", inputSchema: { type: "object", properties: {} } },
   // ─── Identity ──────────────────────────────────────────────────────────────
@@ -214,6 +216,13 @@ export async function handleTool(name: string, args: Record<string, unknown>) {
       if (!owner) return err("Provide walletAddress (or set CELO_PRIVATE_KEY) to prepare Aave supply.");
       const prepared = await prepareAaveSupply(asset, amount, owner, NETWORK);
       return "error" in prepared ? err(prepared.error) : ok({ network: NETWORK, ...prepared });
+    }
+    case "launch_celo_token": {
+      const a = args as { name: string; symbol: string; totalSupply: string; decimals?: number; mintable?: boolean; owner?: string };
+      let owner = a.owner;
+      if (!owner && process.env.CELO_PRIVATE_KEY) { try { owner = getWalletClient(NETWORK).account!.address; } catch { /* ignore */ } }
+      const prepared = prepareTokenLaunch({ ...a, owner });
+      return "error" in prepared && prepared.error ? err(prepared.error) : ok({ network: NETWORK, ...prepared });
     }
     case "get_aave_reserves":
       return ok(await getAaveReserves(NETWORK));
@@ -593,6 +602,14 @@ export function createMcpServer(opts?: { onToolCall?: ToolCallHook }): McpServer
     asset: TOKEN_Z.describe("Supported asset to supply."),
     amount: AMOUNT_Z.describe("Human-readable positive amount to supply."),
     walletAddress: ADDRESS_Z.optional().describe("Wallet that will sign the supply."),
+  });
+  registerCeloTool(server, "launch_celo_token", "Prepare a signable transaction to deploy a NEW ERC-20 token on Celo. Returns the deploy tx for the wallet to review/sign — nothing deploys automatically.", {
+    name: z.string().min(1).max(64).describe("Token name, e.g. \"My Token\"."),
+    symbol: z.string().regex(/^[A-Za-z0-9]{1,11}$/).describe("Ticker symbol, 1-11 letters/digits."),
+    totalSupply: AMOUNT_Z.describe("Initial supply in whole tokens, e.g. \"1000000\"."),
+    decimals: z.number().int().min(0).max(18).optional().describe("Decimals (default 18)."),
+    mintable: z.boolean().optional().describe("If true, deployer keeps owner + mint rights; if false (default), fixed immutable supply."),
+    owner: ADDRESS_Z.optional().describe("Owner/recipient address (defaults to the signer/connected wallet)."),
   });
   registerCeloTool(server, "self_verify", "Explain how to verify identity with Self Protocol on Celo.", {});
   registerCeloTool(server, "self_agent_id_check", "Check on-chain whether an address owns a Self Agent-ID (ERC-8004) identity on Celo.", {

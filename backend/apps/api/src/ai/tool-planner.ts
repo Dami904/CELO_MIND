@@ -64,6 +64,11 @@ const TOOL_CATALOG = [
     args: { to: "0x recipient address", amount: "positive decimal string", tokenSymbolOrAddress: "supported Celo token, default CELO if unclear" },
   },
   {
+    intent: "launch_token",
+    description: "Prepare a signable transaction to deploy a NEW ERC-20 token on Celo. Use when the user asks to launch/create/deploy/make their own token or coin.",
+    args: { name: "token name", symbol: "ticker, 1-11 letters/digits", totalSupply: "initial supply in whole tokens", decimals: "optional integer 0-18, default 18", mintable: "optional boolean — true if the user wants to mint more later, else fixed supply" },
+  },
+  {
     intent: "whale_watch",
     description: "Top whale leaderboard or large-holder list. Use when no specific wallet activity address is requested.",
   },
@@ -153,7 +158,7 @@ const TOOL_CATALOG = [
   },
 ] as const;
 
-const WRITE_INTENTS: Intent[] = ["send", "swap_execute", "aave_supply", "x402_pay", "copy_wallet_prepare"];
+const WRITE_INTENTS: Intent[] = ["send", "swap_execute", "aave_supply", "x402_pay", "copy_wallet_prepare", "launch_token"];
 
 function parseJsonObject(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
@@ -191,6 +196,8 @@ function validationClarification(intent: Intent, message: string): string {
       return "Which supported Celo token's price history do you want?";
     case "get_transaction":
       return "Send me the transaction hash (0x… 64-character hex) you'd like me to look up.";
+    case "launch_token":
+      return "Tell me the token name, symbol, and supply, e.g. \"launch a token called My Coin (MYC) with 1,000,000 supply\".";
     default:
       return "I need one more detail before I can do that.";
   }
@@ -280,6 +287,11 @@ function validatePlan(plan: ChatToolPlan, input: PlannerInput): ChatToolPlan {
     case "portfolio_risk_score":
       if (!plan.args.address && !input.walletAddress && !/0x[0-9a-fA-F]{40}/.test(input.message)) {
         return { ...plan, clarification: "Provide a wallet address to score, or connect your wallet." };
+      }
+      return plan;
+    case "launch_token":
+      if (!plan.args.name || !plan.args.symbol || !(plan.args.totalSupply ?? plan.args.supply ?? plan.args.amount)) {
+        return { ...plan, clarification: validationClarification("launch_token", input.message) };
       }
       return plan;
     default:

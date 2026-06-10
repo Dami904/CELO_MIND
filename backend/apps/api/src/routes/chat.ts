@@ -52,6 +52,7 @@ import { getWhaleWalletActivity, analyzeCopyWallet, getTopCeloWhales } from "@ce
 import { getSwapQuote, prepareSwap, parseSwapRequest } from "@celomind/mcp-server/swap";
 import { prepareTransfer, parseSendRequest } from "@celomind/mcp-server/transfer";
 import { getAavePosition, prepareAaveSupply } from "@celomind/mcp-server/aave";
+import { prepareTokenLaunch } from "@celomind/mcp-server/token-launcher";
 import { checkSelfAgentId } from "@celomind/mcp-server/self";
 
 const NETWORK = resolveNetwork(process.env.CELO_NETWORK);
@@ -609,6 +610,17 @@ function formatFallbackAnswer(intent: Intent, data: unknown): string {
       if (!s?.transactions) return "Tell me the amount and asset, e.g. \"supply 10 cUSD to Aave\".";
       return `Prepared Aave V3 supply: ${s.amount} ${s.asset}.\nSteps to sign: ${(s.transactions ?? []).map((x) => x.type).join(" → ")}.\nNothing executed — confirm in your wallet.`;
     }
+    case "launch_token": {
+      const t = payload as { token?: { name?: string; symbol?: string; totalSupply?: string; decimals?: number }; kind?: string; warning?: string };
+      if (!t?.token) return "Tell me the token name, symbol, and supply to launch, e.g. \"launch My Coin (MYC) with 1,000,000 supply\".";
+      const k = t.token;
+      return [
+        `Prepared a new ${t.kind ?? "ERC-20"} token to deploy on Celo:`,
+        `• ${k.name} (${k.symbol}) — supply ${k.totalSupply}, ${k.decimals ?? 18} decimals`,
+        t.warning ? `⚠ ${t.warning}` : "",
+        "Nothing deployed yet — review and sign in your wallet to create it.",
+      ].filter(Boolean).join("\n");
+    }
     default:
       return typeof data === "string" ? data : `Here is the clean result I found:\n${JSON.stringify(data, null, 2)}`;
   }
@@ -1135,6 +1147,22 @@ async function fetchIntentData(intent: Intent, req: { message: string; walletAdd
         return { ...prepared, requires_confirmation: true };
       }
 
+      case "launch_token": {
+        const owner = wa ?? extractAddress(req.message);
+        if (!owner) return { note: "Connect your wallet (or paste your address) — that's where the new token's supply will go." };
+        const a = req.toolArgs ?? {};
+        const prepared = prepareTokenLaunch({
+          name: String(a.name ?? a.tokenName ?? ""),
+          symbol: String(a.symbol ?? a.tokenSymbol ?? ""),
+          totalSupply: String(a.totalSupply ?? a.supply ?? a.amount ?? ""),
+          decimals: a.decimals != null ? Number(a.decimals) : undefined,
+          mintable: Boolean(a.mintable),
+          owner,
+        });
+        if ("error" in prepared && prepared.error) return { note: prepared.error };
+        return { ...prepared, requires_confirmation: true };
+      }
+
       case "unsupported":
         return null;
 
@@ -1383,6 +1411,7 @@ export async function chatRoutes(app: FastifyInstance) {
       transaction_explain: { type: "risk_card" },
       send: { type: "confirmation_required" },
       swap_execute: { type: "confirmation_required" },
+      launch_token: { type: "confirmation_required" },
       swap_quote: { type: "result_card" },
       aave_position: { type: "result_card" },
       aave_supply: { type: "confirmation_required" },

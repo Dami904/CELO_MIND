@@ -194,6 +194,7 @@ export const INTENTS = [
   "swap_execute",
   "aave_position",
   "aave_supply",
+  "launch_token",
   "self_verify",
   "agent_id_check",
   "x402_pay",

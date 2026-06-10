@@ -339,7 +339,7 @@ function ChatInner() {
       for (const tx of pendingTx.transactions) {
         const hash = await walletClient.sendTransaction({
           account,
-          to: tx.to,
+          to: tx.to ?? undefined, // null → contract deployment (token launch)
           data: tx.data ?? '0x',
           value: tx.value ? BigInt(tx.value) : 0n,
         });

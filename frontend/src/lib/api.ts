@@ -13,7 +13,7 @@ export const API_BASE =
 export type CardColor = "green" | "yellow" | "red" | "default";
 
 export interface PreparedTransaction {
-  to: string;
+  to: string | null; // null = contract deployment (token launch)
   data: string;
   value: string;
   type?: string;
@@ -119,8 +119,14 @@ function extractTransactions(intentData: unknown): PreparedTransaction[] {
   if (Array.isArray(intentData.transactions)) return intentData.transactions as PreparedTransaction[];
   if (isObj(intentData.transaction)) {
     const t = intentData.transaction as Record<string, unknown>;
-    if (typeof t.to === "string") {
-      return [{ to: t.to, data: String(t.data ?? "0x"), value: String(t.value ?? "0"), type: "transfer" }];
+    const isDeploy = t.to === null && typeof t.data === "string"; // contract creation (token launch)
+    if (typeof t.to === "string" || isDeploy) {
+      return [{
+        to: isDeploy ? null : (t.to as string),
+        data: String(t.data ?? "0x"),
+        value: String(t.value ?? "0"),
+        type: isDeploy ? "deploy" : "transfer",
+      }];
     }
   }
   return [];
@@ -142,6 +148,13 @@ function buildPendingTx(intent: string, intentData: unknown, transactions: Prepa
     rows.push({ label: "Action", value: "Supply to Aave V3" });
     rows.push({ label: "Asset", value: String(d.asset ?? "") });
     rows.push({ label: "Amount", value: String(d.amount ?? "") });
+  } else if (intent === "launch_token") {
+    const tok = isObj(d.token) ? (d.token as Record<string, unknown>) : {};
+    rows.push({ label: "Action", value: "Deploy new ERC-20" });
+    rows.push({ label: "Name", value: String(tok.name ?? "") });
+    rows.push({ label: "Symbol", value: String(tok.symbol ?? "") });
+    rows.push({ label: "Supply", value: `${tok.totalSupply ?? "?"} (${tok.decimals ?? 18} decimals)` });
+    rows.push({ label: "Type", value: String(d.kind ?? "fixed-supply") });
   } else {
     // send / x402_pay / generic transfer
     rows.push({ label: "Action", value: intent === "x402_pay" ? "x402 Payment" : "Transfer" });
@@ -160,7 +173,9 @@ function buildPendingTx(intent: string, intentData: unknown, transactions: Prepa
         ? "Aave V3 Supply"
         : intent === "x402_pay"
           ? "x402 Payment"
-          : "Token Transfer";
+          : intent === "launch_token"
+            ? "Launch New Token"
+            : "Token Transfer";
   return { title, data: rows, transactions };
 }
 

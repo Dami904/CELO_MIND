@@ -92,9 +92,9 @@ const JUMPINS = {
     { icon: '🗳️', title: 'Governance proposals',   desc: 'Active CGPs with titles, vote tallies, and deadline — straight from on-chain.',  prompt: 'Show me active Celo governance proposals' },
   ],
   connected: [
+    { icon: '🚀', title: 'Launch a token',          desc: 'Deploy your own ERC-20 on Celo — name, symbol, supply, fixed or mintable.',    prompt: 'Launch a token called ' },
     { icon: '🔒', title: 'Your staking position',  desc: 'Locked CELO, active votes, and any stakes waiting to be activated.',           prompt: 'Show my staking balances and locked CELO' },
     { icon: '💸', title: 'Best yield right now',    desc: 'Top APY across Celo lending, liquidity, and GoodDollar — updated live.',       prompt: 'What are the best yield opportunities on Celo?' },
-    { icon: '🤑', title: 'GoodDollar UBI claim',   desc: "Check if you're whitelisted and how many G$ you can claim today.",             prompt: 'Check my GoodDollar UBI entitlement and whitelist status' },
     { icon: '🔄', title: 'Swap at the best rate',  desc: 'Quotes Mento and Uniswap V3 in parallel — picks the higher output for you.',   prompt: 'Get me the best swap quote for 10 CELO to cUSD' },
   ],
 };
@@ -305,7 +305,7 @@ export default function DashboardPage() {
             {[
               { label: 'TVL', value: celoTvl ? `$${celoTvl}M` : null },
               { label: 'Gas', value: gasPrice ? `${gasPrice} Gwei` : null },
-              { label: 'AI tools', value: '75 loaded' },
+              { label: 'AI tools', value: '76 loaded' },
               { label: 'Success rate', value: successRate !== null ? `${successRate}%` : null },
               { label: 'Avg response', value: avgLatencyMs !== null ? `${(avgLatencyMs/1000).toFixed(1)}s` : null },
             ].map((s, i) => (
@@ -658,7 +658,7 @@ export default function DashboardPage() {
               <div className="absolute inset-0 hidden dark:block" style={{ background: 'linear-gradient(to bottom, transparent 40%, #1A1916 100%)' }} aria-hidden />
             </div>
             <div className="p-5">
-              <h2 className="font-medium text-slate-800 dark:text-slate-200 mb-1">75 AI tools</h2>
+              <h2 className="font-medium text-slate-800 dark:text-slate-200 mb-1">76 AI tools</h2>
               <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Everything the AI can do.</p>
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {toolGroups.map((g, i) => (
@@ -702,7 +702,7 @@ export default function DashboardPage() {
                 { label: 'Network',      value: 'Celo Mainnet',                    ok: true },
                 { label: 'AI provider',  value: 'Connected',                       ok: true },
                 { label: 'RPC latency',  value: gasPrice ? '< 5ms' : 'Checking…', ok: !!gasPrice },
-                { label: 'MCP tools',    value: '75 loaded',                       ok: true },
+                { label: 'MCP tools',    value: '76 loaded',                       ok: true },
               ].map((s) => (
                 <div key={s.label} className="flex items-center justify-between">
                   <span className="text-xs text-slate-500 dark:text-slate-400">{s.label}</span>

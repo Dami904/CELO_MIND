@@ -144,6 +144,13 @@ function looksLikeNetworkPulse(message: string): boolean {
     || /\bis\s+celo\s+(busy|active|doing|healthy)\b/i.test(message);
 }
 
+// "Launch / create / deploy a token" → the token launcher (a write intent, blocked on landing).
+function looksLikeLaunchToken(message: string): boolean {
+  return /\b(launch|create|deploy|make|mint|issue|start)\b[^.]{0,24}\b(token|coin|erc-?20|memecoin|meme coin)\b/i.test(message)
+    || /\b(token|coin)\s+(launcher|deployer|factory)\b/i.test(message)
+    || /\bmy own (token|coin)\b/i.test(message);
+}
+
 const INTENT_PATTERNS: IntentPattern[] = [
   { intent: "token_balance", patterns: [/\btoken balance\b/i, /\bcusd balance\b/i, /\bceur balance\b/i, /\bbalance of\b/i] },
   { intent: "balance", patterns: [/\bbalance\b/i, /\bhow much celo\b/i, /\bmy celo\b/i] },
@@ -224,6 +231,11 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
 
   // Broad "what's happening / state of Celo" → live aggregated snapshot, before the docs catch-all.
   if (looksLikeNetworkPulse(cleaned)) return { intent: "network_pulse" };
+
+  // "Launch/create/deploy a token" → token launcher (before recent_launches / token_search).
+  if (looksLikeLaunchToken(cleaned)) {
+    return chatbotType === "landing" ? { intent: "unsupported" } : { intent: "launch_token" };
+  }
 
   if (needsBestPoolClarification(cleaned)) {
     return { intent: "unsupported", clarification: "Do you mean the highest TVL pool, the highest volume pool, or the best fee tier?" };
@@ -315,7 +327,7 @@ export function resolveIntent(message: string, chatbotType: ChatRequest["chatbot
   }
 
   // Landing chatbot is read-only — never execute write intents.
-  const writeIntents: Intent[] = ["send", "swap_execute", "aave_supply", "x402_pay", "copy_wallet_prepare"];
+  const writeIntents: Intent[] = ["send", "swap_execute", "aave_supply", "x402_pay", "copy_wallet_prepare", "launch_token"];
 
   for (const { intent, patterns } of INTENT_PATTERNS) {
     if (patterns.some((p) => p.test(cleaned))) {

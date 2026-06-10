@@ -12,7 +12,7 @@ const MCP_CLIENTS = [
   { id: 'cursor',   label: 'Cursor IDE',     sublabel: null,            icon: '⌨️', desc: 'Add via Cursor Settings → MCP, or paste the config into ~/.cursor/mcp.json and restart.' },
   { id: 'windsurf', label: 'Windsurf',       sublabel: null,            icon: '🏄', desc: 'Open the Cascade panel → Plugin settings, or edit your mcp_config.json directly.' },
   { id: 'vscode',   label: 'VS Code',        sublabel: 'Copilot',       icon: '💻', desc: 'Requires GitHub Copilot ≥ v1.99. Create .vscode/mcp.json in your project, then use Agent mode.' },
-  { id: 'web',      label: 'Web chat',       sublabel: 'no config',     icon: '🌐', desc: 'Already connected. Open the chat and start asking — 75 tools available instantly, zero setup.' },
+  { id: 'web',      label: 'Web chat',       sublabel: 'no config',     icon: '🌐', desc: 'Already connected. Open the chat and start asking — 76 tools available instantly, zero setup.' },
 ];
 
 function StickyScrollSection({ items, outerClass = '', leftClass = '', rightClass = '' }) {
@@ -132,7 +132,7 @@ export default function HomePage() {
   const [mcpClient, setMcpClient] = useState('claude');
   const [copied, setCopied] = useState('');
   const [liveStats, setLiveStats] = useState([
-    { value: '75', label: 'AI tools' },
+    { value: '76', label: 'AI tools' },
     { value: '—', label: 'CELO price' },
     { value: '—', label: 'Ecosystem TVL' },
     { value: '100%', label: 'Open source' },
@@ -148,7 +148,7 @@ export default function HomePage() {
       const gas   = d?.gasPrice   != null ? `${parseFloat(d.gasPrice).toFixed(3)} Gwei` : null;
       const change = d?.celoPrice?.usd_24h_change ?? null;
       setLiveStats([
-        { value: '75', label: 'AI tools' },
+        { value: '76', label: 'AI tools' },
         { value: price ?? '—', label: 'CELO price' },
         { value: tvl ?? '—', label: 'Ecosystem TVL' },
         { value: '100%', label: 'Open source' },
@@ -493,7 +493,7 @@ export default function HomePage() {
 
       {/* ── 75 Tools Marquee ── */}
       <div className="border-y border-stone-200 dark:border-white/8 bg-stone-50 dark:bg-[#0D0C0A] py-4 overflow-hidden select-none">
-        <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-white/15 mb-3">75 AI-powered tools</p>
+        <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-white/15 mb-3">76 AI-powered tools</p>
 
         {/* Row 1 — scrolls left */}
         <div className="overflow-hidden mb-2">
@@ -688,7 +688,7 @@ export default function HomePage() {
                     <span className="text-5xl">🌐</span>
                     <div>
                       <p className="text-slate-700 dark:text-white/80 font-medium mb-1">No setup needed</p>
-                      <p className="text-sm text-slate-500 dark:text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 75 tools, zero config.</p>
+                      <p className="text-sm text-slate-500 dark:text-white/40 max-w-xs leading-relaxed">CeloMind&apos;s web chat is already connected. Open the chat and start asking — 76 tools, zero config.</p>
                     </div>
                     <Link href="/chat" className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-medium text-sm px-6 py-2.5 rounded-full transition-colors">
                       Open web chat →
