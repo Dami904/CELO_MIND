@@ -38,9 +38,13 @@ export async function getCeloTokenPrice(coingeckoId: string): Promise<{ usd: num
       const data = await fetchJson<Record<string, { usd: number; usd_24h_change: number }>>(
         `${COINGECKO_BASE}/simple/price?ids=${coingeckoId}&vs_currencies=usd&include_24hr_change=true${keyParam}`
       );
+      if (!(coingeckoId in data)) {
+        console.warn(`[price] CoinGecko returned no entry for "${coingeckoId}" — response keys: ${Object.keys(data).join(", ") || "(empty)"}`);
+      }
       return data[coingeckoId] ?? null;
     });
-  } catch {
+  } catch (e) {
+    console.error(`[price] CoinGecko fetch failed for "${coingeckoId}": ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 }
