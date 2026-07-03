@@ -1294,9 +1294,9 @@ export async function chatRoutes(app: FastifyInstance) {
         intent,
         aiProvider: planned.plannerProvider ?? "fallback",
         plannerSource: planned.source,
-        intentData: { clarification: reply, toolArgs: planned.args },
+        intentData: null,
         conversationId: chatReq.conversationId,
-      }, { type: "result_card" });
+      }, { type: "docs_answer" });
     }
 
     // ── Agentic loop (max 5 iterations) ────────────────────────────────────────

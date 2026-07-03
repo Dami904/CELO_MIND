@@ -242,11 +242,21 @@ export async function aiComplete(opts: AICompletionOptions): Promise<AICompletio
   for (const { provider, model } of order) {
     try {
       const result = await callProvider(provider, opts, model);
-      if (result.text.trim()) return result;
+      if (result.text.trim()) {
+        if (provider !== primary) {
+          console.warn(`[ai] ${primary} unavailable — fell back to ${provider}/${model}`);
+        } else {
+          console.log(`[ai] ${provider}/${model} served request`);
+        }
+        return result;
+      }
+      console.warn(`[ai] ${provider}/${model} returned empty response, trying next provider`);
       lastErr = new Error(`${provider} returned empty response`);
     } catch (e) {
+      console.error(`[ai] ${provider}/${model} failed: ${e instanceof Error ? e.message : String(e)}`);
       lastErr = e;
     }
   }
+  console.error(`[ai] all providers exhausted: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
   throw lastErr ?? new Error("All AI providers failed");
 }

@@ -160,6 +160,21 @@ const TOOL_CATALOG = [
 
 const WRITE_INTENTS: Intent[] = ["send", "swap_execute", "aave_supply", "x402_pay", "copy_wallet_prepare", "launch_token"];
 
+// The tool catalog is dumped verbatim into the planner prompt so the model can see arg shapes.
+// Weak/fast models occasionally echo one of those literal description strings back as the
+// "clarification" value instead of writing a real question. Guard against that so it never
+// reaches the user — see PLACEHOLDER_TEXTS usage in planChatTool.
+const PLACEHOLDER_TEXTS = new Set<string>(
+  [
+    "optional short question",
+    ...TOOL_CATALOG.flatMap((t) => ("args" in t ? Object.values(t.args) : [])),
+  ].map((s) => s.trim().toLowerCase())
+);
+
+function isPlaceholderClarification(text: string | undefined): boolean {
+  return !!text && PLACEHOLDER_TEXTS.has(text.trim().toLowerCase());
+}
+
 function parseJsonObject(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
   const raw = fenced ?? text;
@@ -336,7 +351,7 @@ export async function planChatTool(input: PlannerInput): Promise<ChatToolPlan> {
     const plan: ChatToolPlan = {
       intent: parsed.data.intent,
       args: parsed.data.args,
-      clarification: parsed.data.clarification,
+      clarification: isPlaceholderClarification(parsed.data.clarification) ? undefined : parsed.data.clarification,
       source: "ai_tool_planner",
       plannerProvider: result.provider,
       plannerModel: result.model,
