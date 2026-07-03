@@ -44,6 +44,7 @@ export const CELO_TOKENS: Record<string, TokenInfo> = {
     name: "Celo Brazilian Real",
     address: "0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787",
     decimals: 18,
+    coingeckoId: "celo-real-creal",
   },
   USDC: {
     // Native Circle USDC on Celo (the widely-held one). NOT the old bridged 0xef42…6002a.
